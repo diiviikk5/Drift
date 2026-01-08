@@ -1,0 +1,561 @@
+/* === Google Fonts Import - MUST BE AT TOP === */
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================
+   DRIFT - NEO-BRUTALIST DESIGN SYSTEM
+   Raw. Bold. Unapologetic.
+   ============================================ */
+
+/* === Root Variables - Light Mode === */
+:root {
+  /* Neo-Brutalist Brand Colors */
+  --brutal-black: #0a0a0a;
+  --brutal-white: #fafafa;
+  --brutal-cream: #f5f0e6;
+  --brutal-yellow: #c9ff00;
+  --brutal-pink: #ff2d7a;
+  --brutal-blue: #00a8ff;
+  --brutal-orange: #ff6b35;
+  --brutal-purple: #a855f7;
+
+  /* Backgrounds */
+  --bg-primary: #f5f0e6;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e8e3d9;
+  --bg-accent: #c9ff00;
+
+  /* Text */
+  --text-primary: #0a0a0a;
+  --text-secondary: #333333;
+  --text-muted: #666666;
+
+  /* Borders */
+  --border-default: #0a0a0a;
+  --border-thick: 3px solid #0a0a0a;
+  --border-thicker: 4px solid #0a0a0a;
+  --border-thicc: 6px solid #0a0a0a;
+
+  /* Shadows - HARD OFFSET, NO BLUR */
+  --shadow-brutal-sm: 4px 4px 0px #0a0a0a;
+  --shadow-brutal-md: 6px 6px 0px #0a0a0a;
+  --shadow-brutal-lg: 8px 8px 0px #0a0a0a;
+  --shadow-brutal-xl: 12px 12px 0px #0a0a0a;
+  --shadow-brutal-color: 8px 8px 0px var(--brutal-pink);
+
+  /* Typography */
+  --font-mono: 'Space Mono', monospace;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Radius - Brutalist = minimal or none */
+  --radius: 0px;
+  --radius-sm: 0px;
+  --radius-md: 4px;
+
+  /* Shadcn vars */
+  --background: oklch(0.97 0.01 80);
+  --foreground: oklch(0.1 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.1 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.1 0 0);
+  --primary: oklch(0.1 0 0);
+  --primary-foreground: oklch(0.97 0.01 80);
+  --secondary: oklch(0.9 0.01 80);
+  --secondary-foreground: oklch(0.1 0 0);
+  --muted: oklch(0.9 0.01 80);
+  --muted-foreground: oklch(0.4 0 0);
+  --accent: oklch(0.88 0.2 120);
+  --accent-foreground: oklch(0.1 0 0);
+  --destructive: oklch(0.6 0.25 25);
+  --border: oklch(0.1 0 0);
+  --input: oklch(0.1 0 0);
+  --ring: oklch(0.1 0 0);
+}
+
+/* === Dark Mode - Inverted Brutalism === */
+[data-theme="dark"],
+.dark {
+  /* Inverted palette */
+  --brutal-black: #fafafa;
+  --brutal-white: #0a0a0a;
+  --brutal-cream: #1a1a1a;
+  --brutal-yellow: #c9ff00;
+  --brutal-pink: #ff2d7a;
+  --brutal-blue: #00d4ff;
+  --brutal-orange: #ff8c57;
+  --brutal-purple: #c084fc;
+
+  /* Backgrounds */
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #1a1a1a;
+  --bg-tertiary: #252525;
+  --bg-accent: #c9ff00;
+
+  /* Text */
+  --text-primary: #fafafa;
+  --text-secondary: #d4d4d4;
+  --text-muted: #888888;
+
+  /* Borders */
+  --border-default: #fafafa;
+  --border-thick: 3px solid #fafafa;
+  --border-thicker: 4px solid #fafafa;
+  --border-thicc: 6px solid #fafafa;
+
+  /* Shadows - Hard offset */
+  --shadow-brutal-sm: 4px 4px 0px #fafafa;
+  --shadow-brutal-md: 6px 6px 0px #fafafa;
+  --shadow-brutal-lg: 8px 8px 0px #fafafa;
+  --shadow-brutal-xl: 12px 12px 0px #fafafa;
+  --shadow-brutal-color: 8px 8px 0px var(--brutal-pink);
+
+  /* Shadcn vars */
+  --background: oklch(0.1 0 0);
+  --foreground: oklch(0.97 0 0);
+  --card: oklch(0.15 0 0);
+  --card-foreground: oklch(0.97 0 0);
+  --popover: oklch(0.15 0 0);
+  --popover-foreground: oklch(0.97 0 0);
+  --primary: oklch(0.97 0 0);
+  --primary-foreground: oklch(0.1 0 0);
+  --secondary: oklch(0.2 0 0);
+  --secondary-foreground: oklch(0.97 0 0);
+  --muted: oklch(0.2 0 0);
+  --muted-foreground: oklch(0.6 0 0);
+  --accent: oklch(0.88 0.2 120);
+  --accent-foreground: oklch(0.1 0 0);
+  --destructive: oklch(0.65 0.25 25);
+  --border: oklch(0.97 0 0);
+  --input: oklch(0.97 0 0);
+  --ring: oklch(0.97 0 0);
+}
+
+/* === Base Styles === */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* === Typography === */
+.font-mono {
+  font-family: var(--font-mono) !important;
+}
+
+.font-brutal {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* === Selection === */
+::selection {
+  background: var(--brutal-yellow);
+  color: #0a0a0a;
+}
+
+/* === Scrollbar - Brutalist === */
+::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+  border-left: 3px solid var(--border-default);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--brutal-yellow);
+  border: 3px solid var(--border-default);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--brutal-pink);
+}
+
+/* === Neo-Brutalist Components === */
+.brutal-box {
+  background: var(--bg-secondary);
+  border: var(--border-thick);
+  box-shadow: var(--shadow-brutal-md);
+  transition: all 0.1s ease;
+}
+
+.brutal-box:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 10px 10px 0px var(--border-default);
+}
+
+.brutal-box:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0px var(--border-default);
+}
+
+/* Brutalist Button */
+.brutal-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 32px;
+  background: var(--brutal-yellow);
+  color: #0a0a0a;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: 3px solid #0a0a0a;
+  box-shadow: 6px 6px 0px #0a0a0a;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  user-select: none;
+}
+
+.brutal-button:hover {
+  transform: translate(-3px, -3px);
+  box-shadow: 9px 9px 0px #0a0a0a;
+}
+
+.brutal-button:active {
+  transform: translate(3px, 3px);
+  box-shadow: 0px 0px 0px #0a0a0a;
+}
+
+.brutal-button-pink {
+  background: var(--brutal-pink);
+  color: white;
+}
+
+.brutal-button-outline {
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.brutal-button-outline:hover {
+  background: var(--brutal-yellow);
+  color: #0a0a0a;
+}
+
+/* Brutalist Input */
+.brutal-input {
+  width: 100%;
+  padding: 16px 20px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  border: 3px solid #0a0a0a;
+  box-shadow: 4px 4px 0px #0a0a0a;
+  outline: none;
+  transition: all 0.1s ease;
+}
+
+.brutal-input::placeholder {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.brutal-input:focus {
+  transform: translate(-2px, -2px);
+  box-shadow: 8px 8px 0px #0a0a0a;
+}
+
+/* Brutalist Card */
+.brutal-card {
+  background: var(--bg-secondary);
+  border: 3px solid #0a0a0a;
+  box-shadow: 8px 8px 0px #0a0a0a;
+  padding: 24px;
+}
+
+/* Brutalist Badge */
+.brutal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--brutal-yellow);
+  color: #0a0a0a;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: 2px solid #0a0a0a;
+}
+
+.brutal-badge-pink {
+  background: var(--brutal-pink);
+  color: white;
+  border-color: #0a0a0a;
+}
+
+/* === Grid Background === */
+.brutal-grid-bg {
+  background-image:
+    linear-gradient(var(--border-default) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-default) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.15;
+}
+
+/* Dotted Background */
+.brutal-dots-bg {
+  background-image: radial-gradient(var(--border-default) 2px, transparent 2px);
+  background-size: 24px 24px;
+  opacity: 0.3;
+}
+
+/* === Animations === */
+@keyframes brutal-shake {
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-4px) rotate(-1deg);
+  }
+
+  75% {
+    transform: translateX(4px) rotate(1deg);
+  }
+}
+
+@keyframes brutal-bounce {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes brutal-glitch {
+
+  0%,
+  100% {
+    clip-path: inset(0 0 0 0);
+    transform: translate(0);
+  }
+
+  20% {
+    clip-path: inset(20% 0 60% 0);
+    transform: translate(-4px, 2px);
+  }
+
+  40% {
+    clip-path: inset(40% 0 40% 0);
+    transform: translate(4px, -2px);
+  }
+
+  60% {
+    clip-path: inset(60% 0 20% 0);
+    transform: translate(-2px, 4px);
+  }
+
+  80% {
+    clip-path: inset(80% 0 5% 0);
+    transform: translate(2px, -4px);
+  }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes blink {
+
+  0%,
+  50% {
+    opacity: 1;
+  }
+
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-brutal-shake:hover {
+  animation: brutal-shake 0.3s ease-in-out;
+}
+
+.animate-marquee {
+  animation: marquee 20s linear infinite;
+}
+
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* === Sticker/Label Styles === */
+.brutal-sticker {
+  position: relative;
+  display: inline-block;
+  padding: 12px 24px;
+  background: var(--brutal-yellow);
+  border: 3px solid #0a0a0a;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-transform: uppercase;
+  transform: rotate(-3deg);
+  box-shadow: 4px 4px 0px #0a0a0a;
+}
+
+.brutal-sticker::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+}
+
+/* === Marker/Highlight Effect === */
+.brutal-highlight {
+  position: relative;
+  display: inline;
+}
+
+.brutal-highlight::after {
+  content: '';
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  bottom: 0;
+  height: 40%;
+  background: var(--brutal-yellow);
+  z-index: -1;
+  transform: rotate(-1deg);
+}
+
+.brutal-highlight-pink {
+  position: relative;
+  display: inline;
+}
+
+.brutal-highlight-pink::after {
+  content: '';
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  bottom: 0;
+  height: 40%;
+  background: var(--brutal-pink);
+  z-index: -1;
+  transform: rotate(-1deg);
+}
+
+/* === Torn Paper Effect === */
+.brutal-torn-top {
+  position: relative;
+}
+
+.brutal-torn-top::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 0;
+  right: 0;
+  height: 10px;
+  background: linear-gradient(135deg, var(--bg-secondary) 33.33%, transparent 33.33%),
+    linear-gradient(-135deg, var(--bg-secondary) 33.33%, transparent 33.33%);
+  background-size: 20px 100%;
+}
+
+/* === Retro Screen Effect === */
+.brutal-screen {
+  position: relative;
+  overflow: hidden;
+}
+
+.brutal-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.03) 2px,
+      rgba(0, 0, 0, 0.03) 4px);
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* === Striped Background === */
+.brutal-stripes {
+  background: repeating-linear-gradient(45deg,
+      transparent,
+      transparent 10px,
+      var(--brutal-yellow) 10px,
+      var(--brutal-yellow) 20px);
+}
+
+/* === Tailwind Theme === */
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
