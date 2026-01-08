@@ -1,42 +1,19 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 import { Resend } from "resend";
-
-// Path to store waitlist data
-const WAITLIST_FILE = path.join(process.cwd(), "waitlist.json");
 
 // Your email to receive notifications
 const NOTIFY_EMAIL = "divikstudy100@gmail.com";
 
-// Helper to read waitlist
-function getWaitlist() {
-    try {
-        if (fs.existsSync(WAITLIST_FILE)) {
-            const data = fs.readFileSync(WAITLIST_FILE, "utf-8");
-            return JSON.parse(data);
-        }
-    } catch (error) {
-        console.error("Error reading waitlist:", error);
-    }
-    return [];
-}
-
-// Helper to save waitlist
-function saveWaitlist(waitlist) {
-    fs.writeFileSync(WAITLIST_FILE, JSON.stringify(waitlist, null, 2));
-}
+// In-memory counter (resets on cold start, but that's fine for a waitlist)
+let signupCount = 0;
 
 // Send notification email
 async function sendNotificationEmail(email, position) {
     const apiKey = process.env.RESEND_API_KEY;
 
-    console.log("🔑 RESEND_API_KEY exists:", !!apiKey);
-
     if (!apiKey) {
         console.log("📧 Resend not configured. New signup:", email);
-        console.log("   Add RESEND_API_KEY to your .env.local file");
-        return;
+        return false;
     }
 
     const resend = new Resend(apiKey);
@@ -45,50 +22,33 @@ async function sendNotificationEmail(email, position) {
         await resend.emails.send({
             from: "Drift <hello@dvkk.dev>",
             to: NOTIFY_EMAIL,
-            subject: `🎉 New Drift Waitlist Signup #${position}`,
+            subject: `🎉 New Drift Waitlist Signup`,
             html: `
-        <div style="font-family: system-ui, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
-          <h2 style="color: #6366f1; margin-bottom: 20px;">New Waitlist Signup!</h2>
-          <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-            <p style="margin: 0; color: #64748b; font-size: 14px;">Email</p>
-            <p style="margin: 8px 0 0 0; color: #0f172a; font-size: 18px; font-weight: 600;">${email}</p>
+        <div style="font-family: 'Space Mono', monospace; max-width: 500px; margin: 0 auto; padding: 20px; background: #0a0a0a; color: #fafafa;">
+          <div style="border: 3px solid #c9ff00; padding: 20px; margin-bottom: 20px;">
+            <h2 style="color: #c9ff00; margin: 0 0 20px 0; font-size: 24px;">NEW SIGNUP 🎉</h2>
+            <p style="margin: 0; color: #888; font-size: 12px; text-transform: uppercase;">Email</p>
+            <p style="margin: 8px 0 0 0; color: #fafafa; font-size: 18px; font-weight: 600;">${email}</p>
           </div>
-          <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-            <p style="margin: 0; color: #64748b; font-size: 14px;">Position</p>
-            <p style="margin: 8px 0 0 0; color: #6366f1; font-size: 24px; font-weight: 700;">#${position}</p>
-          </div>
-          <p style="color: #94a3b8; font-size: 12px; margin-top: 20px;">
+          <p style="color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;">
             Sent from Drift Waitlist
           </p>
         </div>
       `,
         });
         console.log("✅ Notification email sent for:", email);
+        return true;
     } catch (error) {
         console.error("❌ Failed to send email:", error);
+        return false;
     }
 }
 
-// GET - Retrieve waitlist count (public) and all entries (for you)
-export async function GET(request) {
-    const waitlist = getWaitlist();
-
-    // Check if requesting full list (add ?full=true for admin access)
-    const { searchParams } = new URL(request.url);
-    const showFull = searchParams.get("full") === "true";
-
-    if (showFull) {
-        return NextResponse.json({
-            success: true,
-            count: waitlist.length,
-            emails: waitlist,
-        });
-    }
-
-    // Public endpoint just returns count
+// GET - Return success (count is just for display)
+export async function GET() {
     return NextResponse.json({
         success: true,
-        count: waitlist.length,
+        count: signupCount,
     });
 }
 
@@ -106,39 +66,17 @@ export async function POST(request) {
         }
 
         const normalizedEmail = email.toLowerCase().trim();
-        const waitlist = getWaitlist();
+        signupCount++;
 
-        // Check if already registered
-        const existingEntry = waitlist.find((entry) => entry.email === normalizedEmail);
-        if (existingEntry) {
-            return NextResponse.json({
-                success: true,
-                message: "You're already on the waitlist!",
-                alreadyRegistered: true,
-                count: waitlist.length,
-            });
-        }
+        console.log(`✅ New waitlist signup: ${normalizedEmail}`);
 
-        // Add new entry
-        const position = waitlist.length + 1;
-        const newEntry = {
-            email: normalizedEmail,
-            registeredAt: new Date().toISOString(),
-            position: position,
-        };
-        waitlist.push(newEntry);
-        saveWaitlist(waitlist);
-
-        console.log(`✅ New waitlist signup: ${normalizedEmail} (Total: ${waitlist.length})`);
-
-        // Send notification email (async, don't wait)
-        sendNotificationEmail(normalizedEmail, position);
+        // Send notification email
+        sendNotificationEmail(normalizedEmail, signupCount);
 
         return NextResponse.json({
             success: true,
             message: "Successfully joined the waitlist!",
-            position: position,
-            count: waitlist.length,
+            count: signupCount,
         });
     } catch (error) {
         console.error("Waitlist error:", error);
