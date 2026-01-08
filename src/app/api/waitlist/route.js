@@ -20,7 +20,7 @@ async function sendNotificationEmail(email, position) {
 
     try {
         await resend.emails.send({
-            from: "Drift <hello@dvkk.dev>",
+            from: "Drift <noreply@send.dvkk.dev>",
             to: NOTIFY_EMAIL,
             subject: `🎉 New Drift Waitlist Signup`,
             html: `
