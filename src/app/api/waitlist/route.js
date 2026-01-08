@@ -43,7 +43,7 @@ async function sendNotificationEmail(email, position) {
 
     try {
         await resend.emails.send({
-            from: "Drift <onboarding@resend.dev>", // Use your own domain after verifying
+            from: "Drift <hello@dvkk.dev>",
             to: NOTIFY_EMAIL,
             subject: `🎉 New Drift Waitlist Signup #${position}`,
             html: `
