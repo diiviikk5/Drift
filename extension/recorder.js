@@ -58,6 +58,17 @@ class Drift {
         document.getElementById('stopBtn').onclick = () => this.stopRecording();
 
         chrome.runtime.onMessage.addListener((msg) => {
+            // Toggle Hotkey Handler
+            if (msg.type === 'TOGGLE_FROM_HOTKEY') {
+                if (this.mediaRecorder?.state === 'recording') {
+                    this.trimEndMs = 500;
+                    this.stopRecording();
+                } else if (this.screenStream) {
+                    this.startRecording();
+                }
+                return;
+            }
+
             if (this.mediaRecorder?.state === 'recording') {
                 const t = Date.now() - this.startTime;
                 if (msg.type === 'CLICK_EVENT') {
@@ -66,7 +77,6 @@ class Drift {
                 } else if (msg.type === 'MOUSE_MOVE') {
                     this.mouseMoves.push({ time: t, x: msg.screenX / this.screenW, y: msg.screenY / this.screenH });
                 } else if (msg.type === 'STOP_FROM_HOTKEY') {
-                    // Trim last 2.0s (ensure no hotkey UI / notification remains)
                     this.trimEndMs = 2000;
                     this.stopRecording();
                 }

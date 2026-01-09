@@ -54,6 +54,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
         sendResponse({ ok: true });
 
+    } else if (msg.type === 'TOGGLE_RECORDING_HOTKEY') {
+        chrome.tabs.query({ url: chrome.runtime.getURL('recorder.html') }, tabs => {
+            if (tabs.length > 0) {
+                chrome.tabs.sendMessage(tabs[0].id, { type: 'TOGGLE_FROM_HOTKEY' }).catch(() => { });
+                // Only switch to recorder if we are STOPPING (isRecording=true)
+                if (isRecording) {
+                    chrome.tabs.update(tabs[0].id, { active: true });
+                }
+            }
+        });
+
     } else if ((msg.type === 'CLICK_EVENT' || msg.type === 'MOUSE_MOVE') && isRecording) {
         // Forward to recorder tab
         chrome.tabs.query({ url: chrome.runtime.getURL('recorder.html') }, tabs => {

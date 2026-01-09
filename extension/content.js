@@ -47,7 +47,7 @@
     document.addEventListener('keydown', (e) => {
         if (e.ctrlKey && e.shiftKey && e.key === 'X') {
             e.preventDefault();
-            chrome.runtime.sendMessage({ type: 'STOP_RECORDING_HOTKEY' }).catch(() => { });
+            chrome.runtime.sendMessage({ type: 'TOGGLE_RECORDING_HOTKEY' }).catch(() => { });
         }
     });
 
