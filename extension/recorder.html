@@ -217,6 +217,18 @@
             z-index: 10;
         }
 
+        .click-marker {
+            position: absolute;
+            top: 2px;
+            width: 4px;
+            height: 16px;
+            background: #0093E9;
+            border-radius: 2px;
+            pointer-events: none;
+            z-index: 12;
+            box-shadow: 0 0 4px #0093E9;
+        }
+
         /* --- STUDIO MODE STYLES (NEO-BRUTALIST) --- */
         #studioMode {
             min-height: 100vh;
@@ -562,9 +574,7 @@
 <body>
     <!-- RECORDER -->
     <div id="recorderMode">
-        <div class="status-bar" id="statusBar">
-            ⏺️ Recording: <span id="timer">00:00</span> | Clicks: <span id="clickCount">0</span>
-        </div>
+
 
         <header class="header">
             <div class="brand">Drift<span>_</span></div>
@@ -586,7 +596,8 @@
                                 Microphone</button>
                         </div>
                         <div class="tip-box">
-                            💡 <strong>Pro tip:</strong> Choose "Entire Screen" to capture URL bars and tabs!
+                            💡 <strong>Pro Tips:</strong> Choose "Entire Screen" to capture tabs. Press
+                            <strong>Ctrl+Shift+X</strong> to stop cleanly!
                         </div>
                     </div>
                 </div>
@@ -655,6 +666,12 @@
                         <button class="btn-tool" id="setStartBtn">[ Set Start</button>
                         <button class="btn-tool" id="setEndBtn">] Set End</button>
                         <button class="btn-tool" id="resetTrimBtn" style="color:#ff3366;">Reset</button>
+                    </div>
+
+                    <div class="sfx-controls" style="display:flex; gap:8px;">
+                        <button class="btn-tool" id="addClickBtn" style="color:#0093E9; border-color:#0093E9;">🔊 Add
+                            Click</button>
+                        <button class="btn-tool" id="clearClicksBtn" style="font-size:10px;">Clear SFX</button>
                     </div>
 
                     <div class="bg-selector">

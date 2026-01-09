@@ -55,53 +55,7 @@
     let indicator = null;
 
     function showRecordingIndicator() {
-        if (indicator) return;
-        indicator = document.createElement('div');
-        indicator.id = 'drift-indicator';
-        indicator.innerHTML = `
-            <style>
-                #drift-indicator {
-                    position: fixed;
-                    top: 10px;
-                    right: 10px;
-                    background: #ff3366;
-                    color: white;
-                    padding: 8px 14px;
-                    border-radius: 20px;
-                    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-                    font-size: 12px;
-                    font-weight: 600;
-                    z-index: 2147483647;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    box-shadow: 0 4px 12px rgba(255,51,102,0.4);
-                    cursor: pointer;
-                    user-select: none;
-                }
-                #drift-indicator:hover {
-                    background: #e62e5c;
-                }
-                #drift-indicator .dot {
-                    width: 8px;
-                    height: 8px;
-                    background: white;
-                    border-radius: 50%;
-                    animation: drift-blink 1s infinite;
-                }
-                @keyframes drift-blink {
-                    0%, 50% { opacity: 1; }
-                    51%, 100% { opacity: 0.3; }
-                }
-            </style>
-            <span class="dot"></span>
-            <span>REC</span>
-            <span style="opacity:0.7;font-size:10px">Ctrl+Shift+X to stop</span>
-        `;
-        indicator.onclick = () => {
-            chrome.runtime.sendMessage({ type: 'STOP_RECORDING_HOTKEY' }).catch(() => { });
-        };
-        document.body.appendChild(indicator);
+        // Disabled by user request
     }
 
     function hideRecordingIndicator() {

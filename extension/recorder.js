@@ -23,7 +23,9 @@ class Drift {
         this.startTime = null;
         this.timerInterval = null;
         this.recordingDuration = 0;
+        this.recordingDuration = 0;
         this.trimEndMs = 0; // Trim this many ms from end
+        this.audioClicks = []; // User added sound effects
 
         this.videoBlob = null;
         this.video = null;
@@ -223,17 +225,7 @@ class Drift {
             document.getElementById('statClicks').textContent = this.clicks.length;
             document.getElementById('statSize').textContent = (this.videoBlob.size / 1024 / 1024).toFixed(1) + ' MB';
 
-            const tl = document.getElementById('timeline');
-            // Remove old markers if any (keep progress and range)
-            tl.querySelectorAll('.timeline-marker').forEach(e => e.remove());
-
-            this.clicks.forEach(c => {
-                const m = document.createElement('div');
-                m.className = 'timeline-marker';
-                m.style.left = `${(c.time / 1000 / this.videoDuration) * 100}%`;
-                // Append markers but ensure they don't block clicks (pointer-events:none via css)
-                tl.appendChild(m);
-            });
+            this.updateTimelineUI();
 
             this.resetCamera();
 
@@ -290,6 +282,18 @@ class Drift {
             this.lastClickIdx = -1;
         };
 
+        document.getElementById('addClickBtn').onclick = () => {
+            const t = this.video.currentTime;
+            this.audioClicks.push(t); // Add time in seconds (video.currentTime format)
+            this.audioClicks.sort((a, b) => a - b);
+            this.updateTimelineUI();
+            this.playClickSound(); // Preview
+        };
+        document.getElementById('clearClicksBtn').onclick = () => {
+            this.audioClicks = [];
+            this.updateTimelineUI();
+        };
+
         // Backgrounds
         document.querySelectorAll('.bg-option').forEach(o => {
             o.onclick = () => {
@@ -337,15 +341,33 @@ class Drift {
         this.camera = { x: 0.5, y: 0.5, scale: 1 };
         this.target = { x: 0.5, y: 0.5, scale: 1 };
         this.activeZoom = null;
+        this.lastRenderTime = 0; // For audio tracking
     }
 
     renderLoop() {
         const loop = () => {
             this.updateCamera();
+            this.checkAudioClicks();
             this.drawFrame();
             requestAnimationFrame(loop);
         };
         loop();
+    }
+
+    checkAudioClicks() {
+        if (this.video.paused) return;
+        const now = this.video.currentTime;
+        const last = this.lastRenderTime || now;
+
+        // Find clicks between last frame and now
+        // Handle looping? If now < last, we looped.
+        if (now < last) { /* looped, ignore for simplicity or check 0..now */ }
+        else {
+            this.audioClicks.forEach(t => {
+                if (t > last && t <= now) this.playClickSound();
+            });
+        }
+        this.lastRenderTime = now;
     }
 
     updateCamera() {
@@ -558,6 +580,50 @@ class Drift {
         a.click();
     }
 
+    playClickSound(ctx = null, when = 0, dest = null) {
+        // Synthesize a nice "pop" sound
+        const audioCtx = ctx || new AudioContext();
+        const t = when || audioCtx.currentTime;
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, t);
+        osc.frequency.exponentialRampToValueAtTime(100, t + 0.1);
+
+        gain.gain.setValueAtTime(0.3, t); // Not too loud
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+
+        osc.connect(gain);
+        gain.connect(dest || audioCtx.destination);
+
+        osc.start(t);
+        osc.stop(t + 0.1);
+    }
+
+    updateTimelineUI() {
+        const tl = document.getElementById('timeline');
+        // Clear old markers (keep range & progress)
+        tl.querySelectorAll('.timeline-marker, .click-marker').forEach(e => e.remove());
+
+        // Zoom Markers (Available Clicks) - Red
+        this.clicks.forEach(c => {
+            const m = document.createElement('div');
+            m.className = 'timeline-marker';
+            m.style.left = `${(c.time / 1000 / this.videoDuration) * 100}%`;
+            tl.appendChild(m);
+        });
+
+        // Audio Click Markers - Blue
+        this.audioClicks.forEach(time => {
+            const m = document.createElement('div');
+            m.className = 'click-marker';
+            m.style.left = `${(time / this.videoDuration) * 100}%`;
+            tl.appendChild(m);
+        });
+    }
+
     async exportZoomed() {
         document.getElementById('processingOverlay').classList.remove('hidden');
 
@@ -566,10 +632,7 @@ class Drift {
         this.resetCamera();
         this.lastClickIdx = -1;
 
-        // CRITICAL: Unmute video so captureStream gets audio!
-        // We set volume to 0.05 so it's barely audible to user but exists? 
-        // No, Chrome might mute capture if volume is near 0.
-        // Let's set it to 1.0 but maybe user won't mind the "rendering sounds".
+        // Unmute for capture
         const originalMuted = this.video.muted;
         this.video.muted = false;
         this.video.volume = 1.0;
@@ -578,27 +641,33 @@ class Drift {
 
         const stream = this.canvas.captureStream(60);
 
-        // ... AUDIO SETUP ...
-        try {
-            const audioSrcStream = this.video.captureStream ? this.video.captureStream() :
-                (this.video.mozCaptureStream ? this.video.mozCaptureStream() : null);
-            if (audioSrcStream) {
-                const audioTracks = audioSrcStream.getAudioTracks();
-                if (audioTracks.length > 0) stream.addTrack(audioTracks[0]);
-            }
-        } catch (e) { }
+        // --- AUDIO MIXING FOR EXPORT ---
+        const exCtx = new AudioContext();
+        const exDest = exCtx.createMediaStreamDestination();
 
-        const chunks = [];
+        // 1. Source Video Audio
+        if (this.video.captureStream) {
+            try {
+                const vidStream = this.video.captureStream();
+                if (vidStream.getAudioTracks().length > 0) {
+                    const sourceNode = exCtx.createMediaStreamSource(vidStream);
+                    sourceNode.connect(exDest);
+                }
+            } catch (e) { }
+        }
 
-        // 2. EXPORT FORMAT: Prioritize H.264 + AAC (Universal Compatibility)
-        // Codec Ref: avc1.4d002a (H264 Main Profile), mp4a.40.2 (AAC LC)
+        // Add mixed audio track
+        if (exDest.stream.getAudioTracks().length > 0) {
+            stream.addTrack(exDest.stream.getAudioTracks()[0]);
+        }
 
+        // 2. EXPORT FORMAT
         const types = [
-            { mime: 'video/mp4; codecs="avc1.4d002a, mp4a.40.2"', ext: 'mp4' }, // Gold Standard
-            { mime: 'video/mp4; codecs=avc1.4d002a', ext: 'mp4' }, // H264 Video only?
-            { mime: 'video/mp4', ext: 'mp4' }, // Generic MP4
-            { mime: 'video/webm; codecs=h264', ext: 'mp4' }, // H264 in WebM (often works as MP4 if renamed, bit hacky but acceptable fallback)
-            { mime: 'video/webm; codecs=vp9', ext: 'webm' } // High Quality WebM
+            { mime: 'video/mp4; codecs="avc1.4d002a, mp4a.40.2"', ext: 'mp4' },
+            { mime: 'video/mp4; codecs=avc1.4d002a', ext: 'mp4' },
+            { mime: 'video/mp4', ext: 'mp4' },
+            { mime: 'video/webm; codecs=h264', ext: 'mp4' },
+            { mime: 'video/webm; codecs=vp9', ext: 'webm' }
         ];
 
         let mime = 'video/webm';
@@ -615,15 +684,19 @@ class Drift {
 
         const rec = new MediaRecorder(stream, {
             mimeType: mime,
-            videoBitsPerSecond: 15000000, // 15 Mbps for crisp text
+            videoBitsPerSecond: 15000000,
             audioBitsPerSecond: 128000
         });
+
+        const chunks = [];
         rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
         rec.onstop = () => {
+            exCtx.close();
+            this.video.muted = originalMuted;
             const blob = new Blob(chunks, { type: mime });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = `drift-trimmed-${Date.now()}.${ext}`;
+            a.download = `drift-edited-${Date.now()}.${ext}`;
             a.click();
             document.getElementById('processingOverlay').classList.add('hidden');
         };
@@ -631,15 +704,28 @@ class Drift {
         rec.start(100);
         this.video.play();
 
-        const checkEnd = () => {
-            const pct = ((this.video.currentTime - this.trimStart) / (this.trimEnd - this.trimStart)) * 100;
-            document.getElementById('progressFill').style.width = `${Math.min(pct, 100)}%`;
+        let lastExTime = this.video.currentTime;
 
-            // STOP AT TRIM END
-            // buffer of 0.1s to ensure we don't overrun
-            if (this.video.currentTime >= this.trimEnd - 0.1 || this.video.ended) {
-                console.log('[Drift] Export complete at', this.video.currentTime);
-                rec.stop();
+        const checkEnd = () => {
+            const now = this.video.currentTime;
+
+            // Audio Clicks Check
+            this.audioClicks.forEach(t => {
+                if (t > lastExTime && t <= now) {
+                    this.playClickSound(exCtx, exCtx.currentTime, exDest);
+                }
+            });
+            lastExTime = now;
+
+            const trimSeconds = (this.trimEndMs || 0) / 1000;
+            const endPoint = this.videoDuration - trimSeconds - 0.1;
+
+            const pct = ((now - this.trimStart) / (this.trimEnd - this.trimStart)) * 100;
+            const bar = document.getElementById('progressFill');
+            if (bar) bar.style.width = `${Math.min(pct, 100)}%`;
+
+            if (now >= endPoint || this.video.ended) {
+                setTimeout(() => rec.stop(), 500);
                 this.video.pause();
                 this.video.onended = null;
             } else {
@@ -648,7 +734,6 @@ class Drift {
         };
         checkEnd();
 
-        // Fallback
         this.video.onended = () => { if (rec.state === 'recording') rec.stop(); };
     }
 
