@@ -1,0 +1,507 @@
+// Drift - Cinema-Grade Auto-Zoom with Ultra-Smooth Transitions
+
+// Silky smooth easing functions
+const easeOutQuint = t => 1 - Math.pow(1 - t, 5);
+const easeInOutQuart = t => t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
+const easeOutExpo = t => t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+
+const SPEED_PRESETS = {
+    // Tighter smoothing (0.07) to catch scrolls faster, shorter hold
+    slow: { zoomIn: 700, hold: 1000, zoomOut: 700, smoothing: 0.07 },
+    normal: { zoomIn: 450, hold: 900, zoomOut: 600, smoothing: 0.1 },
+    fast: { zoomIn: 250, hold: 500, zoomOut: 350, smoothing: 0.15 }
+};
+
+class Drift {
+    constructor() {
+        this.screenStream = null;
+        this.micStream = null;
+        this.mediaRecorder = null;
+        this.recordedChunks = [];
+        this.clicks = [];
+        this.startTime = null;
+        this.timerInterval = null;
+        this.recordingDuration = 0;
+        this.trimEndMs = 0; // Trim this many ms from end
+
+        this.videoBlob = null;
+        this.video = null;
+        this.canvas = null;
+        this.ctx = null;
+        this.videoDuration = 10;
+
+        this.camera = { x: 0.5, y: 0.5, scale: 1 };
+        this.target = { x: 0.5, y: 0.5, scale: 1 };
+        this.activeZoom = null;
+        this.lastClickIdx = -1;
+
+        // Settings - slow & elegant by default
+        this.zoomLevel = 1.25;
+        this.speedPreset = 'slow';
+        this.lookAheadMs = 400; // More anticipation for slow mode
+
+        this.screenW = screen.width;
+        this.screenH = screen.height;
+
+        this.init();
+    }
+
+    get speed() { return SPEED_PRESETS[this.speedPreset]; }
+
+    init() {
+        document.getElementById('selectScreenBtn').onclick = () => this.selectScreen();
+        document.getElementById('micBtn').onclick = () => this.toggleMic();
+        document.getElementById('startBtn').onclick = () => this.startRecording();
+        document.getElementById('stopBtn').onclick = () => this.stopRecording();
+
+        chrome.runtime.onMessage.addListener((msg) => {
+            if (msg.type === 'CLICK_EVENT' && this.mediaRecorder?.state === 'recording') {
+                const t = Date.now() - this.startTime;
+                this.clicks.push({ time: t, x: msg.screenX / this.screenW, y: msg.screenY / this.screenH });
+                document.getElementById('clickCount').textContent = this.clicks.length;
+            } else if (msg.type === 'STOP_FROM_HOTKEY' && this.mediaRecorder?.state === 'recording') {
+                // Trim last 2.0s (ensure no hotkey UI / notification remains)
+                this.trimEndMs = 2000;
+                this.stopRecording();
+            }
+        });
+    }
+
+    async selectScreen() {
+        const btn = document.getElementById('selectScreenBtn');
+        try {
+            this.screenStream = await navigator.mediaDevices.getDisplayMedia({
+                video: { cursor: 'always' },
+                audio: true
+            });
+            btn.textContent = '✅ Screen selected';
+            btn.classList.add('selected');
+            document.getElementById('startBtn').disabled = false;
+
+            this.screenStream.getVideoTracks()[0].onended = () => {
+                btn.textContent = '🖥️ Select screen';
+                btn.classList.remove('selected');
+                document.getElementById('startBtn').disabled = true;
+                this.screenStream = null;
+            };
+        } catch (e) { }
+    }
+
+    async toggleMic() {
+        const btn = document.getElementById('micBtn');
+        if (this.micStream) {
+            this.micStream.getTracks().forEach(t => t.stop());
+            this.micStream = null;
+            btn.innerHTML = '<span class="indicator"></span> 🎤 Microphone';
+        } else {
+            try {
+                this.micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                btn.innerHTML = '<span class="indicator active"></span> 🎤 Mic ON';
+            } catch (e) { }
+        }
+    }
+
+    startRecording() {
+        if (!this.screenStream) return;
+
+        this.recordedChunks = [];
+        this.clicks = [];
+        this.startTime = Date.now();
+
+        chrome.runtime.sendMessage({ type: 'START_RECORDING' });
+
+        const tracks = [...this.screenStream.getTracks()];
+        if (this.micStream) tracks.push(...this.micStream.getAudioTracks());
+
+        const stream = new MediaStream(tracks);
+        const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+
+        this.mediaRecorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8000000 });
+        this.mediaRecorder.ondataavailable = e => { if (e.data.size > 0) this.recordedChunks.push(e.data); };
+        this.mediaRecorder.onstop = () => this.onStop();
+        this.mediaRecorder.start(100);
+
+        document.getElementById('statusBar').classList.add('visible');
+        document.getElementById('recordActions').classList.add('hidden');
+        document.getElementById('stopActions').classList.remove('hidden');
+
+        this.timerInterval = setInterval(() => {
+            const s = Math.floor((Date.now() - this.startTime) / 1000);
+            document.getElementById('timer').textContent =
+                `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
+        }, 1000);
+    }
+
+    stopRecording() {
+        this.recordingDuration = (Date.now() - this.startTime) / 1000;
+        if (this.mediaRecorder?.state !== 'inactive') this.mediaRecorder.stop();
+        clearInterval(this.timerInterval);
+        chrome.runtime.sendMessage({ type: 'STOP_RECORDING' });
+        document.getElementById('statusBar').classList.remove('visible');
+    }
+
+    onStop() {
+        this.videoBlob = new Blob(this.recordedChunks, { type: this.mediaRecorder.mimeType });
+        this.showStudio();
+    }
+
+    showStudio() {
+        document.getElementById('recorderMode').classList.add('hidden');
+        document.getElementById('studioMode').classList.remove('hidden');
+
+        this.video = document.getElementById('sourceVideo');
+        this.canvas = document.getElementById('outputCanvas');
+        this.ctx = this.canvas.getContext('2d');
+
+        this.video.src = URL.createObjectURL(this.videoBlob);
+
+        this.video.onloadedmetadata = () => {
+            this.videoDuration = isFinite(this.video.duration) ? this.video.duration : this.recordingDuration;
+
+            this.canvas.width = this.video.videoWidth || 1920;
+            this.canvas.height = this.video.videoHeight || 1080;
+
+            if (this.clicks.length === 0) {
+                const dur = this.videoDuration * 1000;
+                this.clicks = [
+                    { time: dur * 0.15, x: 0.3, y: 0.35 },
+                    { time: dur * 0.35, x: 0.7, y: 0.4 },
+                    { time: dur * 0.55, x: 0.5, y: 0.65 },
+                    { time: dur * 0.75, x: 0.25, y: 0.5 }
+                ];
+            }
+
+            document.getElementById('statDuration').textContent = this.fmt(this.videoDuration);
+            document.getElementById('statClicks').textContent = this.clicks.length;
+            document.getElementById('statSize').textContent = (this.videoBlob.size / 1024 / 1024).toFixed(1) + ' MB';
+
+            const tl = document.getElementById('timeline');
+            tl.innerHTML = '<div class="timeline-progress" id="timelineProgress"></div>';
+            this.clicks.forEach(c => {
+                const m = document.createElement('div');
+                m.className = 'timeline-marker';
+                m.style.left = `${(c.time / 1000 / this.videoDuration) * 100}%`;
+                tl.appendChild(m);
+            });
+
+            this.resetCamera();
+
+            // CINEMATIC INTRO: Always start zoomed in to establish focus, then drift out
+            const firstClick = this.clicks[0];
+            this.camera = {
+                x: firstClick ? firstClick.x : 0.5, // Start near first action if exists
+                y: firstClick ? firstClick.y : 0.5,
+                scale: 1.35 // Distinct intro zoom
+            };
+
+            // Immediately drift to wide view (The "Zoom Out" effect)
+            this.target = { x: 0.5, y: 0.5, scale: 1 };
+
+            this.renderLoop();
+            this.video.play().then(() => document.getElementById('playBtn').textContent = '⏸️');
+        };
+
+        this.video.ontimeupdate = () => {
+            const pct = (this.video.currentTime / this.videoDuration) * 100;
+            document.getElementById('timelineProgress').style.width = `${Math.min(pct, 100)}%`;
+            document.getElementById('timeDisplay').textContent =
+                `${this.fmt(this.video.currentTime)} / ${this.fmt(this.videoDuration)}`;
+        };
+
+        this.video.onended = () => document.getElementById('playBtn').textContent = '▶️';
+
+        // Controls
+        document.getElementById('playBtn').onclick = () => this.togglePlay();
+        document.getElementById('downloadBtn').onclick = () => this.downloadRaw();
+        document.getElementById('exportBtn').onclick = () => this.exportZoomed();
+        document.getElementById('newRecordingBtn').onclick = () => location.reload();
+        document.getElementById('timeline').onclick = e => {
+            const r = e.currentTarget.getBoundingClientRect();
+            this.video.currentTime = ((e.clientX - r.left) / r.width) * this.videoDuration;
+            this.resetCamera();
+            this.lastClickIdx = -1;
+        };
+
+        // Backgrounds
+        document.querySelectorAll('.bg-option').forEach(o => {
+            o.onclick = () => {
+                document.querySelectorAll('.bg-option').forEach(x => x.classList.remove('active'));
+                o.classList.add('active');
+                // Don't change the whole page background, just the video canvas (handled in drawFrame)
+                if (this.video.paused) this.drawFrame();
+            };
+        });
+    }
+
+    resetCamera() {
+        this.camera = { x: 0.5, y: 0.5, scale: 1 };
+        this.target = { x: 0.5, y: 0.5, scale: 1 };
+        this.activeZoom = null;
+    }
+
+    renderLoop() {
+        const loop = () => {
+            this.updateCamera();
+            this.drawFrame();
+            requestAnimationFrame(loop);
+        };
+        loop();
+    }
+
+    updateCamera() {
+        const currentMs = this.video.currentTime * 1000;
+        const sp = this.speed;
+
+        // Only check for new zoom triggers if NO zoom is active
+        // This ensures each zoom fully completes before starting a new one
+        if (!this.activeZoom) {
+            for (let i = 0; i < this.clicks.length; i++) {
+                const click = this.clicks[i];
+                const diff = currentMs - click.time;
+
+                // Look-ahead anticipation (subtle drift before click)
+                if (diff > -this.lookAheadMs && diff < 0 && i > this.lastClickIdx) {
+                    const anticipation = 1 - Math.abs(diff) / this.lookAheadMs;
+                    this.target.x = 0.5 + (click.x - 0.5) * anticipation * 0.1;
+                    this.target.y = 0.5 + (click.y - 0.5) * anticipation * 0.1;
+                }
+
+                // Trigger zoom only when time is reached and no zoom active
+                if (diff >= 0 && diff < 200 && i > this.lastClickIdx) {
+                    this.triggerZoom(click.x, click.y);
+                    this.lastClickIdx = i;
+                    break;
+                }
+            }
+        }
+
+        if (this.activeZoom) {
+            const elapsed = performance.now() - this.activeZoom.startTime;
+            const { zoomIn, hold, zoomOut } = sp;
+
+            if (elapsed < zoomIn) {
+                // Zoom IN - easeOutQuint for silky smooth start
+                const t = elapsed / zoomIn;
+                const e = easeOutQuint(t);
+                this.target.scale = 1 + (this.zoomLevel - 1) * e;
+                this.target.x = 0.5 + (this.activeZoom.x - 0.5) * e;
+                this.target.y = 0.5 + (this.activeZoom.y - 0.5) * e;
+            } else if (elapsed < zoomIn + hold) {
+                // HOLD
+                this.target.scale = this.zoomLevel;
+                this.target.x = this.activeZoom.x;
+                this.target.y = this.activeZoom.y;
+            } else if (elapsed < zoomIn + hold + zoomOut) {
+                // Zoom OUT - ultra smooth easeInOutQuart
+                const t = (elapsed - zoomIn - hold) / zoomOut;
+                const e = easeInOutQuart(t);
+                this.target.scale = this.zoomLevel - (this.zoomLevel - 1) * e;
+                this.target.x = this.activeZoom.x + (0.5 - this.activeZoom.x) * e;
+                this.target.y = this.activeZoom.y + (0.5 - this.activeZoom.y) * e;
+            } else {
+                this.target = { x: 0.5, y: 0.5, scale: 1 };
+                this.activeZoom = null;
+            }
+        }
+
+        // Smooth interpolation
+        this.camera.x += (this.target.x - this.camera.x) * sp.smoothing;
+        this.camera.y += (this.target.y - this.camera.y) * sp.smoothing;
+        this.camera.scale += (this.target.scale - this.camera.scale) * sp.smoothing;
+    }
+
+    triggerZoom(x, y) {
+        this.activeZoom = {
+            x: Math.max(0.15, Math.min(0.85, x)),
+            y: Math.max(0.15, Math.min(0.85, y)),
+            startTime: performance.now()
+        };
+    }
+
+    drawFrame() {
+        const c = this.canvas;
+        const ctx = this.ctx;
+        const v = this.video;
+        const cam = this.camera;
+
+        // 1. Draw Background (Gradient) based on active selection
+        const activeBg = document.querySelector('.bg-option.active');
+        const bgName = activeBg ? activeBg.dataset.bg : 'aurora';
+        const bgs = {
+            aurora: ['#1a1a2e', '#2d1b4e', '#1e3a5f'],
+            sunset: ['#ff6b6b', '#feca57', '#ff9ff3'],
+            ocean: ['#0093E9', '#80D0C7'],
+            forest: ['#134E5E', '#71B280'],
+            nightsky: ['#0f0c29', '#302b63', '#24243e'],
+            candy: ['#a855f7', '#ec4899', '#f43f5e']
+        };
+
+        const g = ctx.createLinearGradient(0, 0, c.width, c.height);
+        const colors = bgs[bgName] || bgs.aurora;
+        colors.forEach((col, i) => g.addColorStop(i / (colors.length - 1), col));
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, c.width, c.height);
+
+        if (v.readyState >= 2) {
+            ctx.save();
+
+            // VIDEO DIMENSIONS (Scaled down slightly to show background frame)
+            const frameScale = 0.85;
+            const vw = c.width * frameScale;
+            // Maintain aspect ratio
+            const vh = (v.videoHeight / v.videoWidth) * vw;
+
+            // Center position
+            const cx = c.width / 2;
+            const cy = c.height / 2;
+
+            // Apply Camera Transform (Zooming relative to center)
+            ctx.translate(cx, cy);
+            ctx.scale(cam.scale, cam.scale);
+
+            // Pan camera (move content opposite to target)
+            // Scaling pan relative to video size so it tracks correctly
+            const panX = (cam.x - 0.5) * vw;
+            const panY = (cam.y - 0.5) * vh;
+            ctx.translate(-panX, -panY);
+
+            // Draw Container (Mac Window Style)
+            // Shadow
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.shadowBlur = 50;
+            ctx.shadowOffsetY = 30;
+
+            const r = 16; // Corner radius
+            const x = -vw / 2; // Centered relative to current transform
+            const y = -vh / 2;
+            const w = vw;
+            const h = vh;
+
+            // Window Background (black backing)
+            ctx.fillStyle = '#000';
+            this.roundRect(ctx, x, y, w, h, r);
+            ctx.fill();
+
+            // Reset shadow for content
+            ctx.shadowColor = 'transparent';
+
+            // Clip for video
+            ctx.save();
+            this.roundRect(ctx, x, y, w, h, r);
+            ctx.clip();
+
+            // Draw Video
+            ctx.drawImage(v, x, y, w, h);
+            ctx.restore();
+
+            // Draw Border / Highlights (Glass effect)
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 1;
+            this.roundRect(ctx, x, y, w, h, r);
+            ctx.stroke();
+
+            // Draw Traffic Lights (Mac Buttons)
+            const bx = x + 20;
+            const by = y + 20;
+            const gap = 24;
+
+            // Red
+            ctx.fillStyle = '#FF5F56';
+            ctx.beginPath(); ctx.arc(bx, by, 6, 0, Math.PI * 2); ctx.fill();
+            // Yellow
+            ctx.fillStyle = '#FFBD2E';
+            ctx.beginPath(); ctx.arc(bx + gap, by, 6, 0, Math.PI * 2); ctx.fill();
+            // Green
+            ctx.fillStyle = '#27C93F';
+            ctx.beginPath(); ctx.arc(bx + gap * 2, by, 6, 0, Math.PI * 2); ctx.fill();
+
+            ctx.restore();
+        }
+    }
+
+    togglePlay() {
+        if (this.video.paused) {
+            this.video.play();
+            document.getElementById('playBtn').textContent = '⏸️';
+        } else {
+            this.video.pause();
+            document.getElementById('playBtn').textContent = '▶️';
+        }
+    }
+
+    downloadRaw() {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(this.videoBlob);
+        a.download = `drift-${Date.now()}.webm`;
+        a.click();
+    }
+
+    async exportZoomed() {
+        document.getElementById('processingOverlay').classList.remove('hidden');
+
+        this.video.pause();
+        this.video.currentTime = 0;
+        this.resetCamera();
+        this.lastClickIdx = -1;
+
+        await new Promise(r => setTimeout(r, 300));
+
+        const stream = this.canvas.captureStream(60);
+        const chunks = [];
+        const rec = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 12000000 });
+
+        rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+        rec.onstop = () => {
+            const blob = new Blob(chunks, { type: 'video/webm' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `drift-zoomed-${Date.now()}.webm`;
+            a.click();
+            document.getElementById('processingOverlay').classList.add('hidden');
+        };
+
+        rec.start(100);
+        this.video.play();
+
+        const checkEnd = () => {
+            const pct = (this.video.currentTime / this.videoDuration) * 100;
+            document.getElementById('progressFill').style.width = `${Math.min(pct, 100)}%`;
+
+            const trimSeconds = (this.trimEndMs || 0) / 1000;
+            const endPoint = this.videoDuration - trimSeconds - 0.1;
+
+            if (this.video.currentTime >= endPoint) {
+                console.log('[Drift] Export complete (trimmed ' + trimSeconds + 's)');
+                rec.stop();
+                this.video.pause();
+                this.video.onended = null; // Prevent double trigger
+            } else if (!this.video.ended && this.video.currentTime < endPoint) {
+                requestAnimationFrame(checkEnd);
+            }
+        };
+        checkEnd();
+
+        // Fallback
+        this.video.onended = () => { if (rec.state === 'recording') rec.stop(); };
+    }
+
+    fmt(s) {
+        return `${Math.floor(s / 60).toString().padStart(2, '0')}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
+    }
+
+    roundRect(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => new Drift());
