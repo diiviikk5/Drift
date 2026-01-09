@@ -119,7 +119,11 @@ class Drift {
     }
 
     startRecording() {
-        if (!this.screenStream) return;
+        if (!this.screenStream || !this.screenStream.active) {
+            alert('Screen stream lost. Please select screen again.');
+            this.selectScreen();
+            return;
+        }
 
         // internal state
         this.startPos = document.getElementById('startPosSelect').value;
