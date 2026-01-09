@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 320px;
+            font-family: 'Space Mono', monospace;
+            background: #0a0a0f;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 3px solid #DCFE50;
+        }
+
+        .logo {
+            font-size: 18px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .logo span {
+            color: #ff3366;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 16px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: 3px solid #333;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .btn:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 4px 4px 0 #333;
+        }
+
+        .btn-primary {
+            background: #DCFE50;
+            color: #000;
+        }
+
+        .info {
+            font-size: 11px;
+            color: #888;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        .info a {
+            color: #DCFE50;
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div class="logo">Drift<span>_</span></div>
+    </div>
+
+    <button class="btn btn-primary" id="launchBtn">
+        🎬 Launch Recorder
+    </button>
+
+    <p class="info">
+        Opens a new tab with the full recording interface.<br><br>
+        <a href="http://localhost:3000/studio" target="_blank">Open Editor →</a>
+    </p>
+
+    <script>
+        document.getElementById('launchBtn').onclick = () => {
+            chrome.tabs.create({ url: chrome.runtime.getURL('recorder.html') });
+            window.close();
+        };
+    </script>
+</body>
+
+</html>
