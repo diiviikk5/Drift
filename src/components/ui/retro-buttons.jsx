@@ -294,3 +294,5 @@ const GlitchWrapper = styled.div`
     80% { transform: translate(-3px, 0); }
   }
 `;
+
+
