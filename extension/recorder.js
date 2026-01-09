@@ -547,13 +547,35 @@ class Drift {
         } catch (e) { }
 
         const chunks = [];
-        // ... MP4 SETUP ...
-        let mime = 'video/webm;codecs=vp9';
-        let ext = 'webm';
-        if (MediaRecorder.isTypeSupported('video/mp4')) { mime = 'video/mp4'; ext = 'mp4'; }
-        else if (MediaRecorder.isTypeSupported('video/webm;codecs=h264')) { mime = 'video/webm;codecs=h264'; }
 
-        const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 12000000 });
+        // 2. EXPORT FORMAT: Prioritize H.264 + AAC (Universal Compatibility)
+        // Codec Ref: avc1.4d002a (H264 Main Profile), mp4a.40.2 (AAC LC)
+
+        const types = [
+            { mime: 'video/mp4; codecs="avc1.4d002a, mp4a.40.2"', ext: 'mp4' }, // Gold Standard
+            { mime: 'video/mp4; codecs=avc1.4d002a', ext: 'mp4' }, // H264 Video only?
+            { mime: 'video/mp4', ext: 'mp4' }, // Generic MP4
+            { mime: 'video/webm; codecs=h264', ext: 'mp4' }, // H264 in WebM (often works as MP4 if renamed, bit hacky but acceptable fallback)
+            { mime: 'video/webm; codecs=vp9', ext: 'webm' } // High Quality WebM
+        ];
+
+        let mime = 'video/webm';
+        let ext = 'webm';
+
+        for (const t of types) {
+            if (MediaRecorder.isTypeSupported(t.mime)) {
+                mime = t.mime;
+                ext = t.ext;
+                console.log(`[Drift] Using compatible format: ${mime}`);
+                break;
+            }
+        }
+
+        const rec = new MediaRecorder(stream, {
+            mimeType: mime,
+            videoBitsPerSecond: 15000000, // 15 Mbps for crisp text
+            audioBitsPerSecond: 128000
+        });
         rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
         rec.onstop = () => {
             const blob = new Blob(chunks, { type: mime });
