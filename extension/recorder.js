@@ -474,15 +474,49 @@ class Drift {
         await new Promise(r => setTimeout(r, 300));
 
         const stream = this.canvas.captureStream(60);
+
+        // 1. FIX AUDIO: Capture audio from the playing video element
+        try {
+            // Standard or vendor-prefixed captureStream
+            const audioSrcStream = this.video.captureStream ? this.video.captureStream() :
+                (this.video.mozCaptureStream ? this.video.mozCaptureStream() : null);
+
+            if (audioSrcStream) {
+                const audioTracks = audioSrcStream.getAudioTracks();
+                if (audioTracks.length > 0) {
+                    stream.addTrack(audioTracks[0]);
+                    console.log('[Drift] Audio track added to export');
+                } else {
+                    console.warn('[Drift] No audio tracks found in source video');
+                }
+            }
+        } catch (e) {
+            console.error('[Drift] Failed to capture audio for export:', e);
+        }
+
         const chunks = [];
-        const rec = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 12000000 });
+
+        // 2. MP4 SUPPORT: Prefer MP4 if available
+        let mime = 'video/webm;codecs=vp9'; // Default high-quality WebM
+        let ext = 'webm';
+
+        if (MediaRecorder.isTypeSupported('video/mp4')) {
+            mime = 'video/mp4';
+            ext = 'mp4';
+            console.log('[Drift] Exporting as native MP4');
+        } else if (MediaRecorder.isTypeSupported('video/webm;codecs=h264')) {
+            // Some browsers support H.264 in WebM container, which is friendlier
+            mime = 'video/webm;codecs=h264';
+        }
+
+        const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 12000000 });
 
         rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
         rec.onstop = () => {
-            const blob = new Blob(chunks, { type: 'video/webm' });
+            const blob = new Blob(chunks, { type: mime });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = `drift-zoomed-${Date.now()}.webm`;
+            a.download = `drift-zoomed-${Date.now()}.${ext}`;
             a.click();
             document.getElementById('processingOverlay').classList.add('hidden');
         };
