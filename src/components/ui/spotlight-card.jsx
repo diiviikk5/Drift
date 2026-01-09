@@ -153,3 +153,5 @@ export function SpotlightGridCard({
         </motion.div>
     );
 }
+
+
