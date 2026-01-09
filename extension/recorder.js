@@ -19,6 +19,7 @@ class Drift {
         this.mediaRecorder = null;
         this.recordedChunks = [];
         this.clicks = [];
+        this.mouseMoves = [];
         this.startTime = null;
         this.timerInterval = null;
         this.recordingDuration = 0;
@@ -55,14 +56,18 @@ class Drift {
         document.getElementById('stopBtn').onclick = () => this.stopRecording();
 
         chrome.runtime.onMessage.addListener((msg) => {
-            if (msg.type === 'CLICK_EVENT' && this.mediaRecorder?.state === 'recording') {
+            if (this.mediaRecorder?.state === 'recording') {
                 const t = Date.now() - this.startTime;
-                this.clicks.push({ time: t, x: msg.screenX / this.screenW, y: msg.screenY / this.screenH });
-                document.getElementById('clickCount').textContent = this.clicks.length;
-            } else if (msg.type === 'STOP_FROM_HOTKEY' && this.mediaRecorder?.state === 'recording') {
-                // Trim last 2.0s (ensure no hotkey UI / notification remains)
-                this.trimEndMs = 2000;
-                this.stopRecording();
+                if (msg.type === 'CLICK_EVENT') {
+                    this.clicks.push({ time: t, x: msg.screenX / this.screenW, y: msg.screenY / this.screenH });
+                    document.getElementById('clickCount').textContent = this.clicks.length;
+                } else if (msg.type === 'MOUSE_MOVE') {
+                    this.mouseMoves.push({ time: t, x: msg.screenX / this.screenW, y: msg.screenY / this.screenH });
+                } else if (msg.type === 'STOP_FROM_HOTKEY') {
+                    // Trim last 2.0s (ensure no hotkey UI / notification remains)
+                    this.trimEndMs = 2000;
+                    this.stopRecording();
+                }
             }
         });
     }
@@ -255,6 +260,7 @@ class Drift {
         // Only check for new zoom triggers if NO zoom is active
         // This ensures each zoom fully completes before starting a new one
         if (!this.activeZoom) {
+            // Priority 1: Check for clicks to trigger zoom
             for (let i = 0; i < this.clicks.length; i++) {
                 const click = this.clicks[i];
                 const diff = currentMs - click.time;
@@ -272,6 +278,27 @@ class Drift {
                     this.lastClickIdx = i;
                     break;
                 }
+            }
+
+            // Priority 2: If no click is imminent/active, FOLLOW THE MOUSE (General Flow)
+            // find the last mouse move before current time
+            // Simple binary search or just iterate (moves are sorted)
+            // Optimization: start from recent index
+            let bestMove = null;
+            for (let i = this.mouseMoves.length - 1; i >= 0; i--) {
+                if (this.mouseMoves[i].time <= currentMs) {
+                    bestMove = this.mouseMoves[i];
+                    break;
+                }
+            }
+
+            if (bestMove) {
+                // Gently drift camera towards mouse position, but keep scale at 1.0 (Full View)
+                // We map mouse (0-1) to target x/y. 
+                // We use a "soft follow" - don't center hard, just bias towards it.
+                this.target.x = bestMove.x;
+                this.target.y = bestMove.y;
+                this.target.scale = 1.0;
             }
         }
 
