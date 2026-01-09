@@ -311,8 +311,12 @@ export class StudioEngine {
     async exportVideo(onProgress) {
         this.video.pause();
         this.video.currentTime = 0;
+
+        // Reset ALL zoom state for fresh export
         this.activeZoom = null;
+        this.lastClickIdx = -1; // Critical: Reset to allow all clicks to trigger
         this.camera = { x: 0.5, y: 0.5, scale: 1 };
+        this.target = { x: 0.5, y: 0.5, scale: 1 };
 
         await new Promise(r => setTimeout(r, 500)); // buffer
 

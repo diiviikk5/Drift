@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 
+export const dynamic = 'force-dynamic';
+
 // Your email to receive notifications
 const NOTIFY_EMAIL = "divikstudy100@gmail.com";
 

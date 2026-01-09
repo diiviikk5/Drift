@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, screen, desktopCapturer } = require('electron');
 const path = require('path');
+const { startNextServer, stopNextServer } = require('./server');
 
 // Safe Import for Global Input Hook
 let uIOhook, UiohookKey;
@@ -34,14 +35,8 @@ function createWindow() {
         }
     });
 
-    // In production, load from the packaged static export
-    if (app.isPackaged) {
-        mainWindow.loadFile(path.join(__dirname, '../.next-electron/recorder.html'));
-    } else {
-        // In dev mode, use the Next.js dev server
-        const startUrl = process.env.ELECTRON_START_URL || 'http://localhost:3000/recorder';
-        mainWindow.loadURL(startUrl);
-    }
+    const startUrl = process.env.ELECTRON_START_URL || 'http://localhost:3000/recorder';
+    mainWindow.loadURL(startUrl);
 
     // Open DevTools in dev mode (uncomment for debugging)
     // mainWindow.webContents.openDevTools();
@@ -96,10 +91,16 @@ function setupInputHooks() {
     } catch (e) { console.error("Failed to start input hook", e); }
 }
 
-app.on('ready', createWindow);
+app.on('ready', async () => {
+    if (app.isPackaged) {
+        await startNextServer();
+    }
+    createWindow();
+});
 
 app.on('window-all-closed', () => {
     if (uIOhook) uIOhook.stop();
+    if (app.isPackaged) stopNextServer();
     if (process.platform !== 'darwin') app.quit();
 });
 

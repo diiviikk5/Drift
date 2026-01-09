@@ -255,6 +255,15 @@ export default function RecorderPage() {
         setExportProgress(0);
     };
 
+    // Export raw recording without any effects
+    const handleRawExport = () => {
+        if (!recordedBlob) return;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(recordedBlob);
+        a.download = `drift-raw-${Date.now()}.webm`;
+        a.click();
+    };
+
     const formatTime = (s) => {
         const m = Math.floor(s / 60).toString().padStart(2, '0');
         const sec = Math.floor(s % 60).toString().padStart(2, '0');
@@ -449,7 +458,13 @@ export default function RecorderPage() {
                                         onClick={handleExport}
                                         disabled={isExporting}
                                     >
-                                        {isExporting ? `⚡ Exporting ${exportProgress}%` : '⚡ EXPORT VIDEO'}
+                                        {isExporting ? `⚡ Exporting ${exportProgress}%` : '⚡ EXPORT WITH EFFECTS'}
+                                    </button>
+                                    <button
+                                        className="w-full py-2 bg-white/5 text-gray-300 text-sm font-medium rounded-lg border border-white/10 hover:bg-white/10 transition-all"
+                                        onClick={handleRawExport}
+                                    >
+                                        📁 Download Raw Recording
                                     </button>
                                 </div>
                             </div>

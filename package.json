@@ -10,7 +10,7 @@
     "build": "next build",
     "start": "next start",
     "electron-dev": "npx concurrently -k \"npx cross-env BROWSER=none npm run dev\" \"npx wait-on http://127.0.0.1:3000 && npx electron .\"",
-    "electron-build": "npx cross-env ELECTRON_BUILD=true next build && npx electron-builder build --win --publish never"
+    "electron-build": "npm run build && npx electron-builder build --win --publish never"
   },
   "build": {
     "appId": "com.drift.desktop",
@@ -20,13 +20,15 @@
     },
     "files": [
       "electron/**/*",
-      ".next-electron/**/*",
+      ".next/**/*",
+      "node_modules/next/**/*",
+      "node_modules/react/**/*",
+      "node_modules/react-dom/**/*",
       "public/**/*",
       "package.json",
       "!src/**/*",
       "!extension/**/*",
-      "!build/**/*",
-      "!.next/**/*"
+      "!build/**/*"
     ],
     "win": {
       "target": [
