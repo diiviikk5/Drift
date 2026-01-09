@@ -54,8 +54,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
         sendResponse({ ok: true });
 
-    } else if (msg.type === 'CLICK_EVENT' && isRecording) {
-        // Forward click to recorder tab
+    } else if ((msg.type === 'CLICK_EVENT' || msg.type === 'MOUSE_MOVE') && isRecording) {
+        // Forward to recorder tab
         chrome.tabs.query({ url: chrome.runtime.getURL('recorder.html') }, tabs => {
             if (tabs.length > 0) {
                 chrome.tabs.sendMessage(tabs[0].id, msg).catch(() => { });
