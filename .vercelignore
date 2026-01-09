@@ -1,0 +1,20 @@
+# Electron build outputs
+dist/
+build/
+
+# Electron source
+electron/
+
+# Extension
+extension/
+extension.crx
+
+# Large media files
+*.mp4
+*.zip
+
+# Node modules (handled by Vercel)
+node_modules/
+
+# Development cache
+.next/cache/
