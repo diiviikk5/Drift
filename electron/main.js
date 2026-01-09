@@ -34,8 +34,14 @@ function createWindow() {
         }
     });
 
-    const startUrl = process.env.ELECTRON_START_URL || 'http://localhost:3000/recorder';
-    mainWindow.loadURL(startUrl);
+    // In production, load from the packaged static export
+    if (app.isPackaged) {
+        mainWindow.loadFile(path.join(__dirname, '../.next-electron/recorder.html'));
+    } else {
+        // In dev mode, use the Next.js dev server
+        const startUrl = process.env.ELECTRON_START_URL || 'http://localhost:3000/recorder';
+        mainWindow.loadURL(startUrl);
+    }
 
     // Open DevTools in dev mode (uncomment for debugging)
     // mainWindow.webContents.openDevTools();
