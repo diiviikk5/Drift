@@ -117,15 +117,51 @@ class Drift {
 
         chrome.runtime.sendMessage({ type: 'START_RECORDING' });
 
-        const tracks = [...this.screenStream.getTracks()];
-        if (this.micStream) tracks.push(...this.micStream.getAudioTracks());
+        // --- AUDIO MIXING MAGIC ---
+        // We must mix System Audio + Mic into a SINGLE track, otherwise MediaRecorder ignores one.
+        const ctx = new AudioContext();
+        const dest = ctx.createMediaStreamDestination();
+        const sources = [];
 
-        const stream = new MediaStream(tracks);
+        // 1. System Audio
+        if (this.screenStream.getAudioTracks().length > 0) {
+            const src = ctx.createMediaStreamSource(this.screenStream);
+            const gain = ctx.createGain();
+            gain.gain.value = 0.8; // Reduce system volume slightly to let voice cut through
+            src.connect(gain).connect(dest);
+            sources.push(src); // Keep ref to prevent GC
+        }
+
+        // 2. Mic Audio
+        if (this.micStream && this.micStream.getAudioTracks().length > 0) {
+            const src = ctx.createMediaStreamSource(this.micStream);
+            const gain = ctx.createGain();
+            gain.gain.value = 1.0; // Boost mic?
+            src.connect(gain).connect(dest);
+            sources.push(src);
+        }
+
+        // Combine Video + Mixed Audio
+        const mixedAudioTracks = dest.stream.getAudioTracks();
+        const videoTracks = this.screenStream.getVideoTracks();
+
+        // Final Stream
+        const combinedStream = new MediaStream([
+            ...videoTracks,
+            ...(mixedAudioTracks.length > 0 ? mixedAudioTracks : [])
+        ]);
+
+        this.audioContext = ctx; // Store to close later if needed
+
         const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
 
-        this.mediaRecorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8000000 });
+        this.mediaRecorder = new MediaRecorder(combinedStream, { mimeType: mime, videoBitsPerSecond: 8000000 });
         this.mediaRecorder.ondataavailable = e => { if (e.data.size > 0) this.recordedChunks.push(e.data); };
-        this.mediaRecorder.onstop = () => this.onStop();
+        this.mediaRecorder.onstop = () => {
+            // Cleanup Audio Context
+            if (this.audioContext) this.audioContext.close();
+            this.onStop();
+        };
         this.mediaRecorder.start(100);
 
         document.getElementById('statusBar').classList.add('visible');
@@ -526,13 +562,19 @@ class Drift {
         document.getElementById('processingOverlay').classList.remove('hidden');
 
         this.video.pause();
-        this.video.currentTime = this.trimStart || 0; // START FROM TRIM POINT
+        this.video.currentTime = this.trimStart || 0;
         this.resetCamera();
-        this.lastClickIdx = -1; // TODO: Should find correct click index for start time?
-        // optimization: skip processing clicks before start time? 
-        // For simplicity, we just run logic and let it catch up.
+        this.lastClickIdx = -1;
 
-        await new Promise(r => setTimeout(r, 500)); // buffer
+        // CRITICAL: Unmute video so captureStream gets audio!
+        // We set volume to 0.05 so it's barely audible to user but exists? 
+        // No, Chrome might mute capture if volume is near 0.
+        // Let's set it to 1.0 but maybe user won't mind the "rendering sounds".
+        const originalMuted = this.video.muted;
+        this.video.muted = false;
+        this.video.volume = 1.0;
+
+        await new Promise(r => setTimeout(r, 500));
 
         const stream = this.canvas.captureStream(60);
 
