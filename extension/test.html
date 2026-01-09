@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Drift Zoom Test - Cursor Following</title>
+    <style>
+        body {
+            margin: 0;
+            background: linear-gradient(135deg, #1a1a2e, #2d1b4e, #1e3a5f);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: sans-serif;
+            color: white;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+        }
+
+        p {
+            color: #aaa;
+            margin-bottom: 20px;
+        }
+
+        canvas {
+            border: 3px solid #DCFE50;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 14px;
+            background: #DCFE50;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 6px;
+        }
+
+        button.secondary {
+            background: #333;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🎬 Drift - Cursor Following + Click Zoom</h1>
+    <p>Move your mouse over the canvas. Click to trigger zoom!</p>
+    <canvas id="canvas" width="960" height="540"></canvas>
+    <div class="controls">
+        <button onclick="location.reload()">🔄 Reset</button>
+        <button class="secondary" onclick="toggleFollow()">Toggle Cursor Follow</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Settings
+        let cursorFollowEnabled = true;
+        const zoomLevel = 2.0;
+        const followStrength = 0.03;  // How much camera follows cursor (lower = smoother)
+        const zoomSmoothing = 0.08;   // Zoom animation smoothness
+
+        // Camera state
+        let camera = { x: 0.5, y: 0.5, scale: 1 };
+        let target = { x: 0.5, y: 0.5, scale: 1 };
+        let mousePos = { x: 0.5, y: 0.5 };
+        let activeZoom = null;
+
+        // Easing functions
+        const easeOutQuart = t => 1 - Math.pow(1 - t, 4);
+        const easeInOutCubic = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+        function toggleFollow() {
+            cursorFollowEnabled = !cursorFollowEnabled;
+            console.log('Cursor follow:', cursorFollowEnabled ? 'ON' : 'OFF');
+        }
+
+        // Draw a mock browser screen
+        function drawMockScreen() {
+            // Browser chrome bar
+            ctx.fillStyle = '#2d2d2d';
+            ctx.fillRect(0, 0, canvas.width, 50);
+
+            // Window controls
+            ctx.fillStyle = '#ff5f56'; ctx.beginPath(); ctx.arc(20, 25, 7, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#ffbd2e'; ctx.beginPath(); ctx.arc(42, 25, 7, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#27ca3f'; ctx.beginPath(); ctx.arc(64, 25, 7, 0, Math.PI * 2); ctx.fill();
+
+            // URL bar
+            ctx.fillStyle = '#404040';
+            ctx.fillRect(100, 12, 500, 28);
+            ctx.fillStyle = '#888';
+            ctx.font = '13px sans-serif';
+            ctx.fillText('🔒 github.com/your-awesome-project', 115, 31);
+
+            // Extension icons
+            ctx.fillStyle = '#666';
+            for (let i = 0; i < 4; i++) {
+                ctx.fillRect(canvas.width - 40 - i * 35, 15, 24, 24);
+            }
+
+            // Page content area
+            ctx.fillStyle = '#0d1117';
+            ctx.fillRect(0, 50, canvas.width, canvas.height - 50);
+
+            // Sidebar
+            ctx.fillStyle = '#161b22';
+            ctx.fillRect(0, 50, 220, canvas.height - 50);
+
+            // Sidebar items
+            ctx.fillStyle = '#21262d';
+            for (let i = 0; i < 10; i++) {
+                ctx.fillRect(15, 70 + i * 42, 190, 35);
+                ctx.fillStyle = '#8b949e';
+                ctx.font = '12px sans-serif';
+                ctx.fillText(['📁 src', '📁 components', '📁 hooks', '📄 README.md', '📄 package.json', '📁 public', '📁 styles', '⚙️ config', '📁 tests', '📄 .gitignore'][i], 25, 93 + i * 42);
+                ctx.fillStyle = '#21262d';
+            }
+
+            // Main content header
+            ctx.fillStyle = '#21262d';
+            ctx.fillRect(235, 60, canvas.width - 250, 80);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 22px sans-serif';
+            ctx.fillText('🚀 Your Awesome Project', 255, 100);
+
+            ctx.fillStyle = '#8b949e';
+            ctx.font = '14px sans-serif';
+            ctx.fillText('A production-ready application with amazing features', 255, 125);
+
+            // Code blocks
+            ctx.fillStyle = '#161b22';
+            for (let i = 0; i < 6; i++) {
+                const y = 160 + i * 55;
+                ctx.fillRect(235, y, canvas.width - 250, 45);
+
+                // Line numbers
+                ctx.fillStyle = '#484f58';
+                ctx.font = '11px monospace';
+                ctx.fillText((i * 3 + 1).toString(), 245, y + 18);
+                ctx.fillText((i * 3 + 2).toString(), 245, y + 30);
+                ctx.fillText((i * 3 + 3).toString(), 245, y + 42);
+
+                // Code
+                ctx.fillStyle = '#c9d1d9';
+                ctx.fillText('const drift = new DriftRecorder();', 275, y + 18);
+                ctx.fillStyle = '#7ee787';
+                ctx.fillText('// Smooth cursor following', 275, y + 30);
+                ctx.fillStyle = '#79c0ff';
+                ctx.fillText('export default drift;', 275, y + 42);
+
+                ctx.fillStyle = '#161b22';
+            }
+        }
+
+        // Trigger click zoom
+        function triggerZoom(x, y) {
+            activeZoom = {
+                x: Math.max(0.15, Math.min(0.85, x)),
+                y: Math.max(0.15, Math.min(0.85, y)),
+                startTime: performance.now()
+            };
+        }
+
+        // Update camera position and zoom
+        function updateCamera() {
+            // Cursor following (subtle drift toward mouse)
+            if (cursorFollowEnabled && !activeZoom) {
+                // Camera gently drifts toward cursor position
+                const driftX = 0.5 + (mousePos.x - 0.5) * 0.15; // 15% toward cursor
+                const driftY = 0.5 + (mousePos.y - 0.5) * 0.15;
+                target.x = driftX;
+                target.y = driftY;
+            }
+
+            // Handle click zoom animation
+            if (activeZoom) {
+                const elapsed = performance.now() - activeZoom.startTime;
+                const zoomInDur = 300;
+                const holdDur = 700;
+                const zoomOutDur = 450;
+
+                if (elapsed < zoomInDur) {
+                    // Zoom IN - fast and snappy
+                    const t = elapsed / zoomInDur;
+                    const e = easeOutQuart(t);
+                    target.scale = 1 + (zoomLevel - 1) * e;
+                    target.x = 0.5 + (activeZoom.x - 0.5) * e;
+                    target.y = 0.5 + (activeZoom.y - 0.5) * e;
+                } else if (elapsed < zoomInDur + holdDur) {
+                    // HOLD - stay at zoom point
+                    target.scale = zoomLevel;
+                    target.x = activeZoom.x;
+                    target.y = activeZoom.y;
+                } else if (elapsed < zoomInDur + holdDur + zoomOutDur) {
+                    // Zoom OUT - smooth and elegant
+                    const t = (elapsed - zoomInDur - holdDur) / zoomOutDur;
+                    const e = easeInOutCubic(t);
+                    target.scale = zoomLevel - (zoomLevel - 1) * e;
+                    target.x = activeZoom.x + (0.5 - activeZoom.x) * e;
+                    target.y = activeZoom.y + (0.5 - activeZoom.y) * e;
+                } else {
+                    // Done
+                    target = { x: 0.5, y: 0.5, scale: 1 };
+                    activeZoom = null;
+                }
+            }
+
+            // SMOOTH INTERPOLATION - The "Drift" effect
+            camera.x += (target.x - camera.x) * followStrength;
+            camera.y += (target.y - camera.y) * followStrength;
+            camera.scale += (target.scale - camera.scale) * zoomSmoothing;
+        }
+
+        // Render frame
+        function render() {
+            updateCamera();
+
+            // Clear
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+
+            // Apply camera transform
+            const px = camera.x * canvas.width;
+            const py = camera.y * canvas.height;
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.scale(camera.scale, camera.scale);
+            ctx.translate(-px, -py);
+
+            drawMockScreen();
+
+            ctx.restore();
+
+            // Glow effect when zoomed
+            if (camera.scale > 1.08) {
+                const gx = camera.x * canvas.width;
+                const gy = camera.y * canvas.height;
+                const intensity = (camera.scale - 1) / (zoomLevel - 1);
+
+                const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, 100);
+                grad.addColorStop(0, `rgba(255, 220, 50, ${0.6 * intensity})`);
+                grad.addColorStop(0.4, `rgba(255, 220, 50, ${0.2 * intensity})`);
+                grad.addColorStop(1, 'rgba(255, 220, 50, 0)');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(gx, gy, 100, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            requestAnimationFrame(render);
+        }
+
+        // Mouse events
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mousePos.x = (e.clientX - rect.left) / rect.width;
+            mousePos.y = (e.clientY - rect.top) / rect.height;
+        });
+
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width;
+            const y = (e.clientY - rect.top) / rect.height;
+            triggerZoom(x, y);
+        });
+
+        // Reset when mouse leaves
+        canvas.addEventListener('mouseleave', () => {
+            mousePos = { x: 0.5, y: 0.5 };
+        });
+
+        // Start rendering
+        render();
+        console.log('✅ Drift test ready - move mouse and click!');
+    </script>
+</body>
+
+</html>
