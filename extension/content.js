@@ -27,6 +27,22 @@
         }).catch(() => { });
     }, true);
 
+    // Track mouse movement (throttled 15fps)
+    let lastMove = 0;
+    document.addEventListener('mousemove', (e) => {
+        if (!isTracking) return;
+        const now = Date.now();
+        if (now - lastMove > 60) { // ~15fps
+            lastMove = now;
+            chrome.runtime.sendMessage({
+                type: 'MOUSE_MOVE',
+                screenX: e.screenX,
+                screenY: e.screenY,
+                timestamp: now
+            }).catch(() => { });
+        }
+    }, true);
+
     // KEYBOARD SHORTCUT: Ctrl+Shift+X to stop recording
     document.addEventListener('keydown', (e) => {
         if (e.ctrlKey && e.shiftKey && e.key === 'X') {
