@@ -583,6 +583,13 @@
             <p class="subtitle">Cinema-grade auto-zoom that follows your clicks</p>
         </header>
 
+        <div class="status-bar" id="statusBar">
+            <div class="recording-dot"></div>
+            <span class="timer" id="timer">00:00</span>
+            <span class="divider">|</span>
+            <span class="click-counter">🖱️ <span id="clickCount">0</span></span>
+        </div>
+
         <div class="container">
             <div class="card">
                 <!-- STEP 1 -->
@@ -619,7 +626,7 @@
                             </select>
                         </div>
                         <div class="step-actions" id="recordActions">
-                            <button class="btn btn-record" id="startBtn" disabled>🎬 Start recording</button>
+                            <button class="btn btn-record" id="startBtn">🎬 Start recording</button>
                         </div>
                         <div class="step-actions hidden" id="stopActions">
                             <button class="btn btn-stop" id="stopBtn">⏹️ Stop recording</button>
