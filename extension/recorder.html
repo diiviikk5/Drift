@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Drift - Professional Screen Recorder</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Mono:wght@700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+            min-height: 100vh;
+            color: #1a1a2e;
+        }
+
+        .header {
+            text-align: center;
+            padding: 40px 20px 20px;
+        }
+
+        .brand {
+            font-family: 'Space Mono', monospace;
+            font-size: 18px;
+            font-weight: 700;
+            color: #DCFE50;
+            text-transform: uppercase;
+            background: #1a1a2e;
+            display: inline-block;
+            padding: 8px 16px;
+            margin-bottom: 20px;
+        }
+
+        .brand span {
+            color: #ff3366;
+        }
+
+        .title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font-size: 15px;
+            color: #666;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            padding: 28px;
+            margin-bottom: 16px;
+        }
+
+        .step {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .step:last-child {
+            margin-bottom: 0;
+        }
+
+        .step-number {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, #DCFE50, #c8eb3c);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .step-desc {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.5;
+            margin-bottom: 12px;
+        }
+
+        .step-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-primary {
+            background: #1a1a2e;
+            color: #fff;
+        }
+
+        .btn-primary.selected {
+            background: #10b981;
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .btn-record {
+            background: linear-gradient(135deg, #DCFE50, #c8eb3c);
+            color: #1a1a2e;
+        }
+
+        .btn-stop {
+            background: #ff3366;
+            color: #fff;
+        }
+
+        .indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ccc;
+            display: inline-block;
+        }
+
+        .indicator.active {
+            background: #10b981;
+        }
+
+        .tip-box {
+            background: #fef3c7;
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #92400e;
+            margin-top: 12px;
+        }
+
+        .status-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #ff3366;
+            color: #fff;
+            padding: 14px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 16px;
+            z-index: 1000;
+            display: none;
+        }
+
+        .status-bar.visible {
+            display: block;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* STUDIO STYLES */
+        #studioMode {
+            min-height: 100vh;
+            padding: 20px;
+            color: #fff;
+            background: #1a1a2e;
+            /* Solid professional dark background */
+        }
+
+        .studio-header {
+            text-align: center;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .studio-header h1 {
+            font-family: 'Space Mono', monospace;
+            font-size: 22px;
+            text-transform: uppercase;
+        }
+
+        .studio-header h1 span {
+            color: #ff3366;
+        }
+
+        .video-container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .stats {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .stats strong {
+            color: #DCFE50;
+        }
+
+        /* Premium video frame with mockup effect */
+        .video-frame {
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow:
+                0 50px 100px -20px rgba(0, 0, 0, 0.5),
+                0 30px 60px -30px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .video-wrapper {
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+        }
+
+        .video-wrapper canvas {
+            width: 100%;
+            display: block;
+        }
+
+        .video-wrapper video {
+            display: none;
+        }
+
+        .controls-bar {
+            background: rgba(26, 26, 46, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 14px 18px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .play-btn {
+            width: 48px;
+            height: 48px;
+            background: #DCFE50;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.15s;
+        }
+
+        .play-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .timeline {
+            flex: 1;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .timeline-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #DCFE50, #c8eb3c);
+            border-radius: 4px;
+            width: 0%;
+        }
+
+        .timeline-marker {
+            position: absolute;
+            top: -4px;
+            width: 3px;
+            height: 16px;
+            background: #ff3366;
+            border-radius: 1px;
+        }
+
+        .time-display {
+            font-family: 'Space Mono', monospace;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            min-width: 85px;
+            text-align: right;
+        }
+
+        .settings-row {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .setting-group {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 12px 16px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+        }
+
+        .setting-group label {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .setting-group select,
+        .setting-group input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .export-section {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-export {
+            background: #DCFE50;
+            color: #000;
+            padding: 14px 28px;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .btn-download {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            padding: 14px 28px;
+            font-size: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-new {
+            background: transparent;
+            color: rgba(255, 255, 255, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 14px 28px;
+            font-size: 15px;
+        }
+
+        /* Background selector */
+        .bg-selector {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .bg-option {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: all 0.15s;
+        }
+
+        .bg-option:hover,
+        .bg-option.active {
+            border-color: #fff;
+            transform: scale(1.1);
+        }
+
+        .bg-aurora {
+            background: linear-gradient(135deg, #1a1a2e, #2d1b4e, #1e3a5f);
+        }
+
+        .bg-sunset {
+            background: linear-gradient(135deg, #ff6b6b, #feca57, #ff9ff3);
+        }
+
+        .bg-ocean {
+            background: linear-gradient(135deg, #0093E9, #80D0C7);
+        }
+
+        .bg-forest {
+            background: linear-gradient(135deg, #134E5E, #71B280);
+        }
+
+        .bg-nightsky {
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+        }
+
+        .bg-candy {
+            background: linear-gradient(135deg, #a855f7, #ec4899, #f43f5e);
+        }
+
+        .processing-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .processing-box {
+            background: #1a1a2e;
+            padding: 40px 50px;
+            border-radius: 16px;
+            text-align: center;
+            border: 2px solid #DCFE50;
+        }
+
+        .processing-box h2 {
+            font-size: 22px;
+            margin-bottom: 12px;
+        }
+
+        .processing-box p {
+            color: #888;
+            margin-bottom: 20px;
+        }
+
+        .progress-bar {
+            width: 280px;
+            height: 8px;
+            background: #333;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #DCFE50;
+            width: 0%;
+            transition: width 0.2s;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- RECORDER -->
+    <div id="recorderMode">
+        <div class="status-bar" id="statusBar">
+            ⏺️ Recording: <span id="timer">00:00</span> | Clicks: <span id="clickCount">0</span>
+        </div>
+
+        <header class="header">
+            <div class="brand">Drift<span>_</span></div>
+            <h1 class="title">Professional Screen Recording</h1>
+            <p class="subtitle">Cinema-grade auto-zoom that follows your clicks</p>
+        </header>
+
+        <div class="container">
+            <div class="card">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h3 class="step-title">Share your screen</h3>
+                        <p class="step-desc">Select your entire screen to capture everything including browser bars and
+                            extensions.</p>
+                        <div class="step-actions">
+                            <button class="btn btn-primary" id="selectScreenBtn">🖥️ Select screen</button>
+                            <button class="btn btn-secondary" id="micBtn"><span class="indicator"></span> 🎤
+                                Microphone</button>
+                        </div>
+                        <div class="tip-box">
+                            💡 <strong>Pro tip:</strong> Choose "Entire Screen" (not just a window/tab) to capture the
+                            full browser with URL bar, tabs, and extensions!
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h3 class="step-title">Start recording</h3>
+                        <p class="step-desc">Click naturally while demonstrating. Each click triggers a smooth,
+                            cinematic zoom.</p>
+                        <div class="step-actions" id="recordActions">
+                            <button class="btn btn-record" id="startBtn" disabled>🎬 Start recording</button>
+                        </div>
+                        <div class="step-actions hidden" id="stopActions">
+                            <button class="btn btn-stop" id="stopBtn">⏹️ Stop recording</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h3 class="step-title">Preview & Export</h3>
+                        <p class="step-desc">Choose a beautiful background, adjust zoom speed, and export your
+                            professional video!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STUDIO -->
+    <div id="studioMode" class="hidden">
+        <header class="studio-header">
+            <h1>Drift<span>_</span> Studio</h1>
+        </header>
+
+        <div class="video-container">
+            <div class="stats">
+                <span>Duration: <strong id="statDuration">00:00</strong></span>
+                <span>Zoom Points: <strong id="statClicks">0</strong></span>
+                <span>Size: <strong id="statSize">0 MB</strong></span>
+            </div>
+
+            <!-- Background Selector -->
+            <div class="bg-selector">
+                <div class="bg-option bg-aurora active" data-bg="aurora" title="Aurora"></div>
+                <div class="bg-option bg-sunset" data-bg="sunset" title="Sunset"></div>
+                <div class="bg-option bg-ocean" data-bg="ocean" title="Ocean"></div>
+                <div class="bg-option bg-forest" data-bg="forest" title="Forest"></div>
+                <div class="bg-option bg-nightsky" data-bg="nightsky" title="Night Sky"></div>
+                <div class="bg-option bg-candy" data-bg="candy" title="Candy"></div>
+            </div>
+
+            <!-- Premium Video Frame -->
+            <div class="video-frame">
+                <div class="video-wrapper">
+                    <video id="sourceVideo" muted></video>
+                    <canvas id="outputCanvas"></canvas>
+                </div>
+            </div>
+
+            <!-- Settings removed - using optimal defaults -->
+
+            <div class="controls-bar">
+                <button class="play-btn" id="playBtn">▶️</button>
+                <div class="timeline" id="timeline">
+                    <div class="timeline-progress" id="timelineProgress"></div>
+                </div>
+                <div class="time-display" id="timeDisplay">00:00 / 00:00</div>
+            </div>
+
+            <div class="export-section">
+                <button class="btn btn-export" id="exportBtn">⚡ Export with Effects</button>
+                <button class="btn btn-download" id="downloadBtn">⬇️ Download Raw</button>
+                <button class="btn btn-new" id="newRecordingBtn">🔄 New Recording</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PROCESSING -->
+    <div id="processingOverlay" class="processing-overlay hidden">
+        <div class="processing-box">
+            <h2>⚡ Rendering Video</h2>
+            <p>Applying zoom effects...</p>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="recorder.js"></script>
+</body>
+
+</html>
