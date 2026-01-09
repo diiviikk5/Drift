@@ -6,10 +6,10 @@ const easeInOutQuart = t => t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 
 const easeOutExpo = t => t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
 
 const SPEED_PRESETS = {
-    // Tighter smoothing (0.07) to catch scrolls faster, shorter hold
-    slow: { zoomIn: 700, hold: 1000, zoomOut: 700, smoothing: 0.07 },
-    normal: { zoomIn: 450, hold: 900, zoomOut: 600, smoothing: 0.1 },
-    fast: { zoomIn: 250, hold: 500, zoomOut: 350, smoothing: 0.15 }
+    // Slower, more cinematic "swoosh"
+    slow: { zoomIn: 1000, hold: 1200, zoomOut: 1000, smoothing: 0.05 }, // Was 700/0.07
+    normal: { zoomIn: 750, hold: 1000, zoomOut: 750, smoothing: 0.07 },
+    fast: { zoomIn: 400, hold: 600, zoomOut: 500, smoothing: 0.12 }
 };
 
 class Drift {
