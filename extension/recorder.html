@@ -20,6 +20,11 @@
             color: #1a1a2e;
         }
 
+        /* --- RECORDER MODE STYLES --- */
+        .hidden {
+            display: none !important;
+        }
+
         .header {
             text-align: center;
             padding: 40px 20px 20px;
@@ -201,228 +206,281 @@
             display: block;
         }
 
-        .hidden {
-            display: none !important;
+        .timeline-marker {
+            position: absolute;
+            top: 0;
+            width: 4px;
+            height: 100%;
+            background: #ff3366;
+            border-radius: 2px;
+            pointer-events: none;
+            z-index: 10;
         }
 
-        /* STUDIO STYLES */
+        /* --- STUDIO MODE STYLES (NEO-BRUTALIST) --- */
         #studioMode {
             min-height: 100vh;
-            padding: 20px;
-            color: #fff;
-            background: #1a1a2e;
-            /* Solid professional dark background */
+            padding: 40px;
+            color: #1a1a2e;
+            background: #f0fdf4;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
 
         .studio-header {
-            text-align: center;
-            padding: 16px;
-            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+            border: 3px solid #1a1a2e;
+            box-shadow: 4px 4px 0 #1a1a2e;
+            padding: 16px 24px;
         }
 
         .studio-header h1 {
             font-family: 'Space Mono', monospace;
             font-size: 22px;
             text-transform: uppercase;
+            margin: 0;
         }
 
         .studio-header h1 span {
             color: #ff3366;
         }
 
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: #666;
+        }
+
+        .stat-item strong {
+            color: #1a1a2e;
+            font-family: 'Space Mono', monospace;
+            font-size: 15px;
+            margin-left: 4px;
+        }
+
         .video-container {
-            max-width: 1000px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            flex: 1;
+            max-width: 1200px;
+            width: 100%;
             margin: 0 auto;
         }
 
-        .stats {
-            display: flex;
-            gap: 30px;
-            justify-content: center;
-            margin-bottom: 16px;
-            font-size: 13px;
-            color: rgba(255, 255, 255, 0.7);
-        }
-
-        .stats strong {
-            color: #DCFE50;
-        }
-
-        /* Premium video frame with mockup effect */
         .video-frame {
-            background: linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
-            border-radius: 20px;
-            padding: 24px;
-            box-shadow:
-                0 50px 100px -20px rgba(0, 0, 0, 0.5),
-                0 30px 60px -30px rgba(0, 0, 0, 0.4),
-                inset 0 1px 0 rgba(255, 255, 255, 0.1);
-            margin-bottom: 20px;
+            background: #1a1a2e;
+            padding: 4px;
+            border: 4px solid #1a1a2e;
+            box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.1);
+            overflow: hidden;
         }
 
         .video-wrapper {
             background: #000;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+            width: 100%;
+            aspect-ratio: 16/9;
+            position: relative;
         }
 
         .video-wrapper canvas {
             width: 100%;
+            height: 100%;
             display: block;
+            object-fit: contain;
         }
 
         .video-wrapper video {
             display: none;
         }
 
-        .controls-bar {
-            background: rgba(26, 26, 46, 0.8);
-            backdrop-filter: blur(10px);
-            padding: 14px 18px;
-            border-radius: 12px;
+        .editor-panel {
+            background: #fff;
+            border: 3px solid #1a1a2e;
+            box-shadow: 4px 4px 0 #1a1a2e;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .controls-row {
             display: flex;
             align-items: center;
-            gap: 14px;
-            margin-bottom: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            gap: 16px;
         }
 
         .play-btn {
             width: 48px;
             height: 48px;
             background: #DCFE50;
-            border: none;
-            border-radius: 50%;
+            border: 3px solid #1a1a2e;
+            box-shadow: 2px 2px 0 #1a1a2e;
             cursor: pointer;
-            font-size: 18px;
+            font-size: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: transform 0.15s;
+            transition: all 0.1s;
         }
 
-        .play-btn:hover {
-            transform: scale(1.05);
+        .play-btn:active {
+            transform: translate(2px, 2px);
+            box-shadow: none;
         }
 
-        .timeline {
+        .timeline-container {
             flex: 1;
-            height: 8px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
+            height: 40px;
+            background: #f3f4f6;
+            border: 3px solid #1a1a2e;
             position: relative;
             cursor: pointer;
         }
 
-        .timeline-progress {
+        .timeline {
+            width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, #DCFE50, #c8eb3c);
-            border-radius: 4px;
-            width: 0%;
+            position: relative;
         }
 
-        .timeline-marker {
+        .timeline-progress {
+            height: 100%;
+            background: rgba(26, 26, 46, 0.1);
+            width: 0%;
             position: absolute;
-            top: -4px;
-            width: 3px;
-            height: 16px;
-            background: #ff3366;
-            border-radius: 1px;
+            left: 0;
+            top: 0;
+            pointer-events: none;
+            border-right: 2px solid #1a1a2e;
+        }
+
+        .timeline-range {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            background: rgba(220, 254, 80, 0.3);
+            border-left: 3px solid #1a1a2e;
+            border-right: 3px solid #1a1a2e;
+            pointer-events: none;
         }
 
         .time-display {
             font-family: 'Space Mono', monospace;
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.6);
-            min-width: 85px;
+            font-weight: 700;
+            font-size: 14px;
+            min-width: 120px;
             text-align: right;
         }
 
-        .settings-row {
+        .actions-row {
             display: flex;
-            gap: 16px;
-            justify-content: center;
-            margin-bottom: 16px;
-            flex-wrap: wrap;
-        }
-
-        .setting-group {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 12px 16px;
-            border-radius: 8px;
-            display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 10px;
-            font-size: 13px;
+            flex-wrap: wrap;
+            gap: 12px;
         }
 
-        .setting-group label {
-            color: rgba(255, 255, 255, 0.7);
+        .trim-controls {
+            display: flex;
+            gap: 8px;
         }
 
-        .setting-group select,
-        .setting-group input {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: #fff;
-            padding: 6px 10px;
-            border-radius: 4px;
+        .btn-tool {
+            padding: 8px 12px;
+            background: #fff;
+            border: 2px solid #1a1a2e;
+            font-family: 'Space Mono', monospace;
             font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 2px 2px 0 #1a1a2e;
         }
 
-        .export-section {
+        .btn-tool:hover {
+            background: #f3f4f6;
+        }
+
+        .btn-tool:active {
+            transform: translate(2px, 2px);
+            box-shadow: none;
+        }
+
+        .export-controls {
             display: flex;
             gap: 10px;
-            justify-content: center;
-            flex-wrap: wrap;
         }
 
         .btn-export {
-            background: #DCFE50;
-            color: #000;
-            padding: 14px 28px;
-            font-size: 15px;
+            background: #1a1a2e;
+            color: #fff;
+            border: 3px solid #1a1a2e;
+            padding: 12px 24px;
             font-weight: 700;
+            font-size: 14px;
+            box-shadow: 4px 4px 0 #9ca3af;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+
+        .btn-export:hover {
+            transform: translate(-1px, -1px);
+            box-shadow: 5px 5px 0 #9ca3af;
+        }
+
+        .btn-export:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 #9ca3af;
         }
 
         .btn-download {
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
-            padding: 14px 28px;
-            font-size: 15px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: #fff;
+            color: #1a1a2e;
+            border: 2px solid #1a1a2e;
+            padding: 12px 24px;
+            font-weight: 700;
+            font-size: 14px;
+            box-shadow: 2px 2px 0 #1a1a2e;
+            cursor: pointer;
         }
 
         .btn-new {
-            background: transparent;
-            color: rgba(255, 255, 255, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 14px 28px;
-            font-size: 15px;
+            background: #fff;
+            color: #1a1a2e;
+            border: 2px solid #1a1a2e;
+            padding: 8px 16px;
+            font-family: 'Space Mono', monospace;
+            font-weight: 700;
+            cursor: pointer;
         }
 
-        /* Background selector */
         .bg-selector {
             display: flex;
-            gap: 8px;
-            justify-content: center;
-            margin-bottom: 16px;
+            gap: 10px;
         }
 
         .bg-option {
-            width: 36px;
-            height: 36px;
+            width: 28px;
+            height: 28px;
+            border: 2px solid #1a1a2e;
             border-radius: 50%;
             cursor: pointer;
-            border: 3px solid transparent;
-            transition: all 0.15s;
+            transition: transform 0.1s;
         }
 
-        .bg-option:hover,
+        .bg-option:hover {
+            transform: scale(1.2);
+        }
+
         .bg-option.active {
-            border-color: #fff;
-            transform: scale(1.1);
+            box-shadow: 0 0 0 2px #fff, 0 0 0 4px #1a1a2e;
         }
 
         .bg-aurora {
@@ -452,7 +510,7 @@
         .processing-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.95);
+            background: rgba(26, 26, 46, 0.9);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -460,36 +518,43 @@
         }
 
         .processing-box {
-            background: #1a1a2e;
-            padding: 40px 50px;
-            border-radius: 16px;
+            background: #fff;
+            padding: 40px;
+            border: 4px solid #1a1a2e;
+            box-shadow: 8px 8px 0 #DCFE50;
             text-align: center;
-            border: 2px solid #DCFE50;
+            max-width: 400px;
+            width: 100%;
         }
 
         .processing-box h2 {
-            font-size: 22px;
-            margin-bottom: 12px;
+            font-family: 'Space Mono', monospace;
+            font-size: 24px;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            border-bottom: 2px solid #1a1a2e;
+            display: inline-block;
         }
 
         .processing-box p {
-            color: #888;
-            margin-bottom: 20px;
+            color: #666;
+            margin-bottom: 24px;
+            font-weight: 500;
         }
 
         .progress-bar {
-            width: 280px;
-            height: 8px;
-            background: #333;
-            border-radius: 4px;
-            overflow: hidden;
+            width: 100%;
+            height: 12px;
+            background: #e5e7eb;
+            border: 2px solid #1a1a2e;
         }
 
         .progress-fill {
             height: 100%;
             background: #DCFE50;
             width: 0%;
-            transition: width 0.2s;
+            border-right: 2px solid #1a1a2e;
+            transition: width 0.1s linear;
         }
     </style>
 </head>
@@ -509,45 +574,44 @@
 
         <div class="container">
             <div class="card">
+                <!-- STEP 1 -->
                 <div class="step">
                     <div class="step-number">1</div>
                     <div class="step-content">
                         <h3 class="step-title">Share your screen</h3>
-                        <p class="step-desc">Select your entire screen to capture everything including browser bars and
-                            extensions.</p>
+                        <p class="step-desc">Select your entire screen to capture everything.</p>
                         <div class="step-actions">
                             <button class="btn btn-primary" id="selectScreenBtn">🖥️ Select screen</button>
                             <button class="btn btn-secondary" id="micBtn"><span class="indicator"></span> 🎤
                                 Microphone</button>
                         </div>
                         <div class="tip-box">
-                            💡 <strong>Pro tip:</strong> Choose "Entire Screen" (not just a window/tab) to capture the
-                            full browser with URL bar, tabs, and extensions!
+                            💡 <strong>Pro tip:</strong> Choose "Entire Screen" to capture URL bars and tabs!
                         </div>
                     </div>
                 </div>
 
+                <!-- STEP 2 -->
                 <div class="step">
                     <div class="step-number">2</div>
                     <div class="step-content">
                         <h3 class="step-title">Start recording</h3>
-                        <p class="step-desc">Click naturally while demonstrating. Each click triggers a smooth,
-                            cinematic zoom.</p>
+                        <div class="setting-group"
+                            style="margin-bottom: 16px; justify-content: flex-start; background: #f3f4f6; border: 1px solid #e5e7eb; padding: 8px 12px; display:flex; align-items:center; gap:10px; border-radius:8px;">
+                            <label style="color:#1a1a2e; font-weight:600; font-size:12px;">Start Zoom:</label>
+                            <select id="startPosSelect" style="padding:4px; border-radius:4px; border:1px solid #ccc;">
+                                <option value="center">🎯 Center</option>
+                                <option value="top-left">↖ Top Left</option>
+                                <option value="top-right">↗ Top Right</option>
+                                <option value="none">❌ None</option>
+                            </select>
+                        </div>
                         <div class="step-actions" id="recordActions">
                             <button class="btn btn-record" id="startBtn" disabled>🎬 Start recording</button>
                         </div>
                         <div class="step-actions hidden" id="stopActions">
                             <button class="btn btn-stop" id="stopBtn">⏹️ Stop recording</button>
                         </div>
-                    </div>
-                </div>
-
-                <div class="step">
-                    <div class="step-number">3</div>
-                    <div class="step-content">
-                        <h3 class="step-title">Preview & Export</h3>
-                        <p class="step-desc">Choose a beautiful background, adjust zoom speed, and export your
-                            professional video!</p>
                     </div>
                 </div>
             </div>
@@ -558,26 +622,15 @@
     <div id="studioMode" class="hidden">
         <header class="studio-header">
             <h1>Drift<span>_</span> Studio</h1>
+            <div class="stats-bar">
+                <div class="stat-item">Duration: <strong id="statDuration">00:00</strong></div>
+                <div class="stat-item">Clicks: <strong id="statClicks">0</strong></div>
+                <div class="stat-item">Size: <strong id="statSize">0 MB</strong></div>
+            </div>
+            <button class="btn-new" id="newRecordingBtn">Start Over</button>
         </header>
 
         <div class="video-container">
-            <div class="stats">
-                <span>Duration: <strong id="statDuration">00:00</strong></span>
-                <span>Zoom Points: <strong id="statClicks">0</strong></span>
-                <span>Size: <strong id="statSize">0 MB</strong></span>
-            </div>
-
-            <!-- Background Selector -->
-            <div class="bg-selector">
-                <div class="bg-option bg-aurora active" data-bg="aurora" title="Aurora"></div>
-                <div class="bg-option bg-sunset" data-bg="sunset" title="Sunset"></div>
-                <div class="bg-option bg-ocean" data-bg="ocean" title="Ocean"></div>
-                <div class="bg-option bg-forest" data-bg="forest" title="Forest"></div>
-                <div class="bg-option bg-nightsky" data-bg="nightsky" title="Night Sky"></div>
-                <div class="bg-option bg-candy" data-bg="candy" title="Candy"></div>
-            </div>
-
-            <!-- Premium Video Frame -->
             <div class="video-frame">
                 <div class="video-wrapper">
                     <video id="sourceVideo" muted></video>
@@ -585,20 +638,39 @@
                 </div>
             </div>
 
-            <!-- Settings removed - using optimal defaults -->
-
-            <div class="controls-bar">
-                <button class="play-btn" id="playBtn">▶️</button>
-                <div class="timeline" id="timeline">
-                    <div class="timeline-progress" id="timelineProgress"></div>
+            <div class="editor-panel">
+                <div class="controls-row">
+                    <button class="play-btn" id="playBtn">▶</button>
+                    <div class="timeline-container">
+                        <div class="timeline" id="timeline">
+                            <div class="timeline-range" id="timelineRange"></div>
+                            <div class="timeline-progress" id="timelineProgress"></div>
+                        </div>
+                    </div>
+                    <div class="time-display" id="timeDisplay">00:00 / 00:00</div>
                 </div>
-                <div class="time-display" id="timeDisplay">00:00 / 00:00</div>
-            </div>
 
-            <div class="export-section">
-                <button class="btn btn-export" id="exportBtn">⚡ Export with Effects</button>
-                <button class="btn btn-download" id="downloadBtn">⬇️ Download Raw</button>
-                <button class="btn btn-new" id="newRecordingBtn">🔄 New Recording</button>
+                <div class="actions-row">
+                    <div class="trim-controls">
+                        <button class="btn-tool" id="setStartBtn">[ Set Start</button>
+                        <button class="btn-tool" id="setEndBtn">] Set End</button>
+                        <button class="btn-tool" id="resetTrimBtn" style="color:#ff3366;">Reset</button>
+                    </div>
+
+                    <div class="bg-selector">
+                        <div class="bg-option bg-aurora active" data-bg="aurora" title="Aurora"></div>
+                        <div class="bg-option bg-sunset" data-bg="sunset" title="Sunset"></div>
+                        <div class="bg-option bg-ocean" data-bg="ocean" title="Ocean"></div>
+                        <div class="bg-option bg-forest" data-bg="forest" title="Forest"></div>
+                        <div class="bg-option bg-nightsky" data-bg="nightsky" title="Night Sky"></div>
+                        <div class="bg-option bg-candy" data-bg="candy" title="Candy"></div>
+                    </div>
+
+                    <div class="export-controls">
+                        <button class="btn-download" id="downloadBtn">Raw</button>
+                        <button class="btn-export" id="exportBtn">⚡ EXPORT MP4</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

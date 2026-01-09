@@ -109,8 +109,10 @@ class Drift {
     startRecording() {
         if (!this.screenStream) return;
 
-        this.recordedChunks = [];
+        // internal state
+        this.startPos = document.getElementById('startPosSelect').value;
         this.clicks = [];
+        this.mouseMoves = [];
         this.startTime = Date.now();
 
         chrome.runtime.sendMessage({ type: 'START_RECORDING' });
@@ -163,6 +165,11 @@ class Drift {
         this.video.onloadedmetadata = () => {
             this.videoDuration = isFinite(this.video.duration) ? this.video.duration : this.recordingDuration;
 
+            // Init trim (respect hotkey trim if present)
+            this.trimStart = 0;
+            this.trimEnd = this.videoDuration - (this.trimEndMs || 0) / 1000;
+            this.updateTimelineUI();
+
             this.canvas.width = this.video.videoWidth || 1920;
             this.canvas.height = this.video.videoHeight || 1080;
 
@@ -181,26 +188,38 @@ class Drift {
             document.getElementById('statSize').textContent = (this.videoBlob.size / 1024 / 1024).toFixed(1) + ' MB';
 
             const tl = document.getElementById('timeline');
-            tl.innerHTML = '<div class="timeline-progress" id="timelineProgress"></div>';
+            // Remove old markers if any (keep progress and range)
+            tl.querySelectorAll('.timeline-marker').forEach(e => e.remove());
+
             this.clicks.forEach(c => {
                 const m = document.createElement('div');
                 m.className = 'timeline-marker';
                 m.style.left = `${(c.time / 1000 / this.videoDuration) * 100}%`;
+                // Append markers but ensure they don't block clicks (pointer-events:none via css)
                 tl.appendChild(m);
             });
 
             this.resetCamera();
 
-            // CINEMATIC INTRO: Always start zoomed in to establish focus, then drift out
-            const firstClick = this.clicks[0];
-            this.camera = {
-                x: firstClick ? firstClick.x : 0.5, // Start near first action if exists
-                y: firstClick ? firstClick.y : 0.5,
-                scale: 1.35 // Distinct intro zoom
-            };
+            // CINEMATIC INTRO: Based on user preference
+            this.camera = { x: 0.5, y: 0.5, scale: 1 }; // Default neutral
+
+            if (this.startPos !== 'none') {
+                let introX = 0.5, introY = 0.5;
+
+                if (this.startPos === 'top-left') { introX = 0.25; introY = 0.25; }
+                else if (this.startPos === 'top-right') { introX = 0.75; introY = 0.25; }
+
+                this.camera = {
+                    x: introX,
+                    y: introY,
+                    scale: 1.35
+                };
+            }
 
             // Immediately drift to wide view (The "Zoom Out" effect)
             this.target = { x: 0.5, y: 0.5, scale: 1 };
+
 
             this.renderLoop();
             this.video.play().then(() => document.getElementById('playBtn').textContent = '⏸️');
@@ -211,6 +230,14 @@ class Drift {
             document.getElementById('timelineProgress').style.width = `${Math.min(pct, 100)}%`;
             document.getElementById('timeDisplay').textContent =
                 `${this.fmt(this.video.currentTime)} / ${this.fmt(this.videoDuration)}`;
+
+            // Enforce Trim Loop
+            if (this.trimEnd > 0) {
+                if (this.video.currentTime > this.trimEnd) {
+                    this.video.currentTime = this.trimStart;
+                }
+                // If scrubbed before start (allow manual seeking, but maybe warn?)
+            }
         };
 
         this.video.onended = () => document.getElementById('playBtn').textContent = '▶️';
@@ -236,6 +263,38 @@ class Drift {
                 if (this.video.paused) this.drawFrame();
             };
         });
+
+        // Trim Controls
+        document.getElementById('setStartBtn').onclick = () => {
+            this.trimStart = this.video.currentTime;
+            if (this.trimStart > this.trimEnd) this.trimEnd = this.videoDuration;
+            this.updateTimelineUI();
+        };
+        document.getElementById('setEndBtn').onclick = () => {
+            this.trimEnd = this.video.currentTime;
+            if (this.trimEnd < this.trimStart) this.trimStart = 0;
+            this.updateTimelineUI();
+        };
+        document.getElementById('resetTrimBtn').onclick = () => {
+            this.trimStart = 0;
+            this.trimEnd = this.videoDuration;
+            this.updateTimelineUI();
+        };
+    }
+
+    updateTimelineUI() {
+        if (!this.videoDuration) return;
+        const tl = document.getElementById('timelineRange');
+        const startPct = (this.trimStart / this.videoDuration) * 100;
+        const durPct = ((this.trimEnd - this.trimStart) / this.videoDuration) * 100;
+
+        tl.style.left = `${startPct}%`;
+        tl.style.width = `${Math.max(0, durPct)}%`;
+        // Highlights the active area, outside is dimmed
+        tl.style.background = 'rgba(220, 254, 80, 0.2)';
+        tl.style.borderLeft = '2px solid #DCFE50';
+        tl.style.borderRight = '2px solid #DCFE50';
+        console.log(`[Drift] Trim: ${this.trimStart.toFixed(2)} - ${this.trimEnd.toFixed(2)}`);
     }
 
     resetCamera() {
@@ -467,56 +526,40 @@ class Drift {
         document.getElementById('processingOverlay').classList.remove('hidden');
 
         this.video.pause();
-        this.video.currentTime = 0;
+        this.video.currentTime = this.trimStart || 0; // START FROM TRIM POINT
         this.resetCamera();
-        this.lastClickIdx = -1;
+        this.lastClickIdx = -1; // TODO: Should find correct click index for start time?
+        // optimization: skip processing clicks before start time? 
+        // For simplicity, we just run logic and let it catch up.
 
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 500)); // buffer
 
         const stream = this.canvas.captureStream(60);
 
-        // 1. FIX AUDIO: Capture audio from the playing video element
+        // ... AUDIO SETUP ...
         try {
-            // Standard or vendor-prefixed captureStream
             const audioSrcStream = this.video.captureStream ? this.video.captureStream() :
                 (this.video.mozCaptureStream ? this.video.mozCaptureStream() : null);
-
             if (audioSrcStream) {
                 const audioTracks = audioSrcStream.getAudioTracks();
-                if (audioTracks.length > 0) {
-                    stream.addTrack(audioTracks[0]);
-                    console.log('[Drift] Audio track added to export');
-                } else {
-                    console.warn('[Drift] No audio tracks found in source video');
-                }
+                if (audioTracks.length > 0) stream.addTrack(audioTracks[0]);
             }
-        } catch (e) {
-            console.error('[Drift] Failed to capture audio for export:', e);
-        }
+        } catch (e) { }
 
         const chunks = [];
-
-        // 2. MP4 SUPPORT: Prefer MP4 if available
-        let mime = 'video/webm;codecs=vp9'; // Default high-quality WebM
+        // ... MP4 SETUP ...
+        let mime = 'video/webm;codecs=vp9';
         let ext = 'webm';
-
-        if (MediaRecorder.isTypeSupported('video/mp4')) {
-            mime = 'video/mp4';
-            ext = 'mp4';
-            console.log('[Drift] Exporting as native MP4');
-        } else if (MediaRecorder.isTypeSupported('video/webm;codecs=h264')) {
-            // Some browsers support H.264 in WebM container, which is friendlier
-            mime = 'video/webm;codecs=h264';
-        }
+        if (MediaRecorder.isTypeSupported('video/mp4')) { mime = 'video/mp4'; ext = 'mp4'; }
+        else if (MediaRecorder.isTypeSupported('video/webm;codecs=h264')) { mime = 'video/webm;codecs=h264'; }
 
         const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 12000000 });
-
         rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
         rec.onstop = () => {
             const blob = new Blob(chunks, { type: mime });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = `drift-zoomed-${Date.now()}.${ext}`;
+            a.download = `drift-trimmed-${Date.now()}.${ext}`;
             a.click();
             document.getElementById('processingOverlay').classList.add('hidden');
         };
@@ -525,18 +568,17 @@ class Drift {
         this.video.play();
 
         const checkEnd = () => {
-            const pct = (this.video.currentTime / this.videoDuration) * 100;
+            const pct = ((this.video.currentTime - this.trimStart) / (this.trimEnd - this.trimStart)) * 100;
             document.getElementById('progressFill').style.width = `${Math.min(pct, 100)}%`;
 
-            const trimSeconds = (this.trimEndMs || 0) / 1000;
-            const endPoint = this.videoDuration - trimSeconds - 0.1;
-
-            if (this.video.currentTime >= endPoint) {
-                console.log('[Drift] Export complete (trimmed ' + trimSeconds + 's)');
+            // STOP AT TRIM END
+            // buffer of 0.1s to ensure we don't overrun
+            if (this.video.currentTime >= this.trimEnd - 0.1 || this.video.ended) {
+                console.log('[Drift] Export complete at', this.video.currentTime);
                 rec.stop();
                 this.video.pause();
-                this.video.onended = null; // Prevent double trigger
-            } else if (!this.video.ended && this.video.currentTime < endPoint) {
+                this.video.onended = null;
+            } else {
                 requestAnimationFrame(checkEnd);
             }
         };
