@@ -9,8 +9,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "clean": "npx rimraf dist",
     "electron-dev": "npx concurrently -k \"npx cross-env BROWSER=none npm run dev\" \"npx wait-on http://127.0.0.1:3000 && npx electron .\"",
-    "electron-build": "npm run build && npx electron-builder build --win --publish never"
+    "electron-build": "npm run clean && npm run build && npx electron-builder build --win --publish never"
   },
   "build": {
     "appId": "com.drift.desktop",
@@ -32,7 +33,9 @@
         "nsis",
         "zip"
       ],
-      "icon": "build/icon.ico"
+      "icon": "build/icon.ico",
+      "sign": null,
+      "signDlls": false
     },
     "mac": {
       "target": [
