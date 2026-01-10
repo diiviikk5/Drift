@@ -4,7 +4,8 @@
 
 Professional screen recording studio that runs entirely in your browser. Powered by native browser APIs and client-side WebAssembly.
 
-![Drift Landing Page](/.github/preview.png)
+![Drift Landing Page](![Uploading image.png…]()
+)
 
 ## ✨ Features (Coming Soon)
 
