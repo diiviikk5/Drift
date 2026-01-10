@@ -67,7 +67,7 @@ function getKeycode(key) {
     return keyMap[key.toUpperCase()];
 }
 
-function createWindow() {
+function createWindow(productionUrl) {
     let dims = { width: 800, height: 600 };
     try {
         const { width, height } = screen.getPrimaryDisplay().workAreaSize;
@@ -87,7 +87,8 @@ function createWindow() {
         }
     });
 
-    const startUrl = process.env.ELECTRON_START_URL || 'http://localhost:3000/recorder';
+    const startUrl = process.env.ELECTRON_START_URL || productionUrl || 'http://localhost:3000/recorder';
+    console.log('[Drift Main] Loading URL:', startUrl);
     mainWindow.loadURL(startUrl);
 
     mainWindow.on('closed', () => (mainWindow = null));
@@ -193,10 +194,12 @@ ipcMain.handle('SET_HOTKEYS', (event, hotkeys) => {
 
 app.on('ready', async () => {
     loadHotkeys();
+    let prodUrl = null;
     if (app.isPackaged) {
-        await startNextServer();
+        const serverBase = await startNextServer();
+        prodUrl = `${serverBase}/recorder`;
     }
-    createWindow();
+    createWindow(prodUrl);
 });
 
 app.on('window-all-closed', () => {

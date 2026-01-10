@@ -20,10 +20,10 @@ const SPEED_PRESETS = {
 };
 
 const START_POSITIONS = {
-    center: { name: '🎯 Center', x: 0.5, y: 0.5 },
-    'top-left': { name: '↖ Top Left', x: 0.25, y: 0.25 },
-    'top-right': { name: '↗ Top Right', x: 0.75, y: 0.25 },
-    none: { name: '❌ None', x: 0.5, y: 0.5, noZoom: true }
+    center: { name: 'Center', x: 0.5, y: 0.5 },
+    'top-left': { name: 'Top Left', x: 0.25, y: 0.25 },
+    'top-right': { name: 'Top Right', x: 0.75, y: 0.25 },
+    none: { name: 'None', x: 0.5, y: 0.5, noZoom: true }
 };
 
 export default function RecorderPage() {
@@ -331,7 +331,7 @@ export default function RecorderPage() {
                 </div>
                 {viewMode === 'studio' && (
                     <button onClick={() => window.location.reload()} className="text-sm text-gray-400 hover:text-white border border-gray-700 px-4 py-2 rounded-lg">
-                        ← New Recording
+                        New Recording
                     </button>
                 )}
             </div>
@@ -375,7 +375,7 @@ export default function RecorderPage() {
 
                                 {/* Mic Toggle */}
                                 <div className="flex items-center justify-between mb-4 p-3 bg-white/5 rounded-lg">
-                                    <span className="text-sm font-medium">🎤 Microphone</span>
+                                    <span className="text-sm font-medium">Microphone</span>
                                     <button
                                         onClick={toggleMic}
                                         className={`w-12 h-6 rounded-full transition-all ${micEnabled ? 'bg-[#DCFE50]' : 'bg-gray-600'}`}
@@ -412,13 +412,13 @@ export default function RecorderPage() {
                                         onClick={() => setShowHotkeySettings(true)}
                                         className="text-xs text-gray-400 hover:text-white transition-colors"
                                     >
-                                        ⚙️ Hotkeys
+                                        Hotkeys
                                     </button>
                                 </div>
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="text-3xl font-mono font-black tracking-wider">{timer}</div>
                                     <div className="flex items-center gap-2 text-sm text-gray-400">
-                                        <span>🖱️ {clickCount}</span>
+                                        <span>Clicks: {clickCount}</span>
                                         {isRecording && <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />}
                                     </div>
                                 </div>
@@ -430,7 +430,7 @@ export default function RecorderPage() {
                                         : 'bg-[#DCFE50] hover:bg-[#c9e845] text-black disabled:opacity-50 disabled:cursor-not-allowed'
                                         }`}
                                 >
-                                    {isRecording ? `⏹️ STOP (${formatHotkey(hotkeys.stop)})` : `🎬 START (${formatHotkey(hotkeys.start)})`}
+                                    {isRecording ? `STOP (${formatHotkey(hotkeys.stop)})` : `START (${formatHotkey(hotkeys.start)})`}
                                 </button>
                                 <div className="mt-2 text-[10px] text-gray-500 text-center font-mono">
                                     TIP: Use hotkeys to keep Drift out of your captures
@@ -515,7 +515,7 @@ export default function RecorderPage() {
                                         className="w-full py-3 bg-white/10 text-white font-bold rounded-lg border border-white/20 hover:bg-white/20 transition-all"
                                         onClick={togglePlayback}
                                     >
-                                        {isPlaying ? '⏸️ Pause' : '▶️ Play Preview'}
+                                        {isPlaying ? 'Pause' : 'Play Preview'}
                                     </button>
                                     <button
                                         className="w-full py-3 bg-[#DCFE50] text-black font-bold rounded-lg shadow-[4px_4px_0_black] hover:translate-y-[-2px] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -523,14 +523,14 @@ export default function RecorderPage() {
                                         disabled={isExporting}
                                     >
                                         {isExporting
-                                            ? `⚡ Exporting... ${exportProgress}%`
-                                            : '⚡ EXPORT WITH EFFECTS'}
+                                            ? `Exporting... ${exportProgress}%`
+                                            : 'EXPORT WITH EFFECTS'}
                                     </button>
                                     <button
                                         className="w-full py-2 bg-white/5 text-gray-300 text-sm font-medium rounded-lg border border-white/10 hover:bg-white/10 transition-all"
                                         onClick={handleRawExport}
                                     >
-                                        📁 Download Raw Recording
+                                        Download Raw Recording
                                     </button>
                                 </div>
                             </div>
@@ -647,7 +647,7 @@ export default function RecorderPage() {
             {showHotkeySettings && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-[#1a1a24] rounded-2xl p-6 max-w-md w-full border border-white/10 shadow-2xl">
-                        <h2 className="text-xl font-bold mb-4 text-[#DCFE50]">⌨️ Hotkey Settings</h2>
+                        <h2 className="text-xl font-bold mb-4 text-[#DCFE50]">Hotkey Settings</h2>
 
                         {/* Start Recording Hotkey */}
                         <div className="mb-6">

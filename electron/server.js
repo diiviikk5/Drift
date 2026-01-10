@@ -47,13 +47,16 @@ async function startNextServer() {
                 handle(req, res);
             });
 
-            server.listen(3000, 'localhost', (err) => {
+            server.listen(0, 'localhost', (err) => {
                 if (err) {
                     console.error('[Drift Server] Failed to start:', err);
                     reject(err);
                     return;
                 }
-                console.log('[Drift Server] Next.js server running on http://localhost:3000');
+                const address = server.address();
+                const port = address.port;
+                serverUrl = `http://localhost:${port}`;
+                console.log(`[Drift Server] Next.js server running on ${serverUrl}`);
                 resolve(serverUrl);
             });
 
