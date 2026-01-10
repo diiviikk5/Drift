@@ -4,8 +4,6 @@
 
 Professional screen recording studio that runs entirely in your browser. Powered by native browser APIs and client-side WebAssembly.
 
-![Drift Landing Page](![Uploading image.png…]()
-)
 
 ## ✨ Features (Coming Soon)
 
@@ -16,7 +14,7 @@ Professional screen recording studio that runs entirely in your browser. Powered
 - **Timeline Editor** - Adjust zoom keyframes after recording
 - **Export Anywhere** - MP4, WebM, or high-quality GIF
 
-## 🚀 Getting Started
+##  Getting Started
 
 ### Prerequisites
 
@@ -55,7 +53,7 @@ npm start
 | Animations | Framer Motion |
 | Fonts | Geist Sans & Geist Mono |
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 drift/
@@ -76,7 +74,7 @@ drift/
 └── package.json
 ```
 
-## 🎨 Design System
+##  Design System
 
 The design uses a premium dark theme with purple/cyan gradient accents:
 
@@ -87,15 +85,6 @@ The design uses a premium dark theme with purple/cyan gradient accents:
 --accent-pink: #ec4899;
 ```
 
-## 📝 Roadmap
-
-- [x] Phase 1: Waitlist Landing Page
-- [ ] Phase 2: Core Recording Engine
-- [ ] Phase 3: Cinematic Intelligence (Drift Effect)
-- [ ] Phase 4: Post-Recording Studio
-- [ ] Phase 5: Public Launch
-
-## 📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.
 
