@@ -8,7 +8,7 @@ const steps = [
     {
         number: "01",
         title: "Open Drift",
-        description: "Launch Drift in your browser. No downloads, no installations, no sign-ups required. Just open and go.",
+        description: "Launch Drift. No installation, no sign-ups required. Just open and go.",
         icon: (
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />

@@ -39,7 +39,7 @@ export default function Footer() {
                         viewport={{ once: true }}
                         transition={{ delay: 0.1 }}
                     >
-                        Cinema-grade screen recording that runs in your browser.
+                        Cinema-grade screen recording for Windows.
                     </motion.p>
 
                     {/* Social Links */}
