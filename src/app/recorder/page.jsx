@@ -3,14 +3,14 @@ import { useEffect, useRef, useState } from 'react';
 import { DriftEngine } from '@/lib/DriftEngine';
 import { StudioEngine } from '@/lib/StudioEngine';
 
-// Background gradients
+// macOS-style gradient backgrounds
 const BACKGROUNDS = {
-    aurora: { name: 'Aurora', colors: ['#1a1a2e', '#2d1b4e', '#1e3a5f'] },
-    sunset: { name: 'Sunset', colors: ['#ff6b6b', '#feca57', '#ff9ff3'] },
-    ocean: { name: 'Ocean', colors: ['#0093E9', '#80D0C7'] },
-    forest: { name: 'Forest', colors: ['#134E5E', '#71B280'] },
-    nightsky: { name: 'Night Sky', colors: ['#0f0c29', '#302b63', '#24243e'] },
-    candy: { name: 'Candy', colors: ['#a855f7', '#ec4899', '#f43f5e'] }
+    bigSur: { name: 'Big Sur', colors: ['#ff6b9d', '#c44569', '#6c5ce7', '#0c3483'] },
+    monterey: { name: 'Monterey', colors: ['#00b894', '#00cec9', '#0984e3', '#6c5ce7'] },
+    ventura: { name: 'Ventura', colors: ['#e17055', '#d63031', '#fd79a8', '#a855f7'] },
+    bloom: { name: 'Bloom', colors: ['#74b9ff', '#0984e3', '#6c5ce7', '#a855f7'] },
+    sonoma: { name: 'Sonoma', colors: ['#fdcb6e', '#f39c12', '#e74c3c', '#9b59b6'] },
+    midnight: { name: 'Midnight', colors: ['#2c3e50', '#1a1a2e', '#0a0a0f'] }
 };
 
 const SPEED_PRESETS = {
@@ -57,8 +57,15 @@ export default function RecorderPage() {
     const [duration, setDuration] = useState(0);
     const [trimStart, setTrimStart] = useState(0);
     const [trimEnd, setTrimEnd] = useState(0);
-    const [background, setBackground] = useState('aurora');
+    const [background, setBackground] = useState('bigSur');
     const [speedPreset, setSpeedPreset] = useState('slow');
+
+    // Hotkey Settings
+    const [showHotkeySettings, setShowHotkeySettings] = useState(false);
+    const [hotkeys, setHotkeys] = useState({
+        start: { key: 'S', ctrl: true, shift: true, alt: false },
+        stop: { key: 'X', ctrl: true, shift: true, alt: false }
+    });
 
     // Hydration Fix State
     const [hookStatus, setHookStatus] = useState('Loading...');
@@ -67,6 +74,13 @@ export default function RecorderPage() {
     useEffect(() => {
         if (typeof window !== 'undefined') {
             setHookStatus(window.electron?.onGlobalClick ? 'Active' : 'Unavailable');
+
+            // Load saved hotkeys
+            if (window.electron?.getHotkeys) {
+                window.electron.getHotkeys().then(savedHotkeys => {
+                    if (savedHotkeys) setHotkeys(savedHotkeys);
+                });
+            }
         }
 
         if (viewMode === 'recorder') {
@@ -177,8 +191,14 @@ export default function RecorderPage() {
             setIsRecording(false);
         } else {
             try {
-                // Confirm Source
-                if (!selectedSource) return alert("Please select a screen first!");
+                // Check if we have an active stream (more reliable than state when minimized)
+                const hasStream = engineRef.current?.screenStream?.active;
+
+                if (!hasStream && !selectedSource) {
+                    console.log('[Drift] No screen selected, cannot start recording');
+                    // Don't use alert() as it blocks - just log and return
+                    return;
+                }
 
                 // Store settings
                 engineRef.current.startPosition = startPosition;
@@ -191,8 +211,7 @@ export default function RecorderPage() {
                 });
                 setIsRecording(true);
             } catch (e) {
-                alert(e.message);
-                console.error(e);
+                console.error('[Drift] Recording error:', e);
             }
         }
     };
@@ -237,19 +256,29 @@ export default function RecorderPage() {
     const handleExport = async () => {
         if (!studioRef.current) return;
         setIsExporting(true);
+        setExportProgress(0);
 
-        // Apply trim settings
-        studioRef.current.trimStart = trimStart;
-        studioRef.current.trimEnd = trimEnd;
+        try {
+            // Apply trim settings
+            studioRef.current.trimStart = trimStart;
+            studioRef.current.trimEnd = trimEnd;
 
-        const blob = await studioRef.current.exportVideo((pct) => {
-            setExportProgress(Math.round(pct * 100));
-        });
+            // Render the video with effects
+            const blob = await studioRef.current.exportVideo((pct) => {
+                const safePct = Math.min(Math.max(pct || 0, 0), 1);
+                setExportProgress(Math.round(safePct * 100));
+            });
 
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `drift-export-${Date.now()}.webm`;
-        a.click();
+            // Download the file
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `drift-export-${Date.now()}.webm`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+
+        } catch (error) {
+            console.error('Export failed:', error);
+        }
 
         setIsExporting(false);
         setExportProgress(0);
@@ -268,6 +297,24 @@ export default function RecorderPage() {
         const m = Math.floor(s / 60).toString().padStart(2, '0');
         const sec = Math.floor(s % 60).toString().padStart(2, '0');
         return `${m}:${sec}`;
+    };
+
+    // Format hotkey for display
+    const formatHotkey = (hk) => {
+        const parts = [];
+        if (hk.ctrl) parts.push('Ctrl');
+        if (hk.shift) parts.push('Shift');
+        if (hk.alt) parts.push('Alt');
+        parts.push(hk.key);
+        return parts.join(' + ');
+    };
+
+    // Save hotkeys to Electron
+    const saveHotkeys = async () => {
+        if (window.electron?.setHotkeys) {
+            await window.electron.setHotkeys(hotkeys);
+            setShowHotkeySettings(false);
+        }
     };
 
     // --- RENDER ---
@@ -359,7 +406,15 @@ export default function RecorderPage() {
 
                             {/* Record */}
                             <div className="bg-[#1a1a24] p-5 rounded-xl border border-white/10 shadow-2xl">
-                                <h2 className="text-base font-bold mb-3 text-[#DCFE50]">3. Record</h2>
+                                <div className="flex items-center justify-between mb-3">
+                                    <h2 className="text-base font-bold text-[#DCFE50]">3. Record</h2>
+                                    <button
+                                        onClick={() => setShowHotkeySettings(true)}
+                                        className="text-xs text-gray-400 hover:text-white transition-colors"
+                                    >
+                                        ⚙️ Hotkeys
+                                    </button>
+                                </div>
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="text-3xl font-mono font-black tracking-wider">{timer}</div>
                                     <div className="flex items-center gap-2 text-sm text-gray-400">
@@ -375,7 +430,7 @@ export default function RecorderPage() {
                                         : 'bg-[#DCFE50] hover:bg-[#c9e845] text-black disabled:opacity-50 disabled:cursor-not-allowed'
                                         }`}
                                 >
-                                    {isRecording ? '⏹️ STOP (Ctrl+Shift+X)' : '🎬 START RECORDING (Ctrl+Shift+S)'}
+                                    {isRecording ? `⏹️ STOP (${formatHotkey(hotkeys.stop)})` : `🎬 START (${formatHotkey(hotkeys.start)})`}
                                 </button>
                                 <div className="mt-2 text-[10px] text-gray-500 text-center font-mono">
                                     TIP: Use hotkeys to keep Drift out of your captures
@@ -426,26 +481,35 @@ export default function RecorderPage() {
                             {/* Background */}
                             <div className="bg-[#1a1a24] p-5 rounded-xl border border-white/10 shadow-xl">
                                 <h2 className="text-base font-bold mb-3 text-[#DCFE50]">Background</h2>
-                                <div className="flex gap-2 flex-wrap">
+                                <div className="grid grid-cols-3 gap-2">
                                     {Object.entries(BACKGROUNDS).map(([key, val]) => (
                                         <button
                                             key={key}
                                             onClick={() => setBackground(key)}
-                                            className={`w-8 h-8 rounded-full border-2 transition-all ${background === key
-                                                ? 'border-white scale-110 ring-2 ring-[#DCFE50]'
-                                                : 'border-gray-600 hover:scale-105'
+                                            className={`p-2 rounded-lg border-2 transition-all ${background === key
+                                                ? 'border-[#DCFE50] ring-1 ring-[#DCFE50]'
+                                                : 'border-gray-700 hover:border-gray-500'
                                                 }`}
-                                            style={{
-                                                background: `linear-gradient(135deg, ${val.colors.join(', ')})`
-                                            }}
-                                            title={val.name}
-                                        />
+                                        >
+                                            <div
+                                                className="w-full h-6 rounded-md mb-1"
+                                                style={{
+                                                    background: `linear-gradient(135deg, ${val.colors.join(', ')})`
+                                                }}
+                                            />
+                                            <div className="text-[10px] text-gray-400">{val.name}</div>
+                                        </button>
                                     ))}
                                 </div>
                             </div>
 
                             {/* Export */}
                             <div className="bg-[#1a1a24] p-5 rounded-xl border border-white/10 shadow-xl">
+                                <h2 className="text-base font-bold mb-3 text-[#DCFE50]">Export</h2>
+                                <p className="text-xs text-gray-500 mb-3">
+                                    Exports as WebM (universal format). Convert to MP4 later using <a href="https://cloudconvert.com/webm-to-mp4" target="_blank" className="text-[#DCFE50] hover:underline">CloudConvert</a> if needed.
+                                </p>
+
                                 <div className="space-y-3">
                                     <button
                                         className="w-full py-3 bg-white/10 text-white font-bold rounded-lg border border-white/20 hover:bg-white/20 transition-all"
@@ -454,11 +518,13 @@ export default function RecorderPage() {
                                         {isPlaying ? '⏸️ Pause' : '▶️ Play Preview'}
                                     </button>
                                     <button
-                                        className="w-full py-3 bg-[#DCFE50] text-black font-bold rounded-lg shadow-[4px_4px_0_black] hover:translate-y-[-2px] transition-all"
+                                        className="w-full py-3 bg-[#DCFE50] text-black font-bold rounded-lg shadow-[4px_4px_0_black] hover:translate-y-[-2px] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                         onClick={handleExport}
                                         disabled={isExporting}
                                     >
-                                        {isExporting ? `⚡ Exporting ${exportProgress}%` : '⚡ EXPORT WITH EFFECTS'}
+                                        {isExporting
+                                            ? `⚡ Exporting... ${exportProgress}%`
+                                            : '⚡ EXPORT WITH EFFECTS'}
                                     </button>
                                     <button
                                         className="w-full py-2 bg-white/5 text-gray-300 text-sm font-medium rounded-lg border border-white/10 hover:bg-white/10 transition-all"
@@ -573,6 +639,106 @@ export default function RecorderPage() {
                             />
                         </div>
                         <div className="mt-2 text-sm text-gray-500">{exportProgress}%</div>
+                    </div>
+                </div>
+            )}
+
+            {/* Hotkey Settings Modal */}
+            {showHotkeySettings && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-[#1a1a24] rounded-2xl p-6 max-w-md w-full border border-white/10 shadow-2xl">
+                        <h2 className="text-xl font-bold mb-4 text-[#DCFE50]">⌨️ Hotkey Settings</h2>
+
+                        {/* Start Recording Hotkey */}
+                        <div className="mb-6">
+                            <label className="text-sm text-gray-400 mb-2 block">Start Recording</label>
+                            <div className="flex gap-2 mb-2">
+                                {['ctrl', 'shift', 'alt'].map((mod) => (
+                                    <button
+                                        key={mod}
+                                        onClick={() => setHotkeys(prev => ({
+                                            ...prev,
+                                            start: { ...prev.start, [mod]: !prev.start[mod] }
+                                        }))}
+                                        className={`px-3 py-1.5 text-xs rounded-lg border transition-all ${hotkeys.start[mod]
+                                            ? 'bg-[#DCFE50]/20 border-[#DCFE50] text-[#DCFE50]'
+                                            : 'bg-white/5 border-gray-700 text-gray-400'
+                                            }`}
+                                    >
+                                        {mod.charAt(0).toUpperCase() + mod.slice(1)}
+                                    </button>
+                                ))}
+                                <select
+                                    value={hotkeys.start.key}
+                                    onChange={(e) => setHotkeys(prev => ({
+                                        ...prev,
+                                        start: { ...prev.start, key: e.target.value }
+                                    }))}
+                                    className="flex-1 bg-[#0a0a0f] border border-gray-700 rounded-lg px-3 py-1.5 text-sm"
+                                >
+                                    {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(k => (
+                                        <option key={k} value={k}>{k}</option>
+                                    ))}
+                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map(k => (
+                                        <option key={k} value={String(k)}>{k}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="text-xs text-gray-500">Current: {formatHotkey(hotkeys.start)}</div>
+                        </div>
+
+                        {/* Stop Recording Hotkey */}
+                        <div className="mb-6">
+                            <label className="text-sm text-gray-400 mb-2 block">Stop Recording</label>
+                            <div className="flex gap-2 mb-2">
+                                {['ctrl', 'shift', 'alt'].map((mod) => (
+                                    <button
+                                        key={mod}
+                                        onClick={() => setHotkeys(prev => ({
+                                            ...prev,
+                                            stop: { ...prev.stop, [mod]: !prev.stop[mod] }
+                                        }))}
+                                        className={`px-3 py-1.5 text-xs rounded-lg border transition-all ${hotkeys.stop[mod]
+                                            ? 'bg-[#DCFE50]/20 border-[#DCFE50] text-[#DCFE50]'
+                                            : 'bg-white/5 border-gray-700 text-gray-400'
+                                            }`}
+                                    >
+                                        {mod.charAt(0).toUpperCase() + mod.slice(1)}
+                                    </button>
+                                ))}
+                                <select
+                                    value={hotkeys.stop.key}
+                                    onChange={(e) => setHotkeys(prev => ({
+                                        ...prev,
+                                        stop: { ...prev.stop, key: e.target.value }
+                                    }))}
+                                    className="flex-1 bg-[#0a0a0f] border border-gray-700 rounded-lg px-3 py-1.5 text-sm"
+                                >
+                                    {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(k => (
+                                        <option key={k} value={k}>{k}</option>
+                                    ))}
+                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map(k => (
+                                        <option key={k} value={String(k)}>{k}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="text-xs text-gray-500">Current: {formatHotkey(hotkeys.stop)}</div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowHotkeySettings(false)}
+                                className="flex-1 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={saveHotkeys}
+                                className="flex-1 py-2 bg-[#DCFE50] text-black font-bold rounded-lg hover:bg-[#c9e845] transition-all"
+                            >
+                                Save Hotkeys
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

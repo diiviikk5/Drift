@@ -57,12 +57,19 @@ export class DriftEngine {
             });
 
             window.electron.onGlobalHotkey((action) => {
-                console.log('[Drift] Global Hotkey received:', action);
+                console.log('[Drift] Global Hotkey received:', action, 'isRecording:', this.isRecording, 'hasStream:', !!this.screenStream?.active);
                 if (action === 'STOP') {
-                    if (this.isRecording) this.stopRecording();
+                    if (this.isRecording) {
+                        console.log('[Drift] Stopping recording via hotkey');
+                        this.stopRecording();
+                    }
                 } else if (action === 'START') {
-                    if (!this.isRecording && this.onHotkeyStart) {
+                    // Only start if we have a stream and aren't recording
+                    if (!this.isRecording && this.screenStream?.active && this.onHotkeyStart) {
+                        console.log('[Drift] Starting recording via hotkey');
                         this.onHotkeyStart();
+                    } else {
+                        console.log('[Drift] Cannot start - no stream or already recording');
                     }
                 }
             });
@@ -162,7 +169,16 @@ export class DriftEngine {
         // Ensure Mic is active if enabled
         if (this.micEnabled && !this.micStream) {
             try {
-                this.micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                // Request mic with better constraints for headphone mics
+                this.micStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        // Don't specify deviceId to use default mic (usually headphone mic)
+                    }
+                });
+                console.log('[Drift] Mic stream acquired:', this.micStream.getAudioTracks()[0]?.label);
             } catch (e) {
                 console.error("Failed to get mic stream:", e);
             }
@@ -207,11 +223,15 @@ export class DriftEngine {
             ...outputTracks
         ]);
 
+        // Higher quality recording settings for polished output
         const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
-        this.mediaRecorder = new MediaRecorder(combinedStream, { mimeType: mime, videoBitsPerSecond: 8000000 });
+        this.mediaRecorder = new MediaRecorder(combinedStream, {
+            mimeType: mime,
+            videoBitsPerSecond: 15000000 // 15 Mbps for high quality
+        });
 
         this.mediaRecorder.ondataavailable = e => { if (e.data.size > 0) this.recordedChunks.push(e.data); };
-        this.mediaRecorder.start(100);
+        this.mediaRecorder.start(50); // Smaller timeslice for smoother capture
 
         // Timer Loop
         this.timerInt = setInterval(() => {

@@ -10,6 +10,12 @@ contextBridge.exposeInMainWorld('electron', {
     // Get Screen Sources (Electron specific API)
     getSources: () => ipcRenderer.invoke('GET_SOURCES'),
 
+    // Get current hotkey settings
+    getHotkeys: () => ipcRenderer.invoke('GET_HOTKEYS'),
+
+    // Set custom hotkeys
+    setHotkeys: (hotkeys) => ipcRenderer.invoke('SET_HOTKEYS', hotkeys),
+
     // Cleanup listeners
     removeListener: (channel) => ipcRenderer.removeAllListeners(channel)
 });

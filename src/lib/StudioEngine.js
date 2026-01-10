@@ -1,12 +1,15 @@
 // Studio Engine - Handles Post-Production (Zooming, Clicks, Export)
 
+// Smooth easing functions for cinematic transitions
 const easeOutQuint = t => 1 - Math.pow(1 - t, 5);
 const easeInOutQuart = t => t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
+const easeOutExpo = t => t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
 
+// Refined speed presets for buttery smooth zoom animations
 const SPEED_PRESETS = {
-    slow: { zoomIn: 1000, hold: 1200, zoomOut: 1000, smoothing: 0.05 },
-    normal: { zoomIn: 750, hold: 1000, zoomOut: 750, smoothing: 0.07 },
-    fast: { zoomIn: 400, hold: 600, zoomOut: 500, smoothing: 0.12 }
+    slow: { zoomIn: 1200, hold: 1500, zoomOut: 1200, smoothing: 0.04 },
+    normal: { zoomIn: 900, hold: 1200, zoomOut: 900, smoothing: 0.06 },
+    fast: { zoomIn: 500, hold: 800, zoomOut: 600, smoothing: 0.10 }
 };
 
 export class StudioEngine {
@@ -30,10 +33,11 @@ export class StudioEngine {
         this.lookAheadMs = 400;
 
         // Customizable settings
-        this.background = 'aurora';
+        this.background = 'bigSur'; // Default to macOS Big Sur style
         this.startPosition = 'center';
         this.trimStart = 0;
         this.trimEnd = 0;
+        this.showCursor = false; // Aesthetic black cursor overlay
 
         this.isPlaying = false;
         this.animationFrame = null;
@@ -211,31 +215,101 @@ export class StudioEngine {
         const v = this.video;
         const cam = this.camera;
 
-        // Background gradients
+        // Premium macOS-style gradient backgrounds (inspired by Big Sur, Monterey, Ventura, Sonoma)
         const BACKGROUNDS = {
-            aurora: ['#1a1a2e', '#2d1b4e', '#1e3a5f'],
-            sunset: ['#ff6b6b', '#feca57', '#ff9ff3'],
-            ocean: ['#0093E9', '#80D0C7'],
-            forest: ['#134E5E', '#71B280'],
-            nightsky: ['#0f0c29', '#302b63', '#24243e'],
-            candy: ['#a855f7', '#ec4899', '#f43f5e']
+            // macOS Big Sur - Pink/Orange/Purple
+            bigSur: {
+                type: 'radial',
+                colors: [
+                    { pos: 0, color: '#ff6b9d' },
+                    { pos: 0.3, color: '#c44569' },
+                    { pos: 0.5, color: '#6c5ce7' },
+                    { pos: 0.8, color: '#0c3483' },
+                    { pos: 1, color: '#1a1a2e' }
+                ]
+            },
+            // macOS Monterey - Blue/Teal/Green
+            monterey: {
+                type: 'radial',
+                colors: [
+                    { pos: 0, color: '#00b894' },
+                    { pos: 0.25, color: '#00cec9' },
+                    { pos: 0.5, color: '#0984e3' },
+                    { pos: 0.8, color: '#6c5ce7' },
+                    { pos: 1, color: '#2d1b4e' }
+                ]
+            },
+            // macOS Ventura - Red/Pink wave
+            ventura: {
+                type: 'diagonal',
+                colors: [
+                    { pos: 0, color: '#e17055' },
+                    { pos: 0.3, color: '#d63031' },
+                    { pos: 0.5, color: '#fd79a8' },
+                    { pos: 0.7, color: '#a855f7' },
+                    { pos: 1, color: '#1e3a5f' }
+                ]
+            },
+            // Windows 11 Bloom - Blue flower
+            bloom: {
+                type: 'radial',
+                colors: [
+                    { pos: 0, color: '#74b9ff' },
+                    { pos: 0.3, color: '#0984e3' },
+                    { pos: 0.5, color: '#6c5ce7' },
+                    { pos: 0.7, color: '#a855f7' },
+                    { pos: 1, color: '#1a1a2e' }
+                ]
+            },
+            // macOS Sonoma - Warm abstract
+            sonoma: {
+                type: 'diagonal',
+                colors: [
+                    { pos: 0, color: '#fdcb6e' },
+                    { pos: 0.25, color: '#f39c12' },
+                    { pos: 0.5, color: '#e74c3c' },
+                    { pos: 0.75, color: '#9b59b6' },
+                    { pos: 1, color: '#2c3e50' }
+                ]
+            },
+            // Deep Night - Dark elegant
+            midnight: {
+                type: 'radial',
+                colors: [
+                    { pos: 0, color: '#2c3e50' },
+                    { pos: 0.5, color: '#1a1a2e' },
+                    { pos: 1, color: '#0a0a0f' }
+                ]
+            }
         };
 
-        // 1. Draw Background (Gradient)
-        const colors = BACKGROUNDS[this.background] || BACKGROUNDS.aurora;
-        const g = ctx.createLinearGradient(0, 0, c.width, c.height);
-        colors.forEach((col, i) => g.addColorStop(i / (colors.length - 1 || 1), col));
-        ctx.fillStyle = g;
+        // Get background config
+        const bgConfig = BACKGROUNDS[this.background] || BACKGROUNDS.bigSur;
+
+        // Create gradient based on type
+        let gradient;
+        if (bgConfig.type === 'radial') {
+            gradient = ctx.createRadialGradient(
+                c.width * 0.3, c.height * 0.3, 0,
+                c.width * 0.5, c.height * 0.5, c.width * 0.8
+            );
+        } else {
+            gradient = ctx.createLinearGradient(0, 0, c.width, c.height);
+        }
+
+        bgConfig.colors.forEach(({ pos, color }) => gradient.addColorStop(pos, color));
+        ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, c.width, c.height);
 
         if (v.readyState >= 2) {
             ctx.save();
 
             // VIDEO DIMENSIONS (Scaled down to show background frame)
-            const frameScale = 0.85;
+            const frameScale = 0.82;
+            const titleBarHeight = 36; // Height for Mac dots title bar
             const vw = c.width * frameScale;
-            // Maintain aspect ratio
             const vh = (v.videoHeight / v.videoWidth) * vw;
+            const totalHeight = vh + titleBarHeight;
 
             // Center position
             const cx = c.width / 2;
@@ -247,58 +321,114 @@ export class StudioEngine {
 
             // Pan camera (move content opposite to target)
             const panX = (cam.x - 0.5) * vw;
-            const panY = (cam.y - 0.5) * vh;
+            const panY = (cam.y - 0.5) * totalHeight;
             ctx.translate(-panX, -panY);
 
-            // Draw Container (Mac Window Style)
-            const r = 16;
+            // Window container dimensions
+            const r = 12;
             const x = -vw / 2;
-            const y = -vh / 2;
+            const y = -totalHeight / 2;
             const w = vw;
-            const h = vh;
+            const h = totalHeight;
 
             // Shadow
-            ctx.shadowColor = 'rgba(0,0,0,0.5)';
-            ctx.shadowBlur = 50;
-            ctx.shadowOffsetY = 30;
+            ctx.shadowColor = 'rgba(0,0,0,0.6)';
+            ctx.shadowBlur = 60;
+            ctx.shadowOffsetY = 25;
 
             // Window Background (black backing)
-            ctx.fillStyle = '#000';
+            ctx.fillStyle = '#1a1a1a';
             this.roundRect(ctx, x, y, w, h, r);
             ctx.fill();
 
-            // Reset shadow for content
+            // Reset shadow
             ctx.shadowColor = 'transparent';
 
-            // Clip for video
+            // --- TITLE BAR (Mac dots area - ABOVE the video) ---
             ctx.save();
-            this.roundRect(ctx, x, y, w, h, r);
+            this.roundRect(ctx, x, y, w, titleBarHeight, { tl: r, tr: r, bl: 0, br: 0 });
+            ctx.clip();
+
+            // Title bar background (dark gray)
+            ctx.fillStyle = '#2d2d2d';
+            ctx.fillRect(x, y, w, titleBarHeight);
+
+            // Draw Traffic Lights (Mac Buttons) - in title bar
+            const bx = x + 18;
+            const by = y + titleBarHeight / 2;
+            const gap = 20;
+            const dotRadius = 6;
+
+            ctx.fillStyle = '#FF5F57';
+            ctx.beginPath(); ctx.arc(bx, by, dotRadius, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#FFBD2E';
+            ctx.beginPath(); ctx.arc(bx + gap, by, dotRadius, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#28C840';
+            ctx.beginPath(); ctx.arc(bx + gap * 2, by, dotRadius, 0, Math.PI * 2); ctx.fill();
+
+            ctx.restore();
+
+            // --- VIDEO AREA (below title bar) ---
+            ctx.save();
+            // Clip to video area only (below title bar)
+            ctx.beginPath();
+            ctx.rect(x, y + titleBarHeight, w, vh);
             ctx.clip();
 
             // Draw Video
-            ctx.drawImage(v, x, y, w, h);
+            ctx.drawImage(v, x, y + titleBarHeight, w, vh);
+
+            // Optional: Draw cursor overlay
+            if (this.showCursor && this.activeZoom) {
+                const cursorX = x + this.activeZoom.x * w;
+                const cursorY = y + titleBarHeight + this.activeZoom.y * vh;
+                this.drawCursor(ctx, cursorX, cursorY);
+            }
+
             ctx.restore();
 
-            // Draw Border / Highlights (Glass effect)
-            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            // Border / Highlight (Glass effect)
+            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
             ctx.lineWidth = 1;
             this.roundRect(ctx, x, y, w, h, r);
             ctx.stroke();
 
-            // Draw Traffic Lights (Mac Buttons)
-            const bx = x + 20;
-            const by = y + 20;
-            const gap = 24;
-
-            ctx.fillStyle = '#FF5F56';
-            ctx.beginPath(); ctx.arc(bx, by, 6, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = '#FFBD2E';
-            ctx.beginPath(); ctx.arc(bx + gap, by, 6, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = '#27C93F';
-            ctx.beginPath(); ctx.arc(bx + gap * 2, by, 6, 0, Math.PI * 2); ctx.fill();
-
             ctx.restore();
         }
+    }
+
+    // Draw aesthetic black cursor
+    drawCursor(ctx, x, y) {
+        ctx.save();
+        ctx.translate(x, y);
+
+        // Cursor shadow
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+
+        // Black cursor with white outline
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, 20);
+        ctx.lineTo(5, 15);
+        ctx.lineTo(9, 22);
+        ctx.lineTo(12, 20);
+        ctx.lineTo(8, 13);
+        ctx.lineTo(14, 13);
+        ctx.closePath();
+
+        // White outline
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Black fill
+        ctx.fillStyle = '#000000';
+        ctx.fill();
+
+        ctx.restore();
     }
 
     roundRect(ctx, x, y, w, h, r) {
@@ -320,15 +450,33 @@ export class StudioEngine {
 
         await new Promise(r => setTimeout(r, 500)); // buffer
 
+        // Capture at 60 FPS for smooth playback
         const stream = this.canvas.captureStream(60);
 
-        // Add Audio (Video Audio)
-        // Note: Logic simplified for now, assuming video has audio
-        // Ideally we also mix the 'Click Sounds' here if added
+        // Add audio from the source video if available
+        if (this.video.captureStream) {
+            try {
+                const videoStream = this.video.captureStream();
+                const audioTracks = videoStream.getAudioTracks();
+                audioTracks.forEach(track => stream.addTrack(track));
+            } catch (e) {
+                console.log('[Studio] Could not capture audio:', e);
+            }
+        }
 
-        const rec = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 15000000 });
+        // Use VP8 for smoother playback (VP9 can have frame timing issues)
+        // VP8 is more widely compatible and has consistent frame timing
+        const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+            ? 'video/webm;codecs=vp8,opus'
+            : 'video/webm';
+
+        const rec = new MediaRecorder(stream, {
+            mimeType,
+            videoBitsPerSecond: 20000000  // 20 Mbps for high quality
+        });
         const chunks = [];
 
+        // Collect data more frequently for smoother playback
         rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
 
         return new Promise((resolve) => {
@@ -337,14 +485,20 @@ export class StudioEngine {
                 resolve(blob);
             };
 
-            rec.start(100);
+            rec.start(20); // Small timeslice for smooth 60fps capture
             this.video.play();
 
             const checkEnd = () => {
                 if (this.video.ended) {
                     rec.stop();
                 } else {
-                    if (onProgress) onProgress(this.video.currentTime / this.videoDuration);
+                    // Safely calculate progress with bounds checking
+                    const duration = this.videoDuration || this.video.duration || 10;
+                    const currentTime = this.video.currentTime || 0;
+                    const progress = Math.min(Math.max(currentTime / duration, 0), 1);
+                    if (onProgress && isFinite(progress)) {
+                        onProgress(progress);
+                    }
                     requestAnimationFrame(checkEnd);
                 }
             };

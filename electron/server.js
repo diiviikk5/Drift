@@ -1,51 +1,75 @@
-const { spawn } = require('child_process');
 const path = require('path');
 const { app } = require('electron');
 
-let nextServer = null;
+let server = null;
+let serverUrl = 'http://localhost:3000';
 
-function startNextServer() {
-    return new Promise((resolve, reject) => {
-        const nextPath = path.join(__dirname, '../node_modules/.bin/next.cmd');
-        const projectPath = path.join(__dirname, '..');
-        
-        console.log('[Drift Server] Starting Next.js server...');
-        
-        nextServer = spawn(nextPath, ['start', '-p', '3000'], {
-            cwd: projectPath,
-            stdio: 'pipe',
-            shell: true
-        });
+async function startNextServer() {
+    return new Promise(async (resolve, reject) => {
+        try {
+            // Get the correct path based on whether we're packaged or not
+            const isDev = !app.isPackaged;
 
-        nextServer.stdout.on('data', (data) => {
-            const output = data.toString();
-            console.log('[Next.js]', output);
-            
-            // Wait for "Ready" or "started server" message
-            if (output.includes('Ready') || output.includes('started server') || output.includes('Local:')) {
-                resolve();
+            if (isDev) {
+                // In development, just use the existing dev server
+                console.log('[Drift Server] Development mode - using existing dev server');
+                resolve(serverUrl);
+                return;
             }
-        });
 
-        nextServer.stderr.on('data', (data) => {
-            console.error('[Next.js Error]', data.toString());
-        });
+            // In production, use Next.js programmatic API
+            console.log('[Drift Server] Starting Next.js production server...');
 
-        nextServer.on('error', (error) => {
-            console.error('[Drift Server] Failed to start Next.js:', error);
-            reject(error);
-        });
+            // Determine correct paths for packaged app
+            const resourcesPath = process.resourcesPath;
+            const appPath = path.join(resourcesPath, 'app.asar');
 
-        // Timeout fallback
-        setTimeout(() => resolve(), 5000);
+            // Set environment for Next.js
+            process.env.NODE_ENV = 'production';
+
+            // Dynamically require next
+            const next = require('next');
+            const http = require('http');
+
+            const nextApp = next({
+                dev: false,
+                dir: appPath,
+                conf: {
+                    distDir: '.next'
+                }
+            });
+
+            const handle = nextApp.getRequestHandler();
+
+            await nextApp.prepare();
+
+            server = http.createServer((req, res) => {
+                handle(req, res);
+            });
+
+            server.listen(3000, 'localhost', (err) => {
+                if (err) {
+                    console.error('[Drift Server] Failed to start:', err);
+                    reject(err);
+                    return;
+                }
+                console.log('[Drift Server] Next.js server running on http://localhost:3000');
+                resolve(serverUrl);
+            });
+
+        } catch (error) {
+            console.error('[Drift Server] Error starting Next.js:', error);
+            // Fallback: try to resolve anyway (app might still work with static files)
+            resolve(serverUrl);
+        }
     });
 }
 
 function stopNextServer() {
-    if (nextServer) {
+    if (server) {
         console.log('[Drift Server] Stopping Next.js server...');
-        nextServer.kill();
-        nextServer = null;
+        server.close();
+        server = null;
     }
 }
 
