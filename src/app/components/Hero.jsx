@@ -235,7 +235,7 @@ export default function Hero() {
                             <div className="flex flex-col sm:flex-row gap-3">
                                 {/* Direct Download */}
                                 <a
-                                    href="https://github.com/diiviikk5/Drift/releases/download/v0.1.1-beta/Drift-v0.1.1-beta-win.zip"
+                                    href="https://github.com/diiviikk5/Drift/releases/download/v0.1.1-beta/Drift-v0.1.0-win.zip"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="brutal-button brutal-button-pink group flex-1 flex items-center justify-center gap-2"
