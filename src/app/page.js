@@ -1,5 +1,7 @@
 import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
+import InstallGuide from "./components/InstallGuide";
+import UsageGuide from "./components/UsageGuide";
 import Footer from "./components/Footer";
 
 export default function Home() {
@@ -8,6 +10,8 @@ export default function Home() {
       <Navbar />
       <main>
         <Hero />
+        <InstallGuide />
+        <UsageGuide />
       </main>
       <Footer />
     </div>
