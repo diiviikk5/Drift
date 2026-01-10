@@ -235,7 +235,7 @@ export default function Hero() {
                             <div className="flex flex-col sm:flex-row gap-3">
                                 {/* Direct Download */}
                                 <a
-                                    href="https://github.com/diiviikk5/Drift/releases/download/v0.1.0/Drift-v0.1.0-win.zip"
+                                    href="https://github.com/diiviikk5/Drift/releases/download/v0.1.1-beta/Drift-v0.1.1-beta-win.zip"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="brutal-button brutal-button-pink group flex-1 flex items-center justify-center gap-2"
@@ -244,11 +244,11 @@ export default function Hero() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                     </svg>
                                     <span>Download</span>
-                                    <span className="text-xs opacity-75">(v0.1.0)</span>
+                                    <span className="text-xs opacity-75">(v0.1.1-beta)</span>
                                 </a>
                                 {/* GitHub Releases */}
                                 <a
-                                    href="https://github.com/diiviikk5/Drift/releases"
+                                    href="https://github.com/diiviikk5/Drift/releases/tag/v0.1.1-beta"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="brutal-button group flex items-center justify-center gap-2"
