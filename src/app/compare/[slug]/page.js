@@ -16,7 +16,8 @@ export async function generateStaticParams() {
     }));
 }
 
-export function generateMetadata({ params }) {
+export async function generateMetadata(props) {
+    const params = await props.params;
     const competitor = params.slug.replace("-alternative", "");
     const competitorName = competitor.charAt(0).toUpperCase() + competitor.slice(1);
 
@@ -29,7 +30,8 @@ export function generateMetadata({ params }) {
     };
 }
 
-export default function ComparePage({ params }) {
+export default async function ComparePage(props) {
+    const params = await props.params;
     const { slug } = params;
     if (!slug.endsWith("-alternative")) {
         notFound();
