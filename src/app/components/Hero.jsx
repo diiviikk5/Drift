@@ -182,7 +182,7 @@ export default function Hero() {
                                                     whileHover={{ scale: 1.02 }}
                                                     whileTap={{ scale: 0.98 }}
                                                 >
-                                                    <span>Join Waitlist</span>
+                                                    <span>Get Updates</span>
                                                     <svg
                                                         className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1"
                                                         fill="none"
@@ -215,7 +215,7 @@ export default function Hero() {
                                             </motion.div>
                                             <div className="text-left font-mono">
                                                 <p className="font-bold text-[#0a0a0a] text-xl uppercase">You're in!</p>
-                                                <p className="text-sm text-[#333]">We'll notify you at launch.</p>
+                                                <p className="text-sm text-[#333]">We'll keep you posted.</p>
                                             </div>
                                         </div>
                                     </motion.div>
@@ -295,7 +295,7 @@ export default function Hero() {
                                     >
                                         {waitlistCount}
                                     </motion.span>{" "}
-                                    {waitlistCount === 1 ? "PERSON" : "PEOPLE"} ON THE WAITLIST
+                                    {waitlistCount === 1 ? "PERSON" : "PEOPLE"} INTERESTED
                                 </div>
                             </motion.div>
                         )}
