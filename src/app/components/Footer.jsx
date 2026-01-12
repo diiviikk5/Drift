@@ -88,17 +88,6 @@ export default function Footer() {
                     >
                         © {currentYear} Drift — Built Different
                     </motion.p>
-                    {/* Comparison Links (SEO) */}
-                    <div className="flex flex-wrap justify-center gap-4 text-xs font-mono text-[var(--text-muted)] mt-8 max-w-2xl px-4">
-                        <span className="opacity-50">COMPARE:</span>
-                        <a href="/compare/loom-alternative" className="hover:text-[var(--text-primary)] transition-colors">LOOM ALTERNATIVE</a>
-                        <span className="opacity-30">•</span>
-                        <a href="/compare/obs-alternative" className="hover:text-[var(--text-primary)] transition-colors">OBS ALTERNATIVE</a>
-                        <span className="opacity-30">•</span>
-                        <a href="/compare/camtasia-alternative" className="hover:text-[var(--text-primary)] transition-colors">CAMTASIA ALTERNATIVE</a>
-                        <span className="opacity-30">•</span>
-                        <a href="/compare/snagit-alternative" className="hover:text-[var(--text-primary)] transition-colors">SNAGIT ALTERNATIVE</a>
-                    </div>
                 </div>
             </div>
         </footer>
