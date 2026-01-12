@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "./ThemeProvider";
+import ProductHuntBadge from "./ProductHuntBadge";
 
 export default function Hero() {
     const [email, setEmail] = useState("");
@@ -223,6 +224,23 @@ export default function Hero() {
                             </AnimatePresence>
                         </motion.div>
 
+                        {/* Product Hunt Badge - Mobile */}
+                        <motion.div
+                            className="flex justify-center lg:hidden mb-8"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.6 }}
+                        >
+                            <a
+                                href="https://www.producthunt.com/products/drift-6?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_campaign=badge-drift-6ef740e8-671a-4130-90b6-140b7784af27"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="transform hover:scale-105 transition-transform"
+                            >
+                                <ProductHuntBadge />
+                            </a>
+                        </motion.div>
+
                         {/* Download Buttons */}
                         <motion.div
                             className="max-w-md mx-auto lg:hidden mb-8"
@@ -262,10 +280,11 @@ export default function Hero() {
                             </p>
                         </motion.div>
 
+
                         {/* Social Proof */}
                         {waitlistCount > 0 && (
                             <motion.div
-                                className="flex items-center justify-center lg:justify-start gap-4"
+                                className="flex items-center justify-center lg:justify-start gap-4 mb-8"
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 transition={{ delay: 0.7 }}
@@ -299,6 +318,8 @@ export default function Hero() {
                                 </div>
                             </motion.div>
                         )}
+
+
                     </div>
 
                     <motion.div
@@ -307,6 +328,22 @@ export default function Hero() {
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.3, duration: 0.6 }}
                     >
+                        {/* Product Hunt Badge - Desktop */}
+                        <motion.div
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.8 }}
+                        >
+                            <a
+                                href="https://www.producthunt.com/products/drift-6?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_campaign=badge-drift-6ef740e8-671a-4130-90b6-140b7784af27"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block transform hover:scale-105 transition-transform"
+                            >
+                                <ProductHuntBadge />
+                            </a>
+                        </motion.div>
+
                         {/* Desktop Download Buttons */}
                         <motion.div
                             className="w-full max-w-md"

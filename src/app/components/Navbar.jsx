@@ -22,7 +22,7 @@ export default function Navbar() {
                 : "py-4"
                 }`}
         >
-            <div className="max-w-6xl mx-auto px-4 flex items-center justify-between">
+            <div className="relative max-w-6xl mx-auto px-4 flex items-center justify-between">
                 {/* Logo */}
                 <motion.a
                     href="/"
