@@ -149,6 +149,44 @@ export class DriftEngine {
         }
     }
 
+    async selectSourceBrowser() {
+        try {
+            if (this.screenStream) {
+                this.screenStream.getTracks().forEach(t => t.stop());
+            }
+
+            // Standard browser API
+            const stream = await navigator.mediaDevices.getDisplayMedia({
+                video: true,
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                },
+                systemAudio: "include"
+            });
+
+            this.screenStream = stream;
+
+            // Handle external stop (browser UI stop button)
+            stream.getVideoTracks()[0].onended = () => {
+                console.log('[Drift] Stream ended by user');
+                if (this.isRecording) {
+                    this.stopRecording();
+                }
+            };
+
+            if (this.video) {
+                this.video.srcObject = stream;
+                await this.video.play().catch(e => console.warn("Auto-play preview failed:", e));
+            }
+            return true;
+        } catch (e) {
+            console.error("Browser source select failed:", e);
+            return false;
+        }
+    }
+
     async enableMic() {
         try {
             this.micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -249,7 +287,8 @@ export class DriftEngine {
 
         this.mediaRecorder.onstop = () => {
             const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
-            if (this.onStopCallback) this.onStopCallback(blob, this.clicks);
+            const duration = (Date.now() - this.startTime) / 1000;
+            if (this.onStopCallback) this.onStopCallback(blob, this.clicks, duration);
         };
     }
 

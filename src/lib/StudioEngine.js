@@ -12,9 +12,12 @@ const SPEED_PRESETS = {
     fast: { zoomIn: 500, hold: 800, zoomOut: 600, smoothing: 0.10 }
 };
 
+const FRAME_SCALE = 0.82;
+const TITLE_BAR_HEIGHT = 36;
+
 export class StudioEngine {
-    constructor(canvas, videoElement, blob, clicks = []) {
-        console.log('[Studio] Initializing with', clicks.length, 'clicks');
+    constructor(canvas, videoElement, blob, clicks = [], duration = null) {
+        console.log('[Studio] Initializing with', clicks.length, 'clicks, duration:', duration);
 
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
@@ -22,6 +25,7 @@ export class StudioEngine {
 
         this.blob = blob;
         this.clicks = clicks;
+        this.explicitDuration = duration; // Store explicit duration
 
         this.camera = { x: 0.5, y: 0.5, scale: 1 };
         this.target = { x: 0.5, y: 0.5, scale: 1 };
@@ -58,7 +62,9 @@ export class StudioEngine {
             this.canvas.height = this.video.videoHeight || 1080;
 
             // Handle Infinity duration (common with MediaRecorder blobs)
-            if (!isFinite(this.video.duration)) {
+            if (this.explicitDuration) {
+                this.videoDuration = this.explicitDuration;
+            } else if (!isFinite(this.video.duration)) {
                 console.log('[Studio] Duration is Infinity, estimating from last click');
                 // Estimate from recording - use last click time + 2 seconds
                 const lastClick = this.clicks[this.clicks.length - 1];
@@ -104,6 +110,102 @@ export class StudioEngine {
         this.lastClickIdx = -1;
     }
 
+    addZoom(timeSec, x = 0.5, y = 0.5, scale = 1.5, speed = 'normal') {
+        console.log('[Studio] Manual Zoom added at:', timeSec, 'Scale:', scale, 'Speed:', speed);
+        // Add artificial click
+        this.clicks.push({
+            time: timeSec * 1000,
+            x: x,
+            y: y,
+            scale: scale,
+            speed: speed
+        });
+        // Sort clicks by time
+        this.clicks.sort((a, b) => a.time - b.time);
+
+        // Reset state to force re-evaluation
+        this.lastClickIdx = -1;
+        this.activeZoom = null;
+
+        // Force immediate update to show preview if paused
+        if (!this.isPlaying) {
+            this.updateCamera();
+            this.drawFrame();
+        }
+    }
+
+    updateClick(index, updates) {
+        if (index < 0 || index >= this.clicks.length) return;
+
+        // Update the stored click data
+        Object.assign(this.clicks[index], updates);
+        console.log(`[Studio] Updated click ${index}:`, updates);
+
+        // If this is the currently active/latest zoom, update the live state too
+        if (this.lastClickIdx === index && this.activeZoom) {
+            if (updates.scale !== undefined) {
+                this.activeZoom.targetScale = updates.scale;
+                this.activeZoom.scale = updates.scale;
+                this.target.scale = updates.scale;
+                if (!this.isPlaying) this.drawFrame();
+            }
+            if (updates.speed !== undefined) {
+                this.activeZoom.speed = updates.speed;
+            }
+        }
+    }
+
+    resolveClick(normX, normY) {
+        // Convert normalized canvas coords to absolute canvas coords
+        const Px = normX * this.canvas.width;
+        const Py = normY * this.canvas.height;
+
+        // --- 1. Untranslate Center ---
+        const P1x = Px - this.canvas.width / 2;
+        const P1y = Py - this.canvas.height / 2;
+
+        // --- 2. Unscale (Camera Zoom) ---
+        const P2x = P1x / this.camera.scale;
+        const P2y = P1y / this.camera.scale;
+
+        // --- Dimensions (Must match drawFrame) ---
+        const vw = this.canvas.width * FRAME_SCALE;
+        const vRatio = this.video.videoHeight / this.video.videoWidth;
+        const vh = vw * vRatio;
+        const totalHeight = vh + TITLE_BAR_HEIGHT;
+
+        // --- 3. Un-pan (Add Camera Pan back) ---
+        // Pan amount in drawFrame is: (cam.x - 0.5) * vw
+        const panX = (this.camera.x - 0.5) * vw;
+        const panY = (this.camera.y - 0.5) * totalHeight;
+
+        const P3x = P2x + panX;
+        const P3y = P2y + panY;
+
+        // --- 4. Map to Video Rect ---
+        // Window drawing starts at x = -vw/2, y = -totalHeight/2
+        // Video starts at WindowX, WindowY + TITLE_BAR_HEIGHT
+        // We want P3 relative to Video Top-Left
+
+        const winX = -vw / 2;
+        const winY = -totalHeight / 2;
+        const videoX = winX;
+        const videoY = winY + TITLE_BAR_HEIGHT;
+
+        const relX = P3x - videoX;
+        const relY = P3y - videoY;
+
+        // --- 5. Normalize to Video ---
+        const finalX = relX / vw;
+        const finalY = relY / vh;
+
+        // Clamp to ensure valid click
+        return {
+            x: Math.max(0, Math.min(1, finalX)),
+            y: Math.max(0, Math.min(1, finalY))
+        };
+    }
+
     renderLoop() {
         console.log('[Studio] renderLoop started');
         let frameCount = 0;
@@ -145,8 +247,10 @@ export class StudioEngine {
                 }
 
                 if (diff >= 0 && diff < 200 && i > this.lastClickIdx) {
-                    console.log('[Studio] TRIGGERING ZOOM on click', i, 'at', click.x, click.y, 'diff:', diff);
-                    this.triggerZoom(click.x, click.y);
+                    const zoomScale = click.scale || this.zoomLevel;
+                    const zoomSpeed = click.speed || 'normal';
+                    console.log('[Studio] TRIGGERING ZOOM on click', i, 'at', click.x, click.y, 'Scale:', zoomScale, 'Speed:', zoomSpeed);
+                    this.triggerZoom(click.x, click.y, zoomScale, zoomSpeed);
                     this.lastClickIdx = i;
                     break;
                 }
@@ -160,9 +264,10 @@ export class StudioEngine {
 
         if (this.activeZoom) {
             const elapsed = performance.now() - this.activeZoom.startTime;
-            // NOTE: In Desktop, using performance.now() is smooth but desyncs if video lags? 
-            // Better to track video time? 
-            // For now sticking to original logic logic.
+
+            // Resolve speed for THIS zoom
+            const speedKey = this.activeZoom.speed || 'normal';
+            const sp = SPEED_PRESETS[speedKey] || SPEED_PRESETS.normal;
 
             const { zoomIn, hold, zoomOut } = sp;
 
@@ -199,13 +304,32 @@ export class StudioEngine {
         }
     }
 
-    triggerZoom(x, y) {
+    triggerZoom(x, y, scale = 1.5, speed = 'normal') {
+        const clampedX = Math.max(0.15, Math.min(0.85, x));
+        const clampedY = Math.max(0.15, Math.min(0.85, y));
+
         this.activeZoom = {
-            x: Math.max(0.15, Math.min(0.85, x)),
-            y: Math.max(0.15, Math.min(0.85, y)),
+            x: clampedX,
+            y: clampedY,
+            scale: scale,
+            speed: speed,
             startTime: performance.now(),
-            videoTimeTriggered: this.video.currentTime * 1000
+            videoTimeTriggered: this.video.currentTime * 1000,
+
+            // Starting state for lerp
+            startX: this.camera.x,
+            startY: this.camera.y,
+            startScale: this.camera.scale,
+            targetScale: scale
         };
+
+        // Update global target for smooth panning if not locked
+        this.target = {
+            x: clampedX,
+            y: clampedY,
+            scale: scale
+        };
+
         console.log('[Studio] Zoom started at video time:', this.activeZoom.videoTimeTriggered);
     }
 
@@ -305,9 +429,8 @@ export class StudioEngine {
             ctx.save();
 
             // VIDEO DIMENSIONS (Scaled down to show background frame)
-            const frameScale = 0.82;
-            const titleBarHeight = 36; // Height for Mac dots title bar
-            const vw = c.width * frameScale;
+            const titleBarHeight = TITLE_BAR_HEIGHT;
+            const vw = c.width * FRAME_SCALE;
             const vh = (v.videoHeight / v.videoWidth) * vw;
             const totalHeight = vh + titleBarHeight;
 

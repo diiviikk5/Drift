@@ -10,8 +10,18 @@ export default function UsageGuide() {
     const usageSteps = [
         {
             step: "1",
-            title: "Select Recording Area",
-            description: "Choose full screen, a specific window, or custom region to capture.",
+            title: "Launch Browser App",
+            description: "Click 'Start Recording' to open the web-based recorder instantly.",
+            icon: (
+                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="square" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-9z" />
+                </svg>
+            ),
+        },
+        {
+            step: "2",
+            title: "Select Screen",
+            description: "Choose a Chrome Tab, Window, or your entire Screen to capture.",
             icon: (
                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="square" strokeWidth={2.5} d="M4 5a1 1 0 011-1h4a1 1 0 010 2H6v3a1 1 0 01-2 0V5zM20 5a1 1 0 00-1-1h-4a1 1 0 000 2h3v3a1 1 0 002 0V5zM4 19a1 1 0 001 1h4a1 1 0 000-2H6v-3a1 1 0 00-2 0v4zM20 19a1 1 0 01-1 1h-4a1 1 0 010-2h3v-3a1 1 0 012 0v4z" />
@@ -19,32 +29,23 @@ export default function UsageGuide() {
             ),
         },
         {
-            step: "2",
-            title: "Hit Record",
-            description: "Click the record button or use keyboard shortcut to start capturing.",
-            icon: (
-                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="8" strokeWidth={2.5} fill="var(--brutal-pink)" />
-                </svg>
-            ),
-        },
-        {
             step: "3",
-            title: "Edit in Studio",
-            description: "Apply auto-zoom effects, trim clips, and polish your recording.",
+            title: "Add Manual Zooms",
+            description: "In Studio, click on the video to add smooth, cinema-grade zoom effects.",
             icon: (
                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="square" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    <circle cx="11" cy="11" r="8" strokeWidth={2.5} />
+                    <path strokeLinecap="square" strokeWidth={2.5} d="M21 21l-4.35-4.35M11 8v6M8 11h6" />
                 </svg>
             ),
         },
         {
             step: "4",
-            title: "Export as WebM",
-            description: "Export your cinema-quality video in WebM format, ready to share.",
+            title: "Export Video",
+            description: "Get your polished video with zoom effects baked in, ready to share.",
             icon: (
                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="square" strokeWidth={2.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    <path strokeLinecap="square" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
             ),
         },
@@ -111,9 +112,9 @@ export default function UsageGuide() {
                                             <div className={`flex-1 ${index % 2 === 0 ? "lg:text-right" : ""}`}>
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <span className={`font-mono font-bold text-sm px-2 py-1 ${index === 0 ? "bg-[var(--brutal-pink)] text-white" :
-                                                            index === 1 ? "bg-[var(--brutal-yellow)] text-[#0a0a0a]" :
-                                                                index === 2 ? "bg-[var(--brutal-blue)] text-white" :
-                                                                    "bg-[var(--brutal-pink)] text-white"
+                                                        index === 1 ? "bg-[var(--brutal-yellow)] text-[#0a0a0a]" :
+                                                            index === 2 ? "bg-[var(--brutal-blue)] text-white" :
+                                                                "bg-[var(--brutal-pink)] text-white"
                                                         } border-2 border-[var(--border-default)]`}>
                                                         STEP {item.step}
                                                     </span>

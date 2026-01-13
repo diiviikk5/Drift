@@ -12,6 +12,12 @@ export default function sitemap() {
             changeFrequency: "weekly",
             priority: 0.8,
         },
+        {
+            url: "https://drift.dvkk.dev/recorder",
+            lastModified: new Date(),
+            changeFrequency: "weekly",
+            priority: 0.9,
+        },
         ...[
             "loom-alternative",
             "obs-alternative",

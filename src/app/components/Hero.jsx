@@ -81,18 +81,7 @@ export default function Hero() {
                 <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
                     {/* Left column - Text */}
                     <div className="text-center lg:text-left">
-                        {/* Sticker Badge */}
-                        <motion.div
-                            className="inline-block mb-8"
-                            initial={{ opacity: 0, rotate: -10, y: -20 }}
-                            animate={{ opacity: 1, rotate: -3, y: 0 }}
-                            transition={{ delay: 0.1, type: "spring" }}
-                        >
-                            <div className="brutal-sticker text-sm">
-                                <span className="inline-block w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse" />
-                                Now Recording
-                            </div>
-                        </motion.div>
+
 
                         {/* Headline - Raw Typography */}
                         <motion.h1
@@ -224,60 +213,50 @@ export default function Hero() {
                             </AnimatePresence>
                         </motion.div>
 
-                        {/* Product Hunt Badge - Mobile */}
-                        <motion.div
-                            className="flex justify-center lg:hidden mb-8"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.6 }}
-                        >
-                            <a
-                                href="https://www.producthunt.com/products/drift-6?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_campaign=badge-drift-6ef740e8-671a-4130-90b6-140b7784af27"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="transform hover:scale-105 transition-transform"
-                            >
-                                <ProductHuntBadge />
-                            </a>
-                        </motion.div>
 
-                        {/* Download Buttons */}
+
+                        {/* Primary CTA - Mobile */}
                         <motion.div
-                            className="max-w-md mx-auto lg:hidden mb-8"
+                            className="max-w-md mx-auto lg:hidden mb-12"
                             initial={{ opacity: 0, y: 30 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.6 }}
                         >
-                            <div className="flex flex-col sm:flex-row gap-3">
-                                {/* Direct Download */}
+                            <a href="/recorder" className="brutal-button w-full flex items-center justify-center gap-3 !py-4 !text-lg !bg-[#DCFE50] !text-black shadow-[6px_6px_0px_var(--border-default)] mb-4 group">
+                                <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                                <span className="font-bold">START RECORDING</span>
+                                <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeWidth="3" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                            </a>
+
+                            <p className="text-center font-mono text-xs text-[var(--text-muted)] mb-6">
+                                Free • No download required
+                            </p>
+
+                            {/* Secondary - Downloads */}
+                            <div className="flex flex-col sm:flex-row gap-3 opacity-90">
                                 <a
                                     href="https://github.com/diiviikk5/Drift/releases/download/v0.1.1-beta/Drift-v0.1.0-win.zip"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="brutal-button brutal-button-pink group flex-1 flex items-center justify-center gap-2"
+                                    className="brutal-button !py-2 !text-sm flex-1 flex items-center justify-center gap-2 bg-[var(--bg-secondary)]"
                                 >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                     </svg>
-                                    <span>Download</span>
-                                    <span className="text-xs opacity-75">(v0.1.1-beta)</span>
+                                    <span>Download App</span>
                                 </a>
-                                {/* GitHub Releases */}
                                 <a
                                     href="https://github.com/diiviikk5/Drift/releases/tag/v0.1.1-beta"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="brutal-button group flex items-center justify-center gap-2"
+                                    className="brutal-button !py-2 !text-sm flex items-center justify-center gap-2 bg-[var(--bg-secondary)]"
                                 >
-                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                                         <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
                                     </svg>
                                     <span>GitHub</span>
                                 </a>
                             </div>
-                            <p className="mt-3 text-center lg:text-left font-mono text-xs text-[var(--text-muted)]">
-                                Free & Open Source • Windows • No installation needed
-                            </p>
                         </motion.div>
 
 
@@ -328,11 +307,15 @@ export default function Hero() {
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.3, duration: 0.6 }}
                     >
-                        {/* Product Hunt Badge - Desktop */}
+
+
+                        {/* Product Hunt Badge */}
+                        {/* Product Hunt Badge */}
                         <motion.div
                             initial={{ opacity: 0, y: -20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.8 }}
+                            className="mb-2"
                         >
                             <a
                                 href="https://www.producthunt.com/products/drift-6?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_campaign=badge-drift-6ef740e8-671a-4130-90b6-140b7784af27"
@@ -344,43 +327,64 @@ export default function Hero() {
                             </a>
                         </motion.div>
 
-                        {/* Desktop Download Buttons */}
+                        {/* Desktop Actions */}
                         <motion.div
                             className="w-full max-w-md"
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.9 }}
                         >
-                            <div className="flex flex-col sm:flex-row gap-3">
-                                {/* Direct Download */}
+                            {/* Main CTA */}
+                            <a
+                                href="/recorder"
+                                className="group relative block mb-8 transform transition-transform hover:-translate-y-1"
+                            >
+                                <div className="absolute inset-0 bg-[#DCFE50] translate-x-3 translate-y-3 border-[4px] border-[var(--border-default)]" />
+                                <div className="relative bg-[var(--bg-secondary)] border-[4px] border-[var(--border-default)] p-6 flex items-center justify-between">
+                                    <div className="flex items-center gap-5">
+                                        <div className="w-14 h-14 bg-[var(--text-primary)] flex items-center justify-center border-[3px] border-[var(--border-default)]">
+                                            <div className="w-5 h-5 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_#ef4444]" />
+                                        </div>
+                                        <div>
+                                            <div className="font-bold text-2xl uppercase tracking-tight text-[var(--text-primary)]">Start Recording</div>
+                                            <div className="text-sm text-[var(--text-muted)] font-mono flex items-center gap-2">
+                                                <span>Launch Browser App</span>
+                                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--brutal-yellow)]" />
+                                                <span>Free</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <svg className="w-10 h-10 text-[var(--text-primary)] transform group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="square" strokeWidth="4" d="M5 12h14M12 5l7 7-7 7" />
+                                    </svg>
+                                </div>
+                            </a>
+
+                            {/* Secondary Links */}
+                            <div className="flex gap-3 items-center opacity-90 hover:opacity-100 transition-opacity">
                                 <a
                                     href="https://github.com/diiviikk5/Drift/releases/download/v0.1.1-beta/Drift-v0.1.0-win.zip"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="brutal-button brutal-button-pink group flex-1 flex items-center justify-center gap-2"
+                                    className="brutal-button bg-[var(--bg-secondary)] flex-1 flex items-center justify-center gap-2 !py-2 !text-xs opacity-80 hover:opacity-100"
                                 >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                     </svg>
-                                    <span>Download</span>
-                                    <span className="text-xs opacity-75">(v0.1.1-beta)</span>
+                                    Desktop App (v0.1.1)
                                 </a>
-                                {/* GitHub Releases */}
                                 <a
-                                    href="https://github.com/diiviikk5/Drift/releases/tag/v0.1.1-beta"
+                                    href="https://github.com/diiviikk5/Drift"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="brutal-button group flex items-center justify-center gap-2"
+                                    className="brutal-button bg-[var(--bg-secondary)] flex items-center justify-center gap-2 !py-2 !text-xs opacity-80 hover:opacity-100"
                                 >
-                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                                         <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
                                     </svg>
-                                    <span>GitHub</span>
+                                    GitHub
                                 </a>
                             </div>
-                            <p className="mt-3 text-center font-mono text-xs text-[var(--text-muted)]">
-                                Free & Open Source • Windows • No installation needed
-                            </p>
                         </motion.div>
 
                         <div className="relative">
@@ -487,7 +491,7 @@ export default function Hero() {
                         ))}
                     </div>
                 </motion.div>
-            </div>
-        </section>
+            </div >
+        </section >
     );
 }

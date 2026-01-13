@@ -13,17 +13,19 @@ const BACKGROUNDS = {
     midnight: { name: 'Midnight', colors: ['#2c3e50', '#1a1a2e', '#0a0a0f'] }
 };
 
-const SPEED_PRESETS = {
-    slow: { name: 'Slow', desc: 'Cinematic' },
-    normal: { name: 'Normal', desc: 'Balanced' },
-    fast: { name: 'Fast', desc: 'Snappy' }
-};
+
 
 const START_POSITIONS = {
     center: { name: 'Center', x: 0.5, y: 0.5 },
     'top-left': { name: 'Top Left', x: 0.25, y: 0.25 },
     'top-right': { name: 'Top Right', x: 0.75, y: 0.25 },
     none: { name: 'None', x: 0.5, y: 0.5, noZoom: true }
+};
+
+const ZOOM_SPEEDS = {
+    slow: { name: 'Slow', start: 1200, hold: 1500, end: 1200 },
+    normal: { name: 'Normal', start: 800, hold: 1000, end: 800 },
+    fast: { name: 'Fast', start: 400, hold: 600, end: 400 }
 };
 
 export default function RecorderPage() {
@@ -50,6 +52,7 @@ export default function RecorderPage() {
     // Studio State
     const [recordedBlob, setRecordedBlob] = useState(null);
     const [recordedClicks, setRecordedClicks] = useState([]);
+    const recDurationRef = useRef(null);
     const [isExporting, setIsExporting] = useState(false);
     const [exportProgress, setExportProgress] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -58,7 +61,11 @@ export default function RecorderPage() {
     const [trimStart, setTrimStart] = useState(0);
     const [trimEnd, setTrimEnd] = useState(0);
     const [background, setBackground] = useState('bigSur');
-    const [speedPreset, setSpeedPreset] = useState('slow');
+
+    // Zoom Settings
+    const [zoomScale, setZoomScale] = useState(2.0);
+    const [zoomSpeed, setZoomSpeed] = useState('normal');
+    const [activeClickIdx, setActiveClickIdx] = useState(-1);
 
     // Hotkey Settings
     const [showHotkeySettings, setShowHotkeySettings] = useState(false);
@@ -67,12 +74,17 @@ export default function RecorderPage() {
         stop: { key: 'X', ctrl: true, shift: true, alt: false }
     });
 
+
     // Hydration Fix State
     const [hookStatus, setHookStatus] = useState('Loading...');
 
     // --- INIT RECORDER ---
+    const [isElectron, setIsElectron] = useState(false);
+
+    // --- INIT RECORDER ---
     useEffect(() => {
         if (typeof window !== 'undefined') {
+            setIsElectron(!!window.electron);
             setHookStatus(window.electron?.onGlobalClick ? 'Active' : 'Unavailable');
 
             // Load saved hotkeys
@@ -82,7 +94,11 @@ export default function RecorderPage() {
                 });
             }
         }
+    }, []);
 
+
+
+    useEffect(() => { // Main Engine Init Effect
         if (viewMode === 'recorder') {
             engineRef.current = new DriftEngine(canvasRef.current, videoRef.current);
             engineRef.current.onclickCallback = (c) => setClickCount(c);
@@ -91,7 +107,7 @@ export default function RecorderPage() {
                 if (toggleRecordRef.current) toggleRecordRef.current();
             };
 
-            engineRef.current.onStopCallback = (blob, clicks) => {
+            engineRef.current.onStopCallback = (blob, clicks, duration) => {
                 if (engineRef.current.screenStream) {
                     engineRef.current.screenStream.getTracks().forEach(t => t.stop());
                 }
@@ -101,6 +117,7 @@ export default function RecorderPage() {
 
                 setRecordedBlob(blob);
                 setRecordedClicks(clicks);
+                recDurationRef.current = duration; // Store immediately
                 setViewMode('studio');
             };
 
@@ -112,7 +129,6 @@ export default function RecorderPage() {
                 setLoadingSources(false);
             }
             load();
-
         } else if (viewMode === 'studio') {
             // STOP the recorder engine
             if (engineRef.current) {
@@ -131,11 +147,12 @@ export default function RecorderPage() {
                         canvasRef.current,
                         videoRef.current,
                         recordedBlob,
-                        recordedClicks
+                        recordedClicks,
+                        recDurationRef.current // Pass explicit duration
                     );
 
                     // Apply settings
-                    studioRef.current.speedPreset = speedPreset;
+
                     studioRef.current.background = background;
                     studioRef.current.startPosition = startPosition;
 
@@ -144,7 +161,19 @@ export default function RecorderPage() {
                         videoRef.current.ontimeupdate = () => {
                             if (videoRef.current) {
                                 setCurrentTime(videoRef.current.currentTime);
+                                setCurrentTime(videoRef.current.currentTime);
                                 setDuration(studioRef.current?.videoDuration || 0);
+
+                                // Sync active zoom settings
+                                const idx = studioRef.current?.lastClickIdx ?? -1;
+                                if (idx !== activeClickIdx) {
+                                    setActiveClickIdx(idx);
+                                    if (idx !== -1 && recordedClicks[idx]) {
+                                        // Update UI to match active zoom
+                                        setZoomScale(recordedClicks[idx].scale || 2.0);
+                                        setZoomSpeed(recordedClicks[idx].speed || 'normal');
+                                    }
+                                }
                             }
                         };
                     }
@@ -152,7 +181,7 @@ export default function RecorderPage() {
                     // Initialize trim to full duration
                     setTimeout(() => {
                         if (studioRef.current) {
-                            const d = studioRef.current?.videoDuration || 10;
+                            const d = recDurationRef.current || studioRef.current?.videoDuration || 10;
                             setDuration(d);
                             setTrimEnd(d);
                         }
@@ -162,12 +191,7 @@ export default function RecorderPage() {
         }
     }, [viewMode]);
 
-    // --- Update Studio settings when changed ---
-    useEffect(() => {
-        if (studioRef.current) {
-            studioRef.current.speedPreset = speedPreset;
-        }
-    }, [speedPreset]);
+
 
     useEffect(() => {
         if (studioRef.current) {
@@ -181,6 +205,11 @@ export default function RecorderPage() {
         if (ok) setSelectedSource(id);
     };
 
+    const selectBrowserSource = async () => {
+        const ok = await engineRef.current.selectSourceBrowser();
+        if (ok) setSelectedSource('browser-source');
+    };
+
     const toggleMic = () => {
         setMicEnabled(!micEnabled);
     };
@@ -191,12 +220,21 @@ export default function RecorderPage() {
             setIsRecording(false);
         } else {
             try {
+                // Browser: Lazy select source if not already selected
+                if (!isElectron && !selectedSource) {
+                    const ok = await engineRef.current.selectSourceBrowser();
+                    if (!ok) return; // User cancelled
+                    setSelectedSource('browser-source'); // Set state to enable UI updates
+
+                    // Small delay to ensure stream is active
+                    await new Promise(r => setTimeout(r, 500));
+                }
+
                 // Check if we have an active stream (more reliable than state when minimized)
                 const hasStream = engineRef.current?.screenStream?.active;
 
                 if (!hasStream && !selectedSource) {
                     console.log('[Drift] No screen selected, cannot start recording');
-                    // Don't use alert() as it blocks - just log and return
                     return;
                 }
 
@@ -242,6 +280,75 @@ export default function RecorderPage() {
 
     const setTrimStartPoint = () => {
         setTrimStart(currentTime);
+        setTrimEnd(duration);
+    };
+
+    const addManualZoom = () => {
+        if (!studioRef.current || !videoRef.current) return;
+        const currentTime = videoRef.current.currentTime;
+        studioRef.current.addZoom(currentTime, 0.5, 0.5, zoomScale, zoomSpeed);
+        setRecordedClicks(prev => [...prev, { time: currentTime * 1000, x: 0.5, y: 0.5 }]);
+    };
+
+
+    const handleCanvasClick = (e) => {
+        if (viewMode !== 'studio' || !studioRef.current || !videoRef.current) return;
+
+        const rect = e.currentTarget.getBoundingClientRect();
+        // Normalized Click on Canvas (0-1)
+        const canvasX = (e.clientX - rect.left) / rect.width;
+        const canvasY = (e.clientY - rect.top) / rect.height;
+        const currentTime = videoRef.current.currentTime;
+
+        // Resolve to Video Coordinates
+        const { x, y } = studioRef.current.resolveClick(canvasX, canvasY);
+
+        console.log(`[Studio] Click Canvas(${canvasX.toFixed(2)},${canvasY.toFixed(2)}) -> Video(${x.toFixed(2)},${y.toFixed(2)})`);
+
+        studioRef.current.addZoom(currentTime, x, y, zoomScale, zoomSpeed);
+        setRecordedClicks(prev => [...prev, { time: currentTime * 1000, x, y }]);
+    };
+
+    const clearManualZooms = () => {
+        if (!studioRef.current) return;
+        studioRef.current.clicks = [];
+        studioRef.current.activeZoom = null;
+        studioRef.current.lastClickIdx = -1;
+        setRecordedClicks([]);
+        setActiveClickIdx(-1);
+    };
+
+    const handleZoomScaleChange = (val) => {
+        const newScale = parseFloat(val);
+        setZoomScale(newScale);
+
+        if (activeClickIdx !== -1 && studioRef.current) {
+            studioRef.current.updateClick(activeClickIdx, { scale: newScale });
+            // Update react state for clicks
+            setRecordedClicks(prev => {
+                const next = [...prev];
+                if (next[activeClickIdx]) {
+                    next[activeClickIdx] = { ...next[activeClickIdx], scale: newScale };
+                }
+                return next;
+            });
+        }
+    };
+
+    const handleZoomSpeedChange = (val) => {
+        setZoomSpeed(val);
+
+        if (activeClickIdx !== -1 && studioRef.current) {
+            studioRef.current.updateClick(activeClickIdx, { speed: val });
+            // Update react state for clicks
+            setRecordedClicks(prev => {
+                const next = [...prev];
+                if (next[activeClickIdx]) {
+                    next[activeClickIdx] = { ...next[activeClickIdx], speed: val };
+                }
+                return next;
+            });
+        }
     };
 
     const setTrimEndPoint = () => {
@@ -321,6 +428,8 @@ export default function RecorderPage() {
     return (
         <div className="min-h-screen bg-[#0a0a0f] text-white font-sans p-6 overflow-auto select-none">
 
+
+
             <video ref={videoRef} className="hidden" muted={viewMode === 'recorder'} playsInline />
 
             {/* Header */}
@@ -343,35 +452,39 @@ export default function RecorderPage() {
 
                     {viewMode === 'recorder' ? (
                         <>
-                            {/* Source Selector */}
-                            <div className="bg-[#1a1a24] p-5 rounded-xl border border-white/10 shadow-2xl flex-1 flex flex-col min-h-0 max-h-[40vh]">
-                                <h2 className="text-base font-bold mb-3 text-[#DCFE50]">1. Select Source</h2>
-                                <div className="space-y-2 overflow-y-auto pr-2 custom-scrollbar flex-1">
-                                    {loadingSources ? (
-                                        <div className="text-gray-500 text-sm animate-pulse">Loading sources...</div>
-                                    ) : sources.length === 0 ? (
-                                        <div className="text-gray-500 text-sm">No sources found. Are you in Electron?</div>
-                                    ) : (
-                                        sources.map(src => (
-                                            <button
-                                                key={src.id}
-                                                onClick={() => selectSource(src.id)}
-                                                className={`w-full text-left p-3 rounded-lg flex items-center gap-3 transition-all border ${selectedSource === src.id
-                                                    ? 'bg-[#DCFE50]/10 border-[#DCFE50] text-[#DCFE50]'
-                                                    : 'bg-white/5 border-transparent hover:bg-white/10'
-                                                    }`}
-                                            >
-                                                <img src={src.thumbnailDataUrl} className="w-10 h-10 rounded object-cover" alt="" />
-                                                <span className="truncate text-sm font-medium">{src.name}</span>
-                                            </button>
-                                        ))
-                                    )}
+                            {/* Source Selector (Electron Only) */}
+                            {isElectron && (
+                                <div className="bg-[#1a1a24] p-5 rounded-xl border border-white/10 shadow-2xl flex-1 flex flex-col min-h-0 max-h-[40vh]">
+                                    <h2 className="text-base font-bold mb-3 text-[#DCFE50]">1. Select Source</h2>
+                                    <div className="space-y-2 overflow-y-auto pr-2 custom-scrollbar flex-1">
+                                        {loadingSources ? (
+                                            <div className="text-gray-500 text-sm animate-pulse">Loading sources...</div>
+                                        ) : sources.length > 0 ? (
+                                            sources.map(src => (
+                                                <button
+                                                    key={src.id}
+                                                    onClick={() => selectSource(src.id)}
+                                                    className={`w-full text-left p-3 rounded-lg flex items-center gap-3 transition-all border ${selectedSource === src.id
+                                                        ? 'bg-[#DCFE50]/10 border-[#DCFE50] text-[#DCFE50]'
+                                                        : 'bg-white/5 border-transparent hover:bg-white/10'
+                                                        }`}
+                                                >
+                                                    <img src={src.thumbnailDataUrl} className="w-10 h-10 rounded object-cover" alt="" />
+                                                    <span className="truncate text-sm font-medium">{src.name}</span>
+                                                </button>
+                                            ))
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center h-full gap-4">
+                                                <div className="text-gray-500 text-sm">No sources found.</div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             {/* Settings */}
                             <div className="bg-[#1a1a24] p-5 rounded-xl border border-white/10 shadow-2xl">
-                                <h2 className="text-base font-bold mb-3 text-[#DCFE50]">2. Settings</h2>
+                                <h2 className="text-base font-bold mb-3 text-[#DCFE50]">{isElectron ? '2. Settings' : '1. Settings'}</h2>
 
                                 {/* Mic Toggle */}
                                 <div className="flex items-center justify-between mb-4 p-3 bg-white/5 rounded-lg">
@@ -384,36 +497,40 @@ export default function RecorderPage() {
                                     </button>
                                 </div>
 
-                                {/* Initial Zoom */}
-                                <div className="mb-4">
-                                    <label className="text-xs text-gray-400 mb-2 block">Initial Zoom Direction</label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {Object.entries(START_POSITIONS).map(([key, val]) => (
-                                            <button
-                                                key={key}
-                                                onClick={() => setStartPosition(key)}
-                                                className={`p-2 text-xs rounded-lg border transition-all ${startPosition === key
-                                                    ? 'bg-[#DCFE50]/20 border-[#DCFE50] text-[#DCFE50]'
-                                                    : 'bg-white/5 border-transparent hover:bg-white/10'
-                                                    }`}
-                                            >
-                                                {val.name}
-                                            </button>
-                                        ))}
+                                {/* Initial Zoom (Electron Only) */}
+                                {isElectron && (
+                                    <div className="mb-4">
+                                        <label className="text-xs text-gray-400 mb-2 block">Initial Zoom Direction</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {Object.entries(START_POSITIONS).map(([key, val]) => (
+                                                <button
+                                                    key={key}
+                                                    onClick={() => setStartPosition(key)}
+                                                    className={`p-2 text-xs rounded-lg border transition-all ${startPosition === key
+                                                        ? 'bg-[#DCFE50]/20 border-[#DCFE50] text-[#DCFE50]'
+                                                        : 'bg-white/5 border-transparent hover:bg-white/10'
+                                                        }`}
+                                                >
+                                                    {val.name}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
 
                             {/* Record */}
                             <div className="bg-[#1a1a24] p-5 rounded-xl border border-white/10 shadow-2xl">
                                 <div className="flex items-center justify-between mb-3">
-                                    <h2 className="text-base font-bold text-[#DCFE50]">3. Record</h2>
-                                    <button
-                                        onClick={() => setShowHotkeySettings(true)}
-                                        className="text-xs text-gray-400 hover:text-white transition-colors"
-                                    >
-                                        Hotkeys
-                                    </button>
+                                    <h2 className="text-base font-bold text-[#DCFE50]">{isElectron ? '3. Record' : '2. Record'}</h2>
+                                    {isElectron && (
+                                        <button
+                                            onClick={() => setShowHotkeySettings(true)}
+                                            className="text-xs text-gray-400 hover:text-white transition-colors"
+                                        >
+                                            Hotkeys
+                                        </button>
+                                    )}
                                 </div>
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="text-3xl font-mono font-black tracking-wider">{timer}</div>
@@ -424,17 +541,19 @@ export default function RecorderPage() {
                                 </div>
                                 <button
                                     onClick={toggleRecord}
-                                    disabled={!selectedSource}
+                                    disabled={isElectron && !selectedSource}
                                     className={`w-full py-4 text-lg font-bold rounded-lg shadow-[4px_4px_0_black] active:translate-y-1 active:shadow-none transition-all ${isRecording
                                         ? 'bg-red-500 hover:bg-red-400 text-white'
                                         : 'bg-[#DCFE50] hover:bg-[#c9e845] text-black disabled:opacity-50 disabled:cursor-not-allowed'
                                         }`}
                                 >
-                                    {isRecording ? `STOP (${formatHotkey(hotkeys.stop)})` : `START (${formatHotkey(hotkeys.start)})`}
+                                    {isRecording ? 'STOP RECORDING' : 'START RECORDING'}
                                 </button>
-                                <div className="mt-2 text-[10px] text-gray-500 text-center font-mono">
-                                    TIP: Use hotkeys to keep Drift out of your captures
-                                </div>
+                                {isElectron && (
+                                    <div className="mt-2 text-[10px] text-gray-500 text-center font-mono">
+                                        TIP: Use hotkeys to keep Drift out of your captures
+                                    </div>
+                                )}
                             </div>
                         </>
                     ) : (
@@ -458,29 +577,11 @@ export default function RecorderPage() {
                                 </div>
                             </div>
 
-                            {/* Speed Preset */}
-                            <div className="bg-[#1a1a24] p-5 rounded-xl border border-white/10 shadow-xl">
-                                <h2 className="text-base font-bold mb-3 text-[#DCFE50]">Zoom Speed</h2>
-                                <div className="flex gap-2">
-                                    {Object.entries(SPEED_PRESETS).map(([key, val]) => (
-                                        <button
-                                            key={key}
-                                            onClick={() => setSpeedPreset(key)}
-                                            className={`flex-1 py-2 text-sm rounded-lg border transition-all ${speedPreset === key
-                                                ? 'bg-[#DCFE50]/20 border-[#DCFE50] text-[#DCFE50]'
-                                                : 'bg-white/5 border-transparent hover:bg-white/10'
-                                                }`}
-                                        >
-                                            <div className="font-bold">{val.name}</div>
-                                            <div className="text-[10px] text-gray-400">{val.desc}</div>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+
 
                             {/* Background */}
                             <div className="bg-[#1a1a24] p-5 rounded-xl border border-white/10 shadow-xl">
-                                <h2 className="text-base font-bold mb-3 text-[#DCFE50]">Background</h2>
+                                <h2 className="text-base font-bold mb-3 text-[#DCFE50]">3. Background</h2>
                                 <div className="grid grid-cols-3 gap-2">
                                     {Object.entries(BACKGROUNDS).map(([key, val]) => (
                                         <button
@@ -500,6 +601,51 @@ export default function RecorderPage() {
                                             <div className="text-[10px] text-gray-400">{val.name}</div>
                                         </button>
                                     ))}
+                                </div>
+                            </div>
+
+                            {/* Zoom Settings */}
+                            <div className="bg-[#1a1a24] p-5 rounded-xl border border-white/10 shadow-xl">
+                                <h2 className="text-base font-bold mb-3 text-[#DCFE50]">4. Next Zoom Settings</h2>
+
+                                {/* Speed */}
+                                <div className="mb-4">
+                                    <label className="text-xs text-gray-400 mb-2 block">Animation Speed</label>
+                                    <div className="flex gap-2">
+                                        {Object.entries(ZOOM_SPEEDS).map(([key, val]) => (
+                                            <button
+                                                key={key}
+                                                onClick={() => handleZoomSpeedChange(key)}
+                                                className={`flex-1 py-1.5 text-xs rounded-lg border transition-all ${zoomSpeed === key
+                                                    ? 'bg-[#DCFE50]/20 border-[#DCFE50] text-[#DCFE50]'
+                                                    : 'bg-white/5 border-transparent hover:bg-white/10'
+                                                    }`}
+                                            >
+                                                {val.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Intensity (Scale) */}
+                                <div>
+                                    <div className="flex justify-between text-xs text-gray-400 mb-2">
+                                        <span>Intensity (Scale)</span>
+                                        <span className="text-[#DCFE50]">{zoomScale}x</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="1.2"
+                                        max="3.0"
+                                        step="0.1"
+                                        value={zoomScale}
+                                        onChange={(e) => handleZoomScaleChange(e.target.value)}
+                                        className="w-full accent-[#DCFE50]"
+                                    />
+                                    <div className="flex justify-between text-[10px] text-gray-600 mt-1">
+                                        <span>1.2x</span>
+                                        <span>3.0x</span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -524,7 +670,7 @@ export default function RecorderPage() {
                                     >
                                         {isExporting
                                             ? `Exporting... ${exportProgress}%`
-                                            : 'EXPORT WITH EFFECTS'}
+                                            : (recordedClicks.length > 0 ? 'EXPORT WITH ZOOM EFFECTS' : 'EXPORT VIDEO')}
                                     </button>
                                     <button
                                         className="w-full py-2 bg-white/5 text-gray-300 text-sm font-medium rounded-lg border border-white/10 hover:bg-white/10 transition-all"
@@ -545,7 +691,8 @@ export default function RecorderPage() {
                             ref={canvasRef}
                             width={1280}
                             height={720}
-                            className="max-w-full max-h-full rounded-lg bg-[#1a1a2e] shadow-lg"
+                            onClick={handleCanvasClick}
+                            className={`max-w-full max-h-full rounded-lg bg-[#1a1a2e] shadow-lg ${viewMode === 'studio' ? 'cursor-crosshair' : ''}`}
                         />
 
                         {viewMode === 'recorder' && !selectedSource && (
@@ -578,45 +725,56 @@ export default function RecorderPage() {
                                     style={{ width: `${(currentTime / duration) * 100}%` }}
                                 />
 
-                                {/* Click Markers */}
+                                {/* Click Markers (Zooms) */}
                                 {recordedClicks.map((click, i) => (
                                     <div
                                         key={i}
-                                        className="absolute top-0 w-0.5 h-full bg-[#DCFE50]"
+                                        className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-red-500 rounded-full border border-white z-10 shadow-[0_0_10px_rgba(255,0,0,0.5)] transform -translate-x-1/2"
                                         style={{ left: `${(click.time / 1000 / duration) * 100}%` }}
-                                        title={`Click ${i + 1}`}
+                                        title={`Zoom at ${formatTime(click.time / 1000)}`}
                                     />
                                 ))}
                             </div>
 
-                            {/* Controls Row */}
-                            <div className="flex items-center justify-between">
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={setTrimStartPoint}
-                                        className="px-3 py-1 text-xs bg-white/10 hover:bg-white/20 rounded border border-white/20"
-                                    >
-                                        [ Set Start
+                            <div className="flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-2">
+                                    <button onClick={togglePlayback} className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-lg">
+                                        {isPlaying ? 'Pause' : 'Play'}
                                     </button>
-                                    <button
-                                        onClick={setTrimEndPoint}
-                                        className="px-3 py-1 text-xs bg-white/10 hover:bg-white/20 rounded border border-white/20"
-                                    >
-                                        ] Set End
-                                    </button>
-                                    <button
-                                        onClick={resetTrim}
-                                        className="px-3 py-1 text-xs text-red-400 bg-white/10 hover:bg-white/20 rounded border border-red-400/30"
-                                    >
-                                        Reset
-                                    </button>
+                                    <span className="text-sm font-mono text-gray-400">
+                                        {formatTime(currentTime)} / {formatTime(duration)}
+                                    </span>
                                 </div>
 
-                                <div className="font-mono text-sm text-gray-400">
-                                    {formatTime(currentTime)} / {formatTime(duration)}
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={addManualZoom}
+                                        className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/50 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105 active:scale-95"
+                                        title="Add a zoom effect at current time"
+                                    >
+                                        + Add Zoom Here
+                                    </button>
+                                    {recordedClicks.length > 0 && (
+                                        <button
+                                            onClick={clearManualZooms}
+                                            className="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/50 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105 active:scale-95"
+                                            title="Clear all zooms"
+                                        >
+                                            Clear Zooms
+                                        </button>
+                                    )}
                                 </div>
                             </div>
+
+                            <div className="flex items-center gap-2 mt-4 pt-4 border-t border-white/5">
+                                <span className="text-xs text-gray-500">Trim:</span>
+                                <button onClick={setTrimStartPoint} className="text-xs bg-black/40 px-2 py-1 rounded border border-gray-700 hover:border-gray-500">Set Start</button>
+                                <button onClick={setTrimEndPoint} className="text-xs bg-black/40 px-2 py-1 rounded border border-gray-700 hover:border-gray-500">Set End</button>
+                                <button onClick={resetTrim} className="text-xs text-gray-500 hover:text-white ml-auto">Reset Trim</button>
+                            </div>
                         </div>
+
+
                     )}
                 </div>
             </div>
@@ -627,121 +785,125 @@ export default function RecorderPage() {
             </div>
 
             {/* Export Overlay */}
-            {isExporting && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div className="bg-[#1a1a24] p-8 rounded-xl border border-white/10 text-center max-w-md">
-                        <h2 className="text-2xl font-bold mb-2">⚡ Rendering Video</h2>
-                        <p className="text-gray-400 mb-6">Applying cinema-grade zoom effects...</p>
-                        <div className="h-3 bg-gray-800 rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-[#DCFE50] transition-all"
-                                style={{ width: `${exportProgress}%` }}
-                            />
+            {
+                isExporting && (
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
+                        <div className="bg-[#1a1a24] p-8 rounded-xl border border-white/10 text-center max-w-md">
+                            <h2 className="text-2xl font-bold mb-2">⚡ Rendering Video</h2>
+                            <p className="text-gray-400 mb-6">Applying cinema-grade zoom effects...</p>
+                            <div className="h-3 bg-gray-800 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-[#DCFE50] transition-all"
+                                    style={{ width: `${exportProgress}%` }}
+                                />
+                            </div>
+                            <div className="mt-2 text-sm text-gray-500">{exportProgress}%</div>
                         </div>
-                        <div className="mt-2 text-sm text-gray-500">{exportProgress}%</div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Hotkey Settings Modal */}
-            {showHotkeySettings && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-[#1a1a24] rounded-2xl p-6 max-w-md w-full border border-white/10 shadow-2xl">
-                        <h2 className="text-xl font-bold mb-4 text-[#DCFE50]">Hotkey Settings</h2>
+            {
+                showHotkeySettings && (
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-[#1a1a24] rounded-2xl p-6 max-w-md w-full border border-white/10 shadow-2xl">
+                            <h2 className="text-xl font-bold mb-4 text-[#DCFE50]">Hotkey Settings</h2>
 
-                        {/* Start Recording Hotkey */}
-                        <div className="mb-6">
-                            <label className="text-sm text-gray-400 mb-2 block">Start Recording</label>
-                            <div className="flex gap-2 mb-2">
-                                {['ctrl', 'shift', 'alt'].map((mod) => (
-                                    <button
-                                        key={mod}
-                                        onClick={() => setHotkeys(prev => ({
+                            {/* Start Recording Hotkey */}
+                            <div className="mb-6">
+                                <label className="text-sm text-gray-400 mb-2 block">Start Recording</label>
+                                <div className="flex gap-2 mb-2">
+                                    {['ctrl', 'shift', 'alt'].map((mod) => (
+                                        <button
+                                            key={mod}
+                                            onClick={() => setHotkeys(prev => ({
+                                                ...prev,
+                                                start: { ...prev.start, [mod]: !prev.start[mod] }
+                                            }))}
+                                            className={`px-3 py-1.5 text-xs rounded-lg border transition-all ${hotkeys.start[mod]
+                                                ? 'bg-[#DCFE50]/20 border-[#DCFE50] text-[#DCFE50]'
+                                                : 'bg-white/5 border-gray-700 text-gray-400'
+                                                }`}
+                                        >
+                                            {mod.charAt(0).toUpperCase() + mod.slice(1)}
+                                        </button>
+                                    ))}
+                                    <select
+                                        value={hotkeys.start.key}
+                                        onChange={(e) => setHotkeys(prev => ({
                                             ...prev,
-                                            start: { ...prev.start, [mod]: !prev.start[mod] }
+                                            start: { ...prev.start, key: e.target.value }
                                         }))}
-                                        className={`px-3 py-1.5 text-xs rounded-lg border transition-all ${hotkeys.start[mod]
-                                            ? 'bg-[#DCFE50]/20 border-[#DCFE50] text-[#DCFE50]'
-                                            : 'bg-white/5 border-gray-700 text-gray-400'
-                                            }`}
+                                        className="flex-1 bg-[#0a0a0f] border border-gray-700 rounded-lg px-3 py-1.5 text-sm"
                                     >
-                                        {mod.charAt(0).toUpperCase() + mod.slice(1)}
-                                    </button>
-                                ))}
-                                <select
-                                    value={hotkeys.start.key}
-                                    onChange={(e) => setHotkeys(prev => ({
-                                        ...prev,
-                                        start: { ...prev.start, key: e.target.value }
-                                    }))}
-                                    className="flex-1 bg-[#0a0a0f] border border-gray-700 rounded-lg px-3 py-1.5 text-sm"
-                                >
-                                    {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(k => (
-                                        <option key={k} value={k}>{k}</option>
-                                    ))}
-                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map(k => (
-                                        <option key={k} value={String(k)}>{k}</option>
-                                    ))}
-                                </select>
+                                        {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(k => (
+                                            <option key={k} value={k}>{k}</option>
+                                        ))}
+                                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map(k => (
+                                            <option key={k} value={String(k)}>{k}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="text-xs text-gray-500">Current: {formatHotkey(hotkeys.start)}</div>
                             </div>
-                            <div className="text-xs text-gray-500">Current: {formatHotkey(hotkeys.start)}</div>
-                        </div>
 
-                        {/* Stop Recording Hotkey */}
-                        <div className="mb-6">
-                            <label className="text-sm text-gray-400 mb-2 block">Stop Recording</label>
-                            <div className="flex gap-2 mb-2">
-                                {['ctrl', 'shift', 'alt'].map((mod) => (
-                                    <button
-                                        key={mod}
-                                        onClick={() => setHotkeys(prev => ({
+                            {/* Stop Recording Hotkey */}
+                            <div className="mb-6">
+                                <label className="text-sm text-gray-400 mb-2 block">Stop Recording</label>
+                                <div className="flex gap-2 mb-2">
+                                    {['ctrl', 'shift', 'alt'].map((mod) => (
+                                        <button
+                                            key={mod}
+                                            onClick={() => setHotkeys(prev => ({
+                                                ...prev,
+                                                stop: { ...prev.stop, [mod]: !prev.stop[mod] }
+                                            }))}
+                                            className={`px-3 py-1.5 text-xs rounded-lg border transition-all ${hotkeys.stop[mod]
+                                                ? 'bg-[#DCFE50]/20 border-[#DCFE50] text-[#DCFE50]'
+                                                : 'bg-white/5 border-gray-700 text-gray-400'
+                                                }`}
+                                        >
+                                            {mod.charAt(0).toUpperCase() + mod.slice(1)}
+                                        </button>
+                                    ))}
+                                    <select
+                                        value={hotkeys.stop.key}
+                                        onChange={(e) => setHotkeys(prev => ({
                                             ...prev,
-                                            stop: { ...prev.stop, [mod]: !prev.stop[mod] }
+                                            stop: { ...prev.stop, key: e.target.value }
                                         }))}
-                                        className={`px-3 py-1.5 text-xs rounded-lg border transition-all ${hotkeys.stop[mod]
-                                            ? 'bg-[#DCFE50]/20 border-[#DCFE50] text-[#DCFE50]'
-                                            : 'bg-white/5 border-gray-700 text-gray-400'
-                                            }`}
+                                        className="flex-1 bg-[#0a0a0f] border border-gray-700 rounded-lg px-3 py-1.5 text-sm"
                                     >
-                                        {mod.charAt(0).toUpperCase() + mod.slice(1)}
-                                    </button>
-                                ))}
-                                <select
-                                    value={hotkeys.stop.key}
-                                    onChange={(e) => setHotkeys(prev => ({
-                                        ...prev,
-                                        stop: { ...prev.stop, key: e.target.value }
-                                    }))}
-                                    className="flex-1 bg-[#0a0a0f] border border-gray-700 rounded-lg px-3 py-1.5 text-sm"
-                                >
-                                    {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(k => (
-                                        <option key={k} value={k}>{k}</option>
-                                    ))}
-                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map(k => (
-                                        <option key={k} value={String(k)}>{k}</option>
-                                    ))}
-                                </select>
+                                        {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(k => (
+                                            <option key={k} value={k}>{k}</option>
+                                        ))}
+                                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map(k => (
+                                            <option key={k} value={String(k)}>{k}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="text-xs text-gray-500">Current: {formatHotkey(hotkeys.stop)}</div>
                             </div>
-                            <div className="text-xs text-gray-500">Current: {formatHotkey(hotkeys.stop)}</div>
-                        </div>
 
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowHotkeySettings(false)}
-                                className="flex-1 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-all"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={saveHotkeys}
-                                className="flex-1 py-2 bg-[#DCFE50] text-black font-bold rounded-lg hover:bg-[#c9e845] transition-all"
-                            >
-                                Save Hotkeys
-                            </button>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowHotkeySettings(false)}
+                                    className="flex-1 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={saveHotkeys}
+                                    className="flex-1 py-2 bg-[#DCFE50] text-black font-bold rounded-lg hover:bg-[#c9e845] transition-all"
+                                >
+                                    Save Hotkeys
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }
