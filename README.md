@@ -5,7 +5,7 @@
 Professional screen recording studio that runs entirely in your browser. Powered by native browser APIs and client-side WebAssembly.
 
 
-## ✨ Features (Coming Soon)
+## Features (Coming Soon)
 
 - **Unified Capture** - Record screen, window, or browser tab
 - **Webcam Overlay** - Picture-in-picture with customizable shapes
