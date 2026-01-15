@@ -3,11 +3,12 @@ const nextConfig = {
   /* config options here */
   reactCompiler: true,
 
-  // Headers for SharedArrayBuffer (required for FFmpeg WASM)
+  // Headers for SharedArrayBuffer (required for multi-threaded FFmpeg WASM)
+  // Only apply to /labs routes to avoid breaking other parts of the site
   async headers() {
     return [
       {
-        source: '/(.*)',
+        source: '/labs/:path*',
         headers: [
           {
             key: 'Cross-Origin-Opener-Policy',
@@ -15,11 +16,16 @@ const nextConfig = {
           },
           {
             key: 'Cross-Origin-Embedder-Policy',
-            value: 'require-corp',
+            value: 'credentialless', // More permissive than require-corp
           },
         ],
       },
     ];
+  },
+
+  // Allow external resources for FFmpeg WASM
+  async rewrites() {
+    return [];
   },
 };
 
