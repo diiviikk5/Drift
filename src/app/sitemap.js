@@ -1,4 +1,4 @@
-import { getAllConversions, getAllTools } from '@/lib/labs/conversions';
+import { getAllSlugs, getPopularConversions, getAllTools } from '@/lib/labs/conversions';
 
 export default function sitemap() {
     const baseUrl = 'https://drift.dvkk.dev';
@@ -46,28 +46,24 @@ export default function sitemap() {
         priority: 0.7,
     }));
 
-    // Labs conversion pages (programmatic SEO)
-    const conversions = getAllConversions();
-    const conversionPages = conversions.map((conversion) => ({
-        url: `${baseUrl}/labs/convert/${conversion.slug}`,
-        lastModified: now,
-        changeFrequency: 'monthly',
-        priority: conversion.popular ? 0.85 : 0.75,
-    }));
+    // Labs pages from the dynamic generator (850+)
+    const allSlugs = getAllSlugs();
+    const popularConversions = getPopularConversions().map(c => c.slug);
+    const popularTools = getAllTools().filter(t => t.popular).map(t => t.slug);
+    const popularSet = new Set([...popularConversions, ...popularTools]);
 
-    // Labs tool pages
-    const tools = getAllTools();
-    const toolPages = tools.map((tool) => ({
-        url: `${baseUrl}/labs/tools/${tool.slug}`,
+    const labsPages = allSlugs.map((s) => ({
+        url: s.isTool
+            ? `${baseUrl}/labs/tools/${s.slug}`
+            : `${baseUrl}/labs/convert/${s.slug}`,
         lastModified: now,
         changeFrequency: 'monthly',
-        priority: tool.popular ? 0.85 : 0.75,
+        priority: popularSet.has(s.slug) ? 0.9 : 0.7,
     }));
 
     return [
         ...corePages,
         ...comparisonPages,
-        ...conversionPages,
-        ...toolPages,
+        ...labsPages,
     ];
 }
