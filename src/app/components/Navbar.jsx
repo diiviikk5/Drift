@@ -58,6 +58,12 @@ export default function Navbar() {
                     >
                         Guide
                     </a>
+                    <a
+                        href="/labs"
+                        className="px-4 py-2 bg-[var(--brutal-yellow)] border-[3px] border-[var(--border-default)] font-mono font-bold text-sm uppercase shadow-[4px_4px_0px_var(--border-default)] hover:shadow-[6px_6px_0px_var(--border-default)] hover:translate-x-[-2px] hover:translate-y-[-2px] transition-all text-[#0a0a0a]"
+                    >
+                        Labs
+                    </a>
 
                     {/* Theme Toggle */}
                     <motion.button
@@ -146,20 +152,29 @@ export default function Navbar() {
                     >
                         <div className="px-4 py-6 flex flex-col gap-3">
                             {/* Section Links */}
-                            <div className="flex justify-center gap-3">
+                            <div className="flex flex-col gap-3">
+                                <div className="flex justify-center gap-3">
+                                    <a
+                                        href="#install"
+                                        onClick={() => setMobileMenuOpen(false)}
+                                        className="flex-1 text-center px-4 py-3 bg-[var(--brutal-yellow)] border-[3px] border-[var(--border-default)] shadow-[4px_4px_0px_var(--border-default)] font-mono font-bold uppercase text-sm text-[#0a0a0a]"
+                                    >
+                                        Install
+                                    </a>
+                                    <a
+                                        href="#usage"
+                                        onClick={() => setMobileMenuOpen(false)}
+                                        className="flex-1 text-center px-4 py-3 bg-[var(--brutal-pink)] border-[3px] border-[var(--border-default)] shadow-[4px_4px_0px_var(--border-default)] font-mono font-bold uppercase text-sm text-white"
+                                    >
+                                        Guide
+                                    </a>
+                                </div>
                                 <a
-                                    href="#install"
+                                    href="/labs"
                                     onClick={() => setMobileMenuOpen(false)}
-                                    className="flex-1 text-center px-4 py-3 bg-[var(--brutal-yellow)] border-[3px] border-[var(--border-default)] shadow-[4px_4px_0px_var(--border-default)] font-mono font-bold uppercase text-sm text-[#0a0a0a]"
+                                    className="w-full text-center px-4 py-3 bg-[var(--brutal-blue)] border-[3px] border-[var(--border-default)] shadow-[4px_4px_0px_var(--border-default)] font-mono font-bold uppercase text-sm text-white"
                                 >
-                                    Install
-                                </a>
-                                <a
-                                    href="#usage"
-                                    onClick={() => setMobileMenuOpen(false)}
-                                    className="flex-1 text-center px-4 py-3 bg-[var(--brutal-pink)] border-[3px] border-[var(--border-default)] shadow-[4px_4px_0px_var(--border-default)] font-mono font-bold uppercase text-sm text-white"
-                                >
-                                    Guide
+                                    Labs Exploration
                                 </a>
                             </div>
                             {/* Social Links */}
