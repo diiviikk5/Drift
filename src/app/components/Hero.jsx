@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "./ThemeProvider";
 import ProductHuntBadge from "./ProductHuntBadge";
+import Link from "next/link";
 
 export default function Hero() {
     const [email, setEmail] = useState("");
@@ -374,7 +375,6 @@ export default function Hero() {
                                     Desktop App (v0.1.1)
                                 </a>
                                 <a
-                                    href="https://github.com/diiviikk5/Drift"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="brutal-button bg-[var(--bg-secondary)] flex items-center justify-center gap-2 !py-2 !text-xs opacity-80 hover:opacity-100"
@@ -384,6 +384,15 @@ export default function Hero() {
                                     </svg>
                                     GitHub
                                 </a>
+                                <Link
+                                    href="/labs"
+                                    className="brutal-button bg-[var(--bg-secondary)] flex items-center justify-center gap-2 !py-2 !text-xs opacity-80 hover:opacity-100"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.051.519A2 2 0 004 17.209V20a2 2 0 002 2h12a2 2 0 002-2v-2.791a2 2 0 00-.572-1.781z" />
+                                    </svg>
+                                    Labs
+                                </Link>
                             </div>
                         </motion.div>
 
