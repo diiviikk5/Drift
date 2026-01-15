@@ -6,6 +6,15 @@ import './labs.css';
 export const metadata = {
     title: 'Free Browser-Based Media Converters | No Upload Required',
     description: 'Fast, secure, and private online tools to convert, compress, and edit video, audio, and images. 100% free with no file size limits.',
+    openGraph: {
+        title: 'Drift Labs | Free Browser-Based Media Converters',
+        description: 'Convert, compress, and edit media 100% privately in your browser.',
+        images: ['/og-labs.png'],
+    },
+    twitter: {
+        card: 'summary_large_image',
+        images: ['/og-labs.png'],
+    }
 };
 
 export default function LabsPage() {
@@ -113,7 +122,7 @@ export default function LabsPage() {
                 {/* MASSIVE SEO SITEMAP CLOUD */}
                 <section className="mb-32">
                     <div className="labs-section-header">
-                        <h2>BROWSE_ALL_CONVERTERS</h2>
+                        <h2>BROWSE_ALL_INDEX ({allSlugs.length}_PAGES)</h2>
                     </div>
                     <div className="border-4 border-black bg-[var(--labs-white)] p-8">
                         <div className="flex flex-wrap gap-x-6 gap-y-2 font-mono text-[10px] font-bold text-gray-400 uppercase">
@@ -164,7 +173,7 @@ export default function LabsPage() {
                 </section>
 
                 <StatsSection
-                    conversionsCount={allConversions.length}
+                    conversionsCount={allSlugs.length}
                     toolsCount={allTools.length}
                 />
 
