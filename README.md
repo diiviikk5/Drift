@@ -4,8 +4,8 @@
 
 Professional screen recording studio that runs entirely in your browser. Powered by native browser APIs and client-side WebAssembly.
 
-
-## Features (Coming Soon)
+## INTRODUCING Drift Labs  - 0 upload file conversions for audio , video , images  .
+## Features
 
 - **Unified Capture** - Record screen, window, or browser tab
 - **Webcam Overlay** - Picture-in-picture with customizable shapes
