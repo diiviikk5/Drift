@@ -1,0 +1,12 @@
+# Drift Security Information
+# https://drift.dvkk.dev
+
+Contact: mailto:hello@dvkk.dev
+Contact: https://github.com/diiviikk5/Drift/security/advisories/new
+Expires: 2027-01-19T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://drift.dvkk.dev/.well-known/security.txt
+
+# Drift is a privacy-first screen recorder that processes all data locally.
+# No user data is collected or transmitted to external servers.
+# Source code is available at: https://github.com/diiviikk5/Drift

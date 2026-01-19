@@ -4,7 +4,7 @@ const nextConfig = {
   reactCompiler: true,
 
   // Headers for SharedArrayBuffer (required for multi-threaded FFmpeg WASM)
-  // Only apply to /labs routes to avoid breaking other parts of the site
+  // and AI discovery files
   async headers() {
     return [
       {
@@ -18,6 +18,30 @@ const nextConfig = {
             key: 'Cross-Origin-Embedder-Policy',
             value: 'credentialless', // More permissive than require-corp
           },
+        ],
+      },
+      // AI/LLM Discovery files - allow CORS for AI agents
+      {
+        source: '/llms.txt',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Content-Type', value: 'text/plain; charset=utf-8' },
+          { key: 'Cache-Control', value: 'public, max-age=3600, s-maxage=86400' },
+        ],
+      },
+      {
+        source: '/llms-full.txt',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Content-Type', value: 'text/plain; charset=utf-8' },
+          { key: 'Cache-Control', value: 'public, max-age=3600, s-maxage=86400' },
+        ],
+      },
+      {
+        source: '/.well-known/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Cache-Control', value: 'public, max-age=3600, s-maxage=86400' },
         ],
       },
     ];

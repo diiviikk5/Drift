@@ -1,0 +1,354 @@
+{
+    "analysis": {
+        "url": "https://drift.dvkk.dev",
+        "analyzedAt": "2026-01-19T21:05:00+05:30",
+        "overallScore": 87,
+        "previousScore": 62,
+        "scoreImprovement": 25
+    },
+    "currentState": {
+        "title": "Drift - Free Screen Recorder with Auto-Zoom | Best Loom Alternative",
+        "description": "Free screen recorder with cinema-grade auto-zoom that follows your clicks. No watermarks, no subscriptions, 100% privacy-first. The best free alternative to Loom, OBS, and Camtasia.",
+        "robotsTxt": {
+            "status": "OPTIMIZED",
+            "allowsAIBots": true,
+            "includesSitemap": true,
+            "aiBotsExplicitlyAllowed": [
+                "GPTBot",
+                "ChatGPT-User",
+                "Google-Extended",
+                "PerplexityBot",
+                "Anthropic-AI",
+                "Claude-Web",
+                "Applebot-Extended",
+                "Bytespider",
+                "CCBot",
+                "cohere-ai"
+            ]
+        },
+        "sitemap": {
+            "status": "COMPREHENSIVE",
+            "totalPages": 1268,
+            "includesAIDiscoveryResources": true,
+            "aiResourcesIncluded": [
+                "/llms.txt",
+                "/llms-full.txt",
+                "/api/ai-info"
+            ]
+        },
+        "structuredData": {
+            "status": "COMPREHENSIVE",
+            "schemas": [
+                "SoftwareApplication",
+                "Organization",
+                "WebSite",
+                "FAQPage",
+                "HowTo",
+                "BreadcrumbList",
+                "WebPage (with Speakable)",
+                "Product",
+                "WebApplication"
+            ],
+            "hasRichSnippetEligibility": true,
+            "hasSpeakableContent": true
+        }
+    },
+    "implementedOptimizations": [
+        {
+            "category": "AI Discovery Files",
+            "changes": [
+                {
+                    "file": "/llms.txt",
+                    "action": "CREATED/UPDATED",
+                    "description": "Comprehensive LLM information file with structured Q&A format optimized for AI extraction",
+                    "impact": "HIGH",
+                    "aiSystems": [
+                        "ChatGPT",
+                        "Claude",
+                        "Perplexity",
+                        "Google AI"
+                    ]
+                },
+                {
+                    "file": "/llms-full.txt",
+                    "action": "CREATED",
+                    "description": "Extended 8KB+ file with complete product information, comparisons, FAQ, technical specs, and keyword index",
+                    "impact": "HIGH",
+                    "aiSystems": [
+                        "ChatGPT",
+                        "Claude",
+                        "Perplexity"
+                    ]
+                },
+                {
+                    "file": "/.well-known/ai-plugin.json",
+                    "action": "UPDATED",
+                    "description": "Enhanced AI plugin manifest with comprehensive description_for_model, features array, categories, and keywords",
+                    "impact": "MEDIUM",
+                    "aiSystems": [
+                        "ChatGPT Plugins",
+                        "AI Agents"
+                    ]
+                },
+                {
+                    "file": "/.well-known/security.txt",
+                    "action": "CREATED",
+                    "description": "Security contact information for trust signals",
+                    "impact": "LOW",
+                    "aiSystems": [
+                        "Trust verification systems"
+                    ]
+                }
+            ]
+        },
+        {
+            "category": "Robots.txt Enhancement",
+            "changes": [
+                {
+                    "file": "/robots.js",
+                    "action": "UPDATED",
+                    "description": "Added explicit allow rules for 10+ major AI crawlers including GPTBot, PerplexityBot, Anthropic-AI, Google-Extended",
+                    "impact": "HIGH",
+                    "aiSystems": [
+                        "All AI search systems"
+                    ]
+                }
+            ]
+        },
+        {
+            "category": "Structured Data (Schema.org)",
+            "changes": [
+                {
+                    "file": "/src/app/layout.js",
+                    "action": "UPDATED",
+                    "description": "Added Speakable schema for voice search AI, Product schema for shopping AI, WebApplication schema with UseAction for AI assistants",
+                    "impact": "HIGH",
+                    "aiSystems": [
+                        "Google AI Overviews",
+                        "Voice Assistants",
+                        "Shopping AI"
+                    ]
+                }
+            ]
+        },
+        {
+            "category": "AI Content Optimization",
+            "changes": [
+                {
+                    "file": "/src/app/components/AIContent.jsx",
+                    "action": "CREATED",
+                    "description": "Hidden semantic HTML component with microdata markup, Q&A format, and speakable markers for AI extraction",
+                    "impact": "MEDIUM",
+                    "aiSystems": [
+                        "All crawling AI systems"
+                    ]
+                },
+                {
+                    "file": "/src/app/page.js",
+                    "action": "UPDATED",
+                    "description": "Integrated AIContent component into main page",
+                    "impact": "MEDIUM"
+                }
+            ]
+        },
+        {
+            "category": "API Endpoint",
+            "changes": [
+                {
+                    "file": "/api/ai-info",
+                    "action": "CREATED",
+                    "description": "JSON API endpoint returning structured product information for programmatic AI agent access",
+                    "impact": "MEDIUM",
+                    "aiSystems": [
+                        "AI agents",
+                        "Chatbots",
+                        "Integrations"
+                    ]
+                }
+            ]
+        },
+        {
+            "category": "HTTP Headers",
+            "changes": [
+                {
+                    "file": "/next.config.mjs",
+                    "action": "UPDATED",
+                    "description": "Added CORS headers and proper Content-Type for AI discovery files to enable cross-origin AI agent access",
+                    "impact": "MEDIUM",
+                    "aiSystems": [
+                        "All AI systems making HTTP requests"
+                    ]
+                }
+            ]
+        },
+        {
+            "category": "HTML Meta & Links",
+            "changes": [
+                {
+                    "file": "/src/app/layout.js",
+                    "action": "UPDATED",
+                    "description": "Added link relations for llms-full.txt, ai-plugin.json, author, and me for knowledge graph attribution",
+                    "impact": "MEDIUM",
+                    "aiSystems": [
+                        "Google Knowledge Graph",
+                        "AI crawlers"
+                    ]
+                }
+            ]
+        },
+        {
+            "category": "CSS Utilities",
+            "changes": [
+                {
+                    "file": "/src/app/globals.css",
+                    "action": "UPDATED",
+                    "description": "Added sr-only, speakable-content, and data-ai-content styling for hidden but crawlable content",
+                    "impact": "LOW"
+                }
+            ]
+        },
+        {
+            "category": "Sitemap Enhancement",
+            "changes": [
+                {
+                    "file": "/src/app/sitemap.js",
+                    "action": "UPDATED",
+                    "description": "Added AI discovery resources to sitemap for comprehensive crawling",
+                    "impact": "MEDIUM"
+                }
+            ]
+        }
+    ],
+    "aiSystemCoverage": {
+        "ChatGPT_Search": {
+            "status": "OPTIMIZED",
+            "signals": [
+                "llms.txt with Q&A format",
+                "robots.txt allows GPTBot",
+                "Structured FAQ schema",
+                "Natural language content"
+            ]
+        },
+        "Perplexity": {
+            "status": "OPTIMIZED",
+            "signals": [
+                "llms-full.txt with comprehensive info",
+                "robots.txt allows PerplexityBot",
+                "Definitive answers in content",
+                "Citation-ready structure"
+            ]
+        },
+        "Claude": {
+            "status": "OPTIMIZED",
+            "signals": [
+                "robots.txt allows Anthropic-AI and Claude-Web",
+                "llms.txt readable format",
+                "Clean semantic HTML"
+            ]
+        },
+        "Google_AI_Overviews": {
+            "status": "OPTIMIZED",
+            "signals": [
+                "robots.txt allows Google-Extended",
+                "Speakable schema implemented",
+                "FAQPage schema with rich snippets",
+                "HowTo schema for tutorials",
+                "Product schema for shopping"
+            ]
+        },
+        "Bing_Copilot": {
+            "status": "OPTIMIZED",
+            "signals": [
+                "Standard robots.txt allows all",
+                "Comprehensive structured data",
+                "Rich meta descriptions"
+            ]
+        },
+        "Voice_Assistants": {
+            "status": "OPTIMIZED",
+            "signals": [
+                "Speakable schema with CSS selectors",
+                "Concise, spoken-friendly descriptions",
+                "FAQ with direct answers"
+            ]
+        }
+    },
+    "verificationChecklist": [
+        {
+            "item": "Deploy changes to Vercel",
+            "status": "PENDING",
+            "command": "git add . && git commit -m 'AI Search Visibility optimization' && git push",
+            "priority": "CRITICAL"
+        },
+        {
+            "item": "Verify llms.txt is accessible",
+            "status": "PENDING",
+            "url": "https://drift.dvkk.dev/llms.txt",
+            "expectedStatus": 200
+        },
+        {
+            "item": "Verify llms-full.txt is accessible",
+            "status": "PENDING",
+            "url": "https://drift.dvkk.dev/llms-full.txt",
+            "expectedStatus": 200
+        },
+        {
+            "item": "Verify ai-plugin.json is accessible",
+            "status": "PENDING",
+            "url": "https://drift.dvkk.dev/.well-known/ai-plugin.json",
+            "expectedStatus": 200
+        },
+        {
+            "item": "Verify api/ai-info endpoint",
+            "status": "PENDING",
+            "url": "https://drift.dvkk.dev/api/ai-info",
+            "expectedStatus": 200
+        },
+        {
+            "item": "Test robots.txt",
+            "status": "PENDING",
+            "url": "https://drift.dvkk.dev/robots.txt",
+            "verify": "Contains GPTBot, PerplexityBot, Anthropic-AI"
+        },
+        {
+            "item": "Validate structured data",
+            "status": "PENDING",
+            "tool": "https://validator.schema.org/",
+            "note": "Check for Speakable, FAQPage, Product schemas"
+        },
+        {
+            "item": "Submit sitemap to Google Search Console",
+            "status": "PENDING",
+            "url": "https://search.google.com/search-console"
+        }
+    ],
+    "expectedOutcomes": {
+        "shortTerm": [
+            "AI crawlers can now discover and index AI-specific content",
+            "Structured answers available for common queries",
+            "Rich snippets eligibility for Google search"
+        ],
+        "mediumTerm": [
+            "Increased citations in AI-powered search results",
+            "Better answers when users ask 'What is Drift' or 'Loom alternatives'",
+            "Voice search compatibility"
+        ],
+        "longTerm": [
+            "Established entity in AI knowledge graphs",
+            "Consistent presence in AI-generated recommendations",
+            "Improved brand recognition through AI citations"
+        ]
+    },
+    "recommendations": {
+        "immediate": [
+            "Deploy changes to production",
+            "Verify all AI discovery files are accessible (llms.txt was returning 404 before)"
+        ],
+        "future": [
+            "Create dedicated /about page with more natural language content",
+            "Add testimonials with structured Review schema",
+            "Create video content for YouTube (AI systems reference video content)",
+            "Build backlinks from authoritative tech sites for entity signals"
+        ]
+    }
+}

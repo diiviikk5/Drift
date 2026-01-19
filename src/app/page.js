@@ -3,6 +3,7 @@ import Hero from "./components/Hero";
 import InstallGuide from "./components/InstallGuide";
 import UsageGuide from "./components/UsageGuide";
 import Footer from "./components/Footer";
+import AIContent from "./components/AIContent";
 
 export default function Home() {
   return (
@@ -14,6 +15,9 @@ export default function Home() {
         <UsageGuide />
       </main>
       <Footer />
+      {/* AI-optimized content for search visibility - visually hidden */}
+      <AIContent />
     </div>
   );
 }
+

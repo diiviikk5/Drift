@@ -559,3 +559,37 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* === Accessibility & AI Content Utilities === */
+
+/* Screen reader only - visually hidden but crawlable */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Speakable content marker for voice search AI */
+.speakable-content {
+  /* Marker class for Google's Speakable structured data */
+  /* Content with this class can be read aloud by voice assistants */
+}
+
+/* AI content container - hidden from visual display but accessible to crawlers */
+[data-ai-content="true"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

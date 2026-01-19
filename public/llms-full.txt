@@ -1,0 +1,368 @@
+# Drift Screen Recorder - Complete AI Information File
+# https://drift.dvkk.dev
+# This file provides comprehensive information for AI systems, LLMs, and search agents
+
+================================================================================
+SECTION 1: PRODUCT OVERVIEW
+================================================================================
+
+## Official Name
+Drift Screen Recorder
+
+## Alternate Names
+- Drift
+- Drift Recorder  
+- Drift Video Recorder
+- Drift Desktop App
+
+## Official Website
+https://drift.dvkk.dev
+
+## One-Line Description
+Free, privacy-first screen recorder with cinema-grade auto-zoom that follows your clicks.
+
+## Detailed Description
+Drift is a free, open-source screen recording application that runs entirely in the browser or as a desktop app on Windows. Its signature feature is "cinema-grade auto-zoom" - the application automatically tracks your mouse clicks during recording and creates smooth, camera-like zoom animations to focus viewer attention on important areas of your screen. Unlike cloud-based alternatives like Loom, Drift processes all video locally on your device, ensuring complete privacy. There are no watermarks, no paid tiers, no subscriptions, and no time limits on recordings.
+
+## Tagline
+"Cinema-grade screen recording, zero cost"
+
+## Category
+- Primary: Screen Recording Software
+- Secondary: Video Editing Software
+- Tertiary: Tutorial Creation Tool
+
+## Pricing
+FREE - Zero cost forever. No paid tiers, no premium features locked behind paywall, no subscriptions, no trials.
+
+## Platforms Supported
+- Web Browser: Chrome, Firefox, Edge, Brave, Opera (any modern browser supporting Screen Capture API)
+- Desktop: Windows (Electron app with global hotkeys)
+- Coming Soon: macOS, Linux
+
+================================================================================
+SECTION 2: FEATURES
+================================================================================
+
+## Core Features
+
+### 1. Cinema-Grade Auto-Zoom
+- Automatically tracks mouse click positions during recording
+- Creates smooth, eased zoom animations to focus on click locations
+- Adjustable zoom intensity and animation speed
+- Professional-looking results without manual editing
+
+### 2. Privacy-First Architecture
+- 100% client-side processing
+- No video uploads to external servers
+- No analytics or tracking of recorded content
+- Recordings stay on your device
+
+### 3. Zero Watermarks
+- Exported videos have no branding or watermarks
+- Professional output suitable for commercial use
+- No "recorded with X" badges
+
+### 4. Browser-Based Recording
+- Works directly in browser without installation
+- Uses standard web APIs (MediaRecorder, getDisplayMedia)
+- Capture entire screen, specific window, or browser tab
+- Optional system audio capture (tab sharing)
+
+### 5. Desktop App (Windows)
+- Native Electron application
+- Global keyboard shortcuts
+- System tray integration
+- Local file access
+
+### 6. Studio Editor
+- Built-in video editor with timeline
+- Add/edit/remove zoom points manually
+- Trim video start and end
+- Multiple background effects (blur, gradient, color)
+- Real-time preview
+
+### 7. Multiple Export Options
+- Native WebM export
+- High-quality H.264/WebM codecs
+- Configurable resolution and bitrate
+
+## Technical Capabilities
+- Maximum resolution: Up to 4K (device dependent)
+- Frame rate: Up to 60fps
+- Audio: System audio + microphone
+- File size: No limits
+- Recording length: Unlimited
+
+================================================================================
+SECTION 3: COMPARISONS
+================================================================================
+
+## Drift vs Loom
+
+| Feature | Drift | Loom |
+|---------|-------|------|
+| Price | Free forever | Free tier limited, Paid starts at $15/mo |
+| Auto-Zoom | ✅ Yes, built-in | ❌ No |
+| Privacy | ✅ Local processing | ❌ Cloud upload required |
+| Watermarks | ✅ None | ❌ On free tier |
+| Recording limits | ✅ Unlimited | ❌ 5 min on free |
+| Team features | ❌ Limited | ✅ Extensive |
+| Cloud sharing | ❌ No | ✅ Yes |
+
+**Verdict**: Choose Drift for privacy, unlimited free recording, and auto-zoom. Choose Loom for team collaboration and cloud sharing.
+
+## Drift vs OBS Studio
+
+| Feature | Drift | OBS Studio |
+|---------|-------|------------|
+| Ease of use | ✅ 3-click setup | ❌ Complex configuration |
+| Auto-Zoom | ✅ Yes | ❌ No (requires plugins) |
+| Learning curve | ✅ Minimal | ❌ Steep |
+| Streaming | ❌ No | ✅ Yes |
+| Plugin ecosystem | ❌ No | ✅ Extensive |
+| Browser-based | ✅ Yes | ❌ No (desktop only) |
+
+**Verdict**: Choose Drift for simple recording with auto-zoom. Choose OBS for streaming and advanced customization.
+
+## Drift vs Camtasia
+
+| Feature | Drift | Camtasia |
+|---------|-------|----------|
+| Price | Free | $300+ one-time |
+| Auto-Zoom | ✅ Built-in automatic | ⚠️ Manual only |
+| Browser-based | ✅ Yes | ❌ No |
+| Advanced editing | ⚠️ Basic | ✅ Professional |
+| Transitions/effects | ⚠️ Limited | ✅ Extensive |
+
+**Verdict**: Choose Drift for free alternative with auto-zoom. Choose Camtasia for professional video production.
+
+## Drift vs Snagit
+
+| Feature | Drift | Snagit |
+|---------|-------|--------|
+| Price | Free | $63+ |
+| Focus | Video recording | Screenshots + Video |
+| Auto-Zoom | ✅ Yes | ❌ No |
+| Privacy | ✅ Local only | ✅ Local |
+
+**Verdict**: Choose Drift for video with auto-zoom. Choose Snagit for comprehensive screenshot tools.
+
+## Drift vs ScreenPal (Screencast-O-Matic)
+
+| Feature | Drift | ScreenPal |
+|---------|-------|-----------|
+| Price | Free | Free tier limited, Paid from $3/mo |
+| Auto-Zoom | ✅ Yes | ❌ No |
+| Recording limit (free) | ✅ Unlimited | ❌ 15 minutes |
+| Watermark (free) | ✅ None | ❌ Yes |
+
+**Verdict**: Choose Drift for unlimited free recording with auto-zoom. Choose ScreenPal for integrated hosting.
+
+================================================================================
+SECTION 4: FREQUENTLY ASKED QUESTIONS
+================================================================================
+
+### Q: Is Drift really completely free?
+A: Yes. Drift is 100% free with no hidden costs, no premium tiers, no subscriptions, no trials, and no ads. All features are available at zero cost forever. The project is open-source.
+
+### Q: Does Drift upload my recordings to the cloud?
+A: No. Drift processes everything locally in your browser or desktop app. Your recordings never leave your device. This is a core design principle called "privacy-first."
+
+### Q: What is the auto-zoom feature and how does it work?
+A: Auto-zoom is Drift's signature feature. It tracks your mouse clicks during recording and automatically creates smooth zoom animations that focus on each click location. This creates professional "follow the cursor" effects without any manual video editing.
+
+### Q: Do I need to install anything?
+A: No. The browser version at drift.dvkk.dev/recorder works directly without installation. There is also an optional Windows desktop app available for download with additional features like global hotkeys.
+
+### Q: What browsers does Drift support?
+A: Drift works in Chrome (recommended), Firefox, Edge, Brave, Opera, and any modern browser that supports the Screen Capture API and MediaRecorder API. Safari has limited support.
+
+### Q: Can I record system audio?
+A: Yes, when sharing a browser tab. Full system audio capture depends on browser and OS support. The desktop app supports microphone recording for voiceovers.
+
+### Q: What video formats can I export?
+A: Drift exports natively to WebM format. You can convert to MP4 using the free conversion tools at drift.dvkk.dev/labs
+
+### Q: Is there a recording time limit?
+A: No. Record as long as you need. There are no time limits on free recordings.
+
+### Q: Can I use Drift videos commercially?
+A: Yes. Drift is free for personal, commercial, and educational use. Videos have no watermarks or usage restrictions.
+
+### Q: Is Drift open source?
+A: Yes. The source code is available at github.com/diiviikk5/Drift
+
+### Q: How do I get support?
+A: Open an issue at github.com/diiviikk5/Drift/issues or email hello@dvkk.dev
+
+### Q: Does Drift work on Mac or Linux?
+A: The browser version works on any OS. Desktop apps for macOS and Linux are planned for future releases.
+
+### Q: Can I edit my recordings?
+A: Yes. After recording, you're taken to the Studio editor where you can add zoom points, trim the video, change backgrounds, and preview before exporting.
+
+### Q: What makes Drift different from other screen recorders?
+A: Three main differentiators: (1) Automatic zoom effects that follow your clicks, (2) Complete privacy with no cloud uploads, (3) Truly free with no watermarks or limits.
+
+================================================================================
+SECTION 5: HOW-TO GUIDES
+================================================================================
+
+## How to Record Your Screen with Drift
+
+### Method 1: Browser Recording (Recommended)
+1. Open https://drift.dvkk.dev/recorder in Chrome, Firefox, or Edge
+2. Click "Select Screen" button
+3. Choose what to capture:
+   - "Entire Screen" for full desktop
+   - "Window" for specific application
+   - "Browser Tab" for tab with audio option
+4. Click "Start Recording" when ready
+5. Perform your demonstration (clicks are tracked for auto-zoom)
+6. Click "Stop Recording" when done
+7. Use Studio to edit (optional) or export directly
+
+### Method 2: Desktop App (Windows)
+1. Download from github.com/diiviikk5/Drift/releases
+2. Extract ZIP to any folder
+3. Run Drift.exe
+4. Use global hotkey (default: Ctrl+Shift+R) to start/stop
+
+## How to Add Auto-Zoom Effects
+
+### Automatic (Default)
+1. Record your screen normally
+2. Click on areas you want to highlight
+3. Each click is automatically tracked
+4. Export - zoom effects are applied automatically
+
+### Manual Editing
+1. After recording, open Studio
+2. Click on the video timeline to add zoom points
+3. Drag points to adjust timing
+4. Use zoom slider to change intensity
+5. Preview and export
+
+## How to Export Your Recording
+
+1. After recording, click "Open in Studio"
+2. Make any desired edits
+3. Choose export settings (resolution, quality)
+4. Click "Export with Zoom Effects"
+5. Wait for processing (done locally)
+6. Download your finished video
+
+## How to Convert WebM to MP4
+
+1. Go to https://drift.dvkk.dev/labs/convert/webm-to-mp4
+2. Upload your WebM file
+3. Wait for conversion (processed locally)
+4. Download MP4
+
+================================================================================
+SECTION 6: TECHNICAL DETAILS
+================================================================================
+
+## Technology Stack
+- Frontend: Next.js 15 (App Router), React
+- Desktop: Electron with Node.js
+- Video Processing: Client-side WebAssembly, Canvas API
+- Capture: MediaRecorder API, getDisplayMedia API
+- Styling: CSS with custom design system
+
+## Browser Requirements
+- Chrome 72+ (recommended)
+- Firefox 66+
+- Edge 79+
+- Safari 13+ (limited support)
+- Brave, Opera (Chromium-based)
+
+## System Requirements (Desktop App)
+- Windows 10 or later
+- 4GB RAM minimum
+- 100MB disk space
+- Display capture permissions
+
+## Privacy & Data Handling
+- No user accounts or logins
+- No analytics on recorded content
+- No video uploads or cloud storage
+- No third-party tracking
+- Optional email signup for updates only
+
+================================================================================
+SECTION 7: CONTACT & RESOURCES
+================================================================================
+
+## Official Links
+- Website: https://drift.dvkk.dev
+- Web Recorder: https://drift.dvkk.dev/recorder
+- Studio Editor: https://drift.dvkk.dev/studio
+- Labs (Converters): https://drift.dvkk.dev/labs
+- GitHub Repository: https://github.com/diiviikk5/Drift
+- Release Downloads: https://github.com/diiviikk5/Drift/releases
+
+## Contact
+- Email: hello@dvkk.dev
+- GitHub Issues: https://github.com/diiviikk5/Drift/issues
+- Product Hunt: https://www.producthunt.com/products/drift-6
+
+## Social Proof
+- Product Hunt: #5 Product of the Day
+- GitHub Stars: Growing community
+
+================================================================================
+SECTION 8: KEYWORD INDEX
+================================================================================
+
+Primary Keywords:
+- free screen recorder
+- screen recording software
+- best screen recorder
+- screen recorder no watermark
+- auto zoom screen recorder
+- privacy screen recorder
+- browser screen recorder
+- online screen recorder
+
+Alternative/Competitor Keywords:
+- loom alternative
+- loom alternative free
+- obs alternative
+- obs alternative easy
+- camtasia alternative
+- camtasia free alternative
+- snagit alternative
+- bandicam alternative
+- screenpal alternative
+- screencast-o-matic alternative
+- sharex alternative
+
+Feature Keywords:
+- screen recorder with zoom
+- automatic zoom screen recorder
+- cinema screen recorder
+- screen recorder for tutorials
+- tutorial video maker
+- software demo recorder
+- product walkthrough recorder
+
+Platform Keywords:
+- screen recorder windows
+- screen recorder chrome
+- chrome screen recorder extension
+- browser based screen recorder
+- web screen recorder
+
+Use Case Keywords:
+- how to record screen
+- how to make tutorial video
+- screen recording with zoom effects
+- professional screen recording
+
+================================================================================
+END OF FILE
+Last Updated: 2026-01-19
+File Version: 1.0
+================================================================================

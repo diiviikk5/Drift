@@ -13,22 +13,50 @@ export default function sitemap() {
             priority: 1,
         },
         {
+            url: `${baseUrl}/recorder`,
+            lastModified: now,
+            changeFrequency: 'weekly',
+            priority: 0.95,
+        },
+        {
             url: `${baseUrl}/studio`,
+            lastModified: now,
+            changeFrequency: 'weekly',
+            priority: 0.85,
+        },
+        {
+            url: `${baseUrl}/editor`,
             lastModified: now,
             changeFrequency: 'weekly',
             priority: 0.8,
         },
         {
-            url: `${baseUrl}/recorder`,
+            url: `${baseUrl}/labs`,
             lastModified: now,
             changeFrequency: 'weekly',
             priority: 0.9,
         },
+    ];
+
+    // AI/LLM discovery resources (for AI search visibility)
+    const aiDiscoveryPages = [
         {
-            url: `${baseUrl}/labs`,
+            url: `${baseUrl}/llms.txt`,
             lastModified: now,
-            changeFrequency: 'weekly',
-            priority: 0.95,
+            changeFrequency: 'monthly',
+            priority: 0.6,
+        },
+        {
+            url: `${baseUrl}/llms-full.txt`,
+            lastModified: now,
+            changeFrequency: 'monthly',
+            priority: 0.5,
+        },
+        {
+            url: `${baseUrl}/api/ai-info`,
+            lastModified: now,
+            changeFrequency: 'monthly',
+            priority: 0.5,
         },
     ];
 
@@ -63,6 +91,7 @@ export default function sitemap() {
 
     return [
         ...corePages,
+        ...aiDiscoveryPages,
         ...comparisonPages,
         ...labsPages,
     ];

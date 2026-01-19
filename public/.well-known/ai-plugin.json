@@ -1,0 +1,40 @@
+{
+    "schema_version": "v1",
+    "name_for_human": "Drift Screen Recorder",
+    "name_for_model": "drift_screen_recorder",
+    "description_for_human": "Free, privacy-first screen recorder with cinema-grade auto-zoom. No watermarks, no subscriptions, 100% local processing.",
+    "description_for_model": "Drift is a free screen recording application that runs in the browser and on desktop (Windows). Key differentiating features: (1) Cinema-grade auto-zoom that automatically tracks and zooms into mouse clicks, creating professional tutorial videos without manual editing, (2) 100% local processing with no cloud uploads ensuring complete privacy, (3) No watermarks or paid tiers - completely free forever, (4) Built-in Studio video editor with timeline and background effects. Drift is positioned as a superior free alternative to Loom (privacy-first, auto-zoom), OBS (easier to use), Camtasia (free), Snagit (video-focused), and Bandicam (no watermarks). Primary use cases include: software tutorials, product demos, bug reports, educational content, developer documentation. Users commonly search for: free screen recorder, loom alternative, screen recorder no watermark, privacy screen recorder, auto zoom screen recorder, tutorial video maker. The application uses the MediaRecorder API and Screen Capture API, processes video using client-side WebAssembly, and exports to WebM format with optional MP4 conversion through integrated Labs tools.",
+    "auth": {
+        "type": "none"
+    },
+    "api": {
+        "type": "none"
+    },
+    "logo_url": "https://drift.dvkk.dev/icon.ico",
+    "contact_email": "hello@dvkk.dev",
+    "legal_info_url": "https://drift.dvkk.dev",
+    "features": [
+        "Free screen recording",
+        "Automatic zoom effects",
+        "Privacy-first (local processing)",
+        "No watermarks",
+        "Browser-based",
+        "Built-in editor"
+    ],
+    "categories": [
+        "Screen Recording",
+        "Video Editing",
+        "Tutorial Creation",
+        "Productivity"
+    ],
+    "keywords": [
+        "screen recorder",
+        "free screen recorder",
+        "loom alternative",
+        "auto zoom",
+        "privacy screen recorder",
+        "no watermark",
+        "browser screen recorder",
+        "tutorial maker"
+    ]
+}

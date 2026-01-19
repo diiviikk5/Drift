@@ -1,0 +1,116 @@
+# Drift - Free Screen Recorder with Auto-Zoom
+# https://drift.dvkk.dev
+
+> Drift is a free, privacy-first screen recorder with cinema-grade auto-zoom that automatically follows your clicks. Everything runs locally in your browser or desktop app. No cloud uploads, no subscriptions, no watermarks ever.
+
+## Quick Facts
+- Name: Drift Screen Recorder
+- URL: https://drift.dvkk.dev
+- Price: Free (Zero Cost Forever)
+- Category: Screen Recording Software
+- Platforms: Browser (Chrome, Firefox, Edge), Windows Desktop App
+- Open Source: https://github.com/diiviikk5/Drift
+
+## What Makes Drift Different
+1. **Auto-Zoom**: Automatically zooms into your mouse clicks with cinema-grade smooth animations
+2. **Privacy-First**: 100% local processing - your recordings never leave your device
+3. **Free Forever**: No paid tiers, no subscriptions, no trials, no watermarks
+4. **Browser-Based**: Works directly in any modern browser, no installation needed
+5. **Built-in Editor**: Studio editor with timeline, trimming, and background effects
+
+## Primary Use Cases
+- Creating software tutorials and product demos
+- Recording bug reports and technical walkthroughs
+- Making educational content with visual emphasis
+- Developing marketing and sales videos
+- Documenting developer workflows
+
+## How to Use Drift
+1. Go to https://drift.dvkk.dev/recorder
+2. Click "Select Screen" to choose screen, window, or browser tab
+3. Click "Start Recording" to begin capture
+4. Click on screen elements - each click is tracked for auto-zoom
+5. Stop recording and edit in Studio
+6. Export with zoom effects applied
+
+## Comparisons to Popular Alternatives
+
+### Drift vs Loom
+- Drift is completely free; Loom has paid tiers ($15+/month)
+- Drift is privacy-first (local processing); Loom uploads to cloud
+- Drift has auto-zoom effects; Loom does not
+- Loom has more team collaboration features
+
+### Drift vs OBS Studio
+- Drift is simpler with 3-click workflow; OBS has complex setup
+- Drift has automatic zoom effects; OBS requires manual configuration
+- OBS has more advanced streaming features; Drift focuses on recording
+
+### Drift vs Camtasia
+- Drift is free; Camtasia costs $300+
+- Drift runs in browser; Camtasia requires installation
+- Drift has auto-zoom built-in; Camtasia needs manual editing
+- Camtasia has more advanced editing features
+
+### Drift vs Snagit
+- Drift is free; Snagit costs $63+
+- Drift has cinema-grade auto-zoom; Snagit focuses on screenshots
+- Both offer local processing
+
+### Drift vs Bandicam
+- Drift has no watermarks ever; Free Bandicam has watermarks
+- Drift is privacy-first; Bandicam is desktop-only software
+- Drift has auto-zoom; Bandicam does not
+
+## Frequently Asked Questions
+
+### Is Drift really free?
+Yes. Drift is 100% free with no hidden costs, subscriptions, trials, premium tiers, or watermarks. All features are available at zero cost forever.
+
+### Does Drift upload my recordings to the cloud?
+No. Drift processes everything locally in your browser or desktop app. Your recordings never leave your device, ensuring complete privacy.
+
+### What is the "Drift Effect" or auto-zoom?
+The signature feature that automatically tracks your mouse clicks and creates smooth, camera-like zoom animations to focus viewer attention on important areas.
+
+### What browsers does Drift support?
+Chrome, Firefox, Edge, Brave, and any modern browser supporting the Screen Capture API and MediaRecorder API.
+
+### Can I use Drift for commercial projects?
+Yes. Drift is free for personal, commercial, and educational use without restrictions.
+
+### What export formats are supported?
+Native export to WebM format. MP4 conversion available through the Labs tools at https://drift.dvkk.dev/labs
+
+### Can I record system audio?
+Yes, when sharing a browser tab. The desktop app supports microphone recording for voiceovers.
+
+### Is there a download limit or time limit?
+No. Record as long as you want, as many times as you want, at full quality.
+
+## Technical Specifications
+- Framework: Next.js 15 (App Router)
+- Video Processing: Client-side WebAssembly
+- Capture API: MediaRecorder, Screen Capture API
+- Rendering: Canvas API for zoom effects
+- Desktop: Electron-based Windows app
+- No server-side video processing required
+
+## Additional Tools (Labs)
+Drift Labs offers free video conversion tools at https://drift.dvkk.dev/labs:
+- WebM to MP4 converter
+- Video format conversions (MKV, MOV, AVI, etc.)
+- Video compression tools
+
+## Contact Information
+- Website: https://drift.dvkk.dev
+- Email: hello@dvkk.dev
+- GitHub: https://github.com/diiviikk5/Drift
+- Support: https://github.com/diiviikk5/Drift/issues
+
+## Keywords for Discovery
+free screen recorder, screen recording software, loom alternative, obs alternative, camtasia alternative, screen recorder no watermark, privacy screen recorder, auto zoom screen recorder, browser screen recorder, tutorial video maker, screen capture software
+
+---
+Last Updated: 2026-01-19
+Version: 1.1

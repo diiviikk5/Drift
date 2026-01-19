@@ -21,6 +21,19 @@ export const VIDEO_FORMATS = {
     'mpg': 'MPEG Video',
     'vob': 'DVD Video',
     'ogv': 'Ogg Video',
+    'asf': 'Advanced Systems Format',
+    'm2ts': 'Blu-ray Video',
+    'mts': 'AVCHD Video',
+    'ts': 'MPEG Transport Stream',
+    'f4v': 'Flash MP4 Video',
+    'swf': 'Shockwave Flash',
+    'rm': 'RealMedia',
+    'rmvb': 'RealMedia Variable Bitrate',
+    'divx': 'DivX Video',
+    'xvid': 'Xvid Video',
+    'mpeg': 'MPEG-1 Video',
+    'm2v': 'MPEG-2 Video',
+    'mjpeg': 'Motion JPEG',
 };
 
 export const AUDIO_FORMATS = {
@@ -33,6 +46,16 @@ export const AUDIO_FORMATS = {
     'wma': 'Windows Audio',
     'opus': 'Opus Audio',
     'aiff': 'AIFF Audio',
+    'amr': 'Adaptive Multi-Rate',
+    'm4b': 'MPEG-4 Audiobook',
+    'm4r': 'iPhone Ringtone',
+    'mp2': 'MPEG Audio Layer II',
+    'mka': 'Matroska Audio',
+    'ra': 'RealAudio',
+    'mid': 'MIDI Audio',
+    'au': 'Sun Audio',
+    'snd': 'Sound File',
+    'weba': 'WebM Audio',
 };
 
 export const IMAGE_FORMATS = {
@@ -44,6 +67,16 @@ export const IMAGE_FORMATS = {
     'gif': 'GIF Image',
     'tiff': 'TIFF Image',
     'avif': 'AVIF Image',
+    'tga': 'Truevision Targa',
+    'ico': 'Windows Icon',
+    'psd': 'Adobe Photoshop',
+    'raw': 'Raw Image',
+    'cr2': 'Canon Raw',
+    'nef': 'Nikon Raw',
+    'orf': 'Olympus Raw',
+    'arw': 'Sony Raw',
+    'dng': 'Digital Negative',
+    'ppm': 'Portable Pixmap',
 };
 
 // ============================================
