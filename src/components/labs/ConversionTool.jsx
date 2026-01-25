@@ -11,8 +11,7 @@ import DownloadButton from '@/components/labs/DownloadButton';
 import { convertMedia, getConversionSpeedTier, estimateConversionTime } from '@/lib/labs/media-engine';
 
 /**
- * Conversion Tool Component - INDUSTRIAL MAXIMALIST EDITION
- * Uses the high-performance hybrid media engine
+ * 
  */
 export default function ConversionTool({ config, slug }) {
     const [file, setFile] = useState(null);
