@@ -2,26 +2,27 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { X, Download, Loader2, Check, Film, Image } from "lucide-react";
+import { X, Download, Loader2, Check, Film, Image, Sparkles } from "lucide-react";
+import { getMediaExporter, QUALITY_PRESETS, EXPORT_FORMATS } from "@/lib/export/MediaExporter";
 
 export default function ExportModal({ videoBlob, onClose }) {
     const [format, setFormat] = useState("mp4");
-    const [quality, setQuality] = useState("high");
+    const [quality, setQuality] = useState("1080p");
     const [isExporting, setIsExporting] = useState(false);
     const [progress, setProgress] = useState(0);
     const [downloadUrl, setDownloadUrl] = useState(null);
     const [error, setError] = useState(null);
 
     const formats = [
-        { id: "webm", label: "WebM", icon: Film, description: "Best quality, web-native" },
-        { id: "mp4", label: "MP4", icon: Film, description: "Universal compatibility (coming soon)" },
-        { id: "gif", label: "GIF", icon: Image, description: "Animated image (coming soon)" },
+        { id: "mp4", label: "MP4", icon: Film, description: "H.264 · Universal" },
+        { id: "webm", label: "WebM", icon: Film, description: "VP9 · Web-native" },
+        { id: "gif", label: "GIF", icon: Image, description: "Animated image" },
     ];
 
     const qualities = [
-        { id: "high", label: "High", bitrate: "8 Mbps" },
-        { id: "medium", label: "Medium", bitrate: "4 Mbps" },
-        { id: "low", label: "Low", bitrate: "2 Mbps" },
+        { id: "4k", label: "4K", detail: "3840×2160 · 20 Mbps" },
+        { id: "1080p", label: "1080p", detail: "1920×1080 · 8 Mbps" },
+        { id: "720p", label: "720p", detail: "1280×720 · 4 Mbps" },
     ];
 
     // Export video
@@ -36,28 +37,22 @@ export default function ExportModal({ videoBlob, onClose }) {
         setError(null);
 
         try {
-            // For now, just provide direct download of WebM
-            // FFmpeg WASM integration can be added later for MP4/GIF
-            if (format === "webm") {
-                // Simulate progress for UX
-                for (let i = 0; i <= 100; i += 10) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    setProgress(i);
-                }
+            const exporter = getMediaExporter();
+            const blob = await exporter.export(videoBlob, {
+                format,
+                quality,
+                onProgress: (p) => setProgress(Math.round(p * 100)),
+            });
 
-                const url = URL.createObjectURL(videoBlob);
-                setDownloadUrl(url);
-            } else {
-                // MP4 and GIF require FFmpeg WASM
-                // For now, show coming soon message
-                setError(`${format.toUpperCase()} export requires FFmpeg WASM integration. Use WebM for now.`);
-            }
+            const url = URL.createObjectURL(blob);
+            setDownloadUrl(url);
         } catch (err) {
+            console.error('[Export] Failed:', err);
             setError(err.message);
         } finally {
             setIsExporting(false);
         }
-    }, [videoBlob, format]);
+    }, [videoBlob, format, quality]);
 
     // Trigger download
     const handleDownload = useCallback(() => {
@@ -120,23 +115,19 @@ export default function ExportModal({ videoBlob, onClose }) {
                         {formats.map((f) => {
                             const Icon = f.icon;
                             const isActive = format === f.id;
-                            const isAvailable = f.id === "webm";
 
                             return (
                                 <motion.button
                                     key={f.id}
-                                    onClick={() => isAvailable && setFormat(f.id)}
-                                    disabled={!isAvailable}
+                                    onClick={() => setFormat(f.id)}
                                     className={`p-4 border-3 flex flex-col items-center gap-2 transition-all
                              ${isActive
                                             ? "bg-[var(--brutal-yellow)] border-[var(--border-default)] shadow-[4px_4px_0px_var(--border-default)]"
-                                            : isAvailable
-                                                ? "bg-[var(--bg-tertiary)] border-[var(--border-default)] hover:shadow-[4px_4px_0px_var(--border-default)]"
-                                                : "bg-[var(--bg-tertiary)] border-[var(--text-muted)] opacity-50 cursor-not-allowed"
+                                            : "bg-[var(--bg-tertiary)] border-[var(--border-default)] hover:shadow-[4px_4px_0px_var(--border-default)]"
                                         }`}
                                     style={{ borderWidth: "3px" }}
-                                    whileHover={isAvailable ? { scale: 1.02 } : {}}
-                                    whileTap={isAvailable ? { scale: 0.98 } : {}}
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
                                 >
                                     <Icon className={`w-6 h-6 ${isActive ? "text-[#0a0a0a]" : ""}`} />
                                     <span className={`font-mono text-sm font-bold uppercase ${isActive ? "text-[#0a0a0a]" : ""}`}>
@@ -176,7 +167,7 @@ export default function ExportModal({ videoBlob, onClose }) {
                                         {q.label}
                                     </span>
                                     <span className={`font-mono text-xs ${isActive ? "text-white/80" : "text-[var(--text-muted)]"}`}>
-                                        {q.bitrate}
+                                        {q.detail}
                                     </span>
                                 </motion.button>
                             );

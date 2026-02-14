@@ -1,8 +1,11 @@
 /**
  * Cursor Tracker for Drift Effect
  * Tracks cursor position and detects click events for auto-zoom
+ * Supports both browser (in-tab) and Tauri (global) cursor tracking
  * All client-side, zero cost
  */
+
+import { drift } from './tauri-bridge';
 
 export class CursorTracker {
     constructor(options = {}) {
@@ -21,11 +24,15 @@ export class CursorTracker {
         this.lastTime = 0;
 
         // Settings
-        this.sampleRate = options.sampleRate || 60; // samples per second
-        this.smoothing = options.smoothing || 0.3; // position smoothing factor
-        this.velocityThreshold = options.velocityThreshold || 500; // px/s for "fast" movement
+        this.sampleRate = options.sampleRate || 60;
+        this.smoothing = options.smoothing || 0.3;
+        this.velocityThreshold = options.velocityThreshold || 500;
         this.clickZoomEnabled = options.clickZoomEnabled ?? true;
         this.movementZoomEnabled = options.movementZoomEnabled ?? false;
+
+        // Canvas/screen dimensions for normalization
+        this.screenWidth = options.screenWidth || window.screen.width;
+        this.screenHeight = options.screenHeight || window.screen.height;
 
         // Callbacks
         this.onPositionUpdate = options.onPositionUpdate || null;
@@ -39,6 +46,10 @@ export class CursorTracker {
 
         // Sample interval
         this.sampleInterval = null;
+
+        // Tauri global listener cleanup
+        this._tauriClickCleanup = null;
+        this._tauriMoveCleanup = null;
     }
 
     /**
@@ -55,18 +66,65 @@ export class CursorTracker {
     }
 
     /**
-     * Start tracking cursor
+     * Get normalized position (0-1 range) relative to screen/recording area
      */
-    start(targetElement = document) {
+    getNormalizedPosition() {
+        return {
+            x: this.currentX / this.screenWidth,
+            y: this.currentY / this.screenHeight,
+        };
+    }
+
+    /**
+     * Start tracking cursor — uses Tauri global input on desktop, browser events on web
+     */
+    async start(targetElement = document) {
         if (this.isTracking) return;
 
         this.isTracking = true;
         this.startTime = performance.now();
         this.events = [];
 
-        targetElement.addEventListener("mousemove", this._handleMouseMove);
-        targetElement.addEventListener("mousedown", this._handleMouseDown);
-        targetElement.addEventListener("mouseup", this._handleMouseUp);
+        // Try Tauri global tracking first (works outside the app window)
+        if (drift.isDesktop()) {
+            try {
+                this._tauriClickCleanup = await drift.onGlobalClick((data) => {
+                    const event = {
+                        type: 'mousedown',
+                        x: data.x,
+                        y: data.y,
+                        button: data.button === 'Left' ? 0 : data.button === 'Right' ? 2 : 1,
+                        time: performance.now() - this.startTime,
+                    };
+                    this.events.push(event);
+                    if (this.onClick && this.clickZoomEnabled) {
+                        this.onClick(event);
+                    }
+                });
+
+                this._tauriMoveCleanup = await drift.onGlobalMouseMove((data) => {
+                    this.currentX = this.lastX + (data.x - this.lastX) * this.smoothing;
+                    this.currentY = this.lastY + (data.y - this.lastY) * this.smoothing;
+
+                    if (this.onPositionUpdate) {
+                        this.onPositionUpdate({
+                            x: this.currentX,
+                            y: this.currentY,
+                            rawX: data.x,
+                            rawY: data.y,
+                            time: performance.now() - this.startTime,
+                        });
+                    }
+                });
+
+                console.log('[CursorTracker] Using Tauri global input tracking');
+            } catch (err) {
+                console.warn('[CursorTracker] Tauri global input failed, falling back to browser:', err);
+                this._startBrowserTracking(targetElement);
+            }
+        } else {
+            this._startBrowserTracking(targetElement);
+        }
 
         // Start sampling for velocity calculations
         this.sampleInterval = setInterval(() => {
@@ -75,16 +133,45 @@ export class CursorTracker {
     }
 
     /**
+     * Browser-based tracking (fallback)
+     */
+    _startBrowserTracking(targetElement) {
+        targetElement.addEventListener("mousemove", this._handleMouseMove);
+        targetElement.addEventListener("mousedown", this._handleMouseDown);
+        targetElement.addEventListener("mouseup", this._handleMouseUp);
+        this._browserTarget = targetElement;
+    }
+
+    /**
      * Stop tracking
      */
-    stop() {
+    async stop() {
         if (!this.isTracking) return;
 
         this.isTracking = false;
 
-        document.removeEventListener("mousemove", this._handleMouseMove);
-        document.removeEventListener("mousedown", this._handleMouseDown);
-        document.removeEventListener("mouseup", this._handleMouseUp);
+        // Clean up Tauri global listeners
+        if (this._tauriClickCleanup) {
+            try { await this._tauriClickCleanup(); } catch { /* ignore */ }
+            this._tauriClickCleanup = null;
+        }
+        if (this._tauriMoveCleanup) {
+            try { await this._tauriMoveCleanup(); } catch { /* ignore */ }
+            this._tauriMoveCleanup = null;
+        }
+
+        // Clean up Tauri global listener process
+        if (drift.isDesktop()) {
+            try { await drift.stopGlobalListener(); } catch { /* ignore */ }
+        }
+
+        // Clean up browser listeners
+        if (this._browserTarget) {
+            this._browserTarget.removeEventListener("mousemove", this._handleMouseMove);
+            this._browserTarget.removeEventListener("mousedown", this._handleMouseDown);
+            this._browserTarget.removeEventListener("mouseup", this._handleMouseUp);
+            this._browserTarget = null;
+        }
 
         if (this.sampleInterval) {
             clearInterval(this.sampleInterval);
@@ -199,8 +286,8 @@ export class CursorTracker {
     /**
      * Destroy tracker
      */
-    destroy() {
-        this.stop();
+    async destroy() {
+        await this.stop();
         this.events = [];
         this.onPositionUpdate = null;
         this.onClick = null;

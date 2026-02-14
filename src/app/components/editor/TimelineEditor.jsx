@@ -16,8 +16,12 @@ import {
     ArrowLeft,
     Volume2,
     VolumeX,
+    Brain,
+    Settings2,
 } from "lucide-react";
 import ExportModal from "./ExportModal";
+import AISidebar from "./AISidebar";
+import AISettings from "../settings/AISettings";
 
 export default function TimelineEditor() {
     const { recordedUrl, recordedBlob, zoomKeyframes, removeZoomKeyframe, updateZoomKeyframe } = useRecording();
@@ -34,6 +38,8 @@ export default function TimelineEditor() {
     const [trimStart, setTrimStart] = useState(0);
     const [trimEnd, setTrimEnd] = useState(100);
     const [selectedKeyframe, setSelectedKeyframe] = useState(null);
+    const [showAISidebar, setShowAISidebar] = useState(false);
+    const [showAISettings, setShowAISettings] = useState(false);
 
     // Update time on video progress
     useEffect(() => {
@@ -160,15 +166,37 @@ export default function TimelineEditor() {
                     </h1>
                 </div>
 
-                <motion.button
-                    onClick={() => setShowExportModal(true)}
-                    className="brutal-button brutal-button-pink flex items-center gap-2"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                >
-                    <Download className="w-5 h-5" />
-                    Export
-                </motion.button>
+                <div className="flex items-center gap-3">
+                    <motion.button
+                        onClick={() => setShowAISettings(true)}
+                        className="p-2.5 border-2 border-[var(--border-default)] bg-[var(--bg-tertiary)] hover:bg-[var(--brutal-blue)] transition-colors"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        title="AI Settings"
+                    >
+                        <Settings2 className="w-5 h-5" />
+                    </motion.button>
+
+                    <motion.button
+                        onClick={() => setShowAISidebar(!showAISidebar)}
+                        className={`brutal-button flex items-center gap-2 ${showAISidebar ? 'brutal-button-blue' : ''}`}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                    >
+                        <Brain className="w-5 h-5" />
+                        AI Studio
+                    </motion.button>
+
+                    <motion.button
+                        onClick={() => setShowExportModal(true)}
+                        className="brutal-button brutal-button-pink flex items-center gap-2"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                    >
+                        <Download className="w-5 h-5" />
+                        Export
+                    </motion.button>
+                </div>
             </header>
 
             {/* Main Content */}
@@ -365,6 +393,22 @@ export default function TimelineEditor() {
                     />
                 )}
             </AnimatePresence>
+
+            {/* AI Sidebar */}
+            <AISidebar
+                isOpen={showAISidebar}
+                onToggle={() => setShowAISidebar(!showAISidebar)}
+                studioEngine={null}
+                videoBlob={recordedBlob}
+                clicks={zoomKeyframes}
+                duration={duration}
+            />
+
+            {/* AI Settings Modal */}
+            <AISettings
+                isOpen={showAISettings}
+                onClose={() => setShowAISettings(false)}
+            />
         </div>
     );
 }

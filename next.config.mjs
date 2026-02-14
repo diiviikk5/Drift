@@ -1,7 +1,23 @@
+const isProd = process.env.NODE_ENV === 'production';
+const isTauri = process.env.TAURI_ENV_PLATFORM !== undefined;
+const isTauriBuild = isTauri && isProd;
+const internalHost = process.env.TAURI_DEV_HOST || 'localhost';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   /* config options here */
   reactCompiler: true,
+
+  // When building for Tauri production, use static export (SSG)
+  // During tauri dev, keep SSR so headers/rewrites work
+  ...(isTauriBuild ? {
+    output: 'export',
+  } : {}),
+
+  // Always unoptimize images in Tauri (no Next.js image server)
+  ...(isTauri ? {
+    images: { unoptimized: true },
+  } : {}),
 
   // Headers for SharedArrayBuffer (required for multi-threaded FFmpeg WASM)
   // and AI discovery files
