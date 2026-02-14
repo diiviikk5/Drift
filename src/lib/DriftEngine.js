@@ -1,14 +1,11 @@
-// Drift Engine - Electron Port
+// Drift Engine - Universal Recording Engine
+// Supports: Tauri (native desktop), Electron, Browser
 // Handles Recording, Zoom Logic, and Canvas Drawing
+// NOW with Cinema Zoom + Cursor engines for live preview
 
-const easeOutQuint = t => 1 - Math.pow(1 - t, 5);
-const easeInOutQuart = t => t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
-
-const SPEED_PRESETS = {
-    slow: { zoomIn: 1000, hold: 1200, zoomOut: 1000, smoothing: 0.05 },
-    normal: { zoomIn: 750, hold: 1000, zoomOut: 750, smoothing: 0.07 },
-    fast: { zoomIn: 400, hold: 600, zoomOut: 500, smoothing: 0.12 }
-};
+import drift from './tauri-bridge';
+import { CinemaZoomEngine } from './zoom/CinemaZoomEngine.js';
+import { CinemaCursorEngine } from './zoom/CinemaCursorEngine.js';
 
 export class DriftEngine {
     constructor(canvas, videoElement) {
@@ -28,74 +25,155 @@ export class DriftEngine {
         this.isActive = true; // For stopping render loop
         this.timerCallback = null;
 
+        // Cinema Zoom Engine (live preview)
+        this.zoomEngine = new CinemaZoomEngine({
+            width: canvas.width || 1920,
+            height: canvas.height || 1080,
+            zoomLevel: 2.0,
+        });
+
+        // Cinema Cursor Engine (smoothed cursor overlay)
+        this.cursorEngine = new CinemaCursorEngine({
+            screenWidth: window.screen.width || 1920,
+            screenHeight: window.screen.height || 1080,
+        });
+
+        // Camera state (driven by zoom engine)
         this.camera = { x: 0.5, y: 0.5, scale: 1 };
-        this.target = { x: 0.5, y: 0.5, scale: 1 };
-        this.activeZoom = null;
-        this.lastClickIdx = -1;
 
-        this.zoomLevel = 1.25;
-        this.speedPreset = 'slow';
-        this.lookAheadMs = 400;
+        this.zoomLevel = 2.0;
+        this.zoomEnabled = true;
 
-        this.initElectronListeners();
+        // Capture source resolution (for normalizing mouse coordinates)
+        // Updated when a stream is selected — defaults to screen dimensions
+        this._sourceWidth = window.screen.width || 1920;
+        this._sourceHeight = window.screen.height || 1080;
+
+        // Track platform
+        this._isTauri = drift.isTauri();
+        this._isElectron = drift.isElectron();
+        this._isDesktop = drift.isDesktop();
+        this._globalClickUnlisten = null;
+        this._globalMoveUnlisten = null;
+
+        this.initPlatformListeners();
         this.renderLoop();
     }
 
-    get speed() { return SPEED_PRESETS[this.speedPreset]; }
+    /**
+     * Initialize global input listeners based on platform
+     * Tauri: uses Rust global input via IPC events
+     * Electron: uses preload bridge
+     * Browser: no global listeners (only click-on-canvas)
+     */
+    async initPlatformListeners() {
+        if (this._isTauri) {
+            console.log('[Drift] Init Tauri platform listeners');
 
-    initElectronListeners() {
-        console.log('[Drift] Init Electron Listeners, window.electron:', !!window.electron);
-        if (window.electron) {
-            window.electron.onGlobalClick((data) => {
-                console.log('[Drift] Global Click received:', data, 'isRecording:', this.isRecording);
+            // Global click listener via Rust rdev
+            this._globalClickUnlisten = await drift.onGlobalClick((data) => {
                 if (!this.isRecording) return;
-
                 const t = Date.now() - this.startTime;
-                this.clicks.push({ time: t, x: data.x, y: data.y });
-                console.log('[Drift] Click saved:', this.clicks.length, 'total');
+                // Normalize to 0-1 using actual source/screen resolution
+                const nx = data.x / this._sourceWidth;
+                const ny = data.y / this._sourceHeight;
+                this.clicks.push({ time: t, x: nx, y: ny });
+
+                // Feed into Cinema Zoom Engine (live zoom preview)
+                if (this.zoomEnabled) {
+                    this.zoomEngine.addClick(t, nx, ny);
+                }
+                // Feed into Cinema Cursor Engine (normalized coords)
+                this.cursorEngine.addClick(t, data.x, data.y);
+
+                console.log('[Drift] Tauri global click:', this.clicks.length);
                 if (this.onclickCallback) this.onclickCallback(this.clicks.length);
             });
 
-            window.electron.onGlobalHotkey((action) => {
-                console.log('[Drift] Global Hotkey received:', action, 'isRecording:', this.isRecording, 'hasStream:', !!this.screenStream?.active);
-                if (action === 'STOP') {
-                    if (this.isRecording) {
-                        console.log('[Drift] Stopping recording via hotkey');
-                        this.stopRecording();
-                    }
-                } else if (action === 'START') {
-                    // Only start if we have a stream and aren't recording
-                    if (!this.isRecording && this.screenStream?.active && this.onHotkeyStart) {
-                        console.log('[Drift] Starting recording via hotkey');
-                        this.onHotkeyStart();
-                    } else {
-                        console.log('[Drift] Cannot start - no stream or already recording');
-                    }
-                }
+            // Global mouse move listener for cursor tracking
+            this._globalMoveUnlisten = await drift.onGlobalMouseMove((data) => {
+                if (!this.isRecording) return;
+                const t = Date.now() - this.startTime;
+                const nx = data.x / this._sourceWidth;
+                const ny = data.y / this._sourceHeight;
+                this.mouseMoves.push({ time: t, x: nx, y: ny });
+
+                // Feed cursor position into zoom engine (for camera following)
+                this.zoomEngine.updateCursor(nx, ny, t);
+                // Feed into cursor engine (raw pixels — engine normalizes internally)
+                this.cursorEngine.addMove(t, data.x, data.y);
             });
+
+        } else if (this._isElectron) {
+            console.log('[Drift] Init Electron listeners');
+            if (window.electron) {
+                window.electron.onGlobalClick((data) => {
+                    if (!this.isRecording) return;
+                    const t = Date.now() - this.startTime;
+                    const nx = data.x / this._sourceWidth;
+                    const ny = data.y / this._sourceHeight;
+                    this.clicks.push({ time: t, x: nx, y: ny });
+
+                    if (this.zoomEnabled) {
+                        this.zoomEngine.addClick(t, nx, ny);
+                    }
+                    this.cursorEngine.addClick(t, data.x, data.y);
+
+                    if (this.onclickCallback) this.onclickCallback(this.clicks.length);
+                });
+
+                window.electron.onGlobalHotkey((action) => {
+                    if (action === 'STOP') {
+                        if (this.isRecording) this.stopRecording();
+                    } else if (action === 'START') {
+                        if (!this.isRecording && this.screenStream?.active && this.onHotkeyStart) {
+                            this.onHotkeyStart();
+                        }
+                    }
+                });
+            }
         } else {
-            console.warn('[Drift] window.electron not available - running in browser mode?');
+            console.log('[Drift] Browser mode — no global listeners');
         }
     }
 
+    /**
+     * Get available recording sources
+     * Tauri: returns monitors from Rust xcap
+     * Electron: returns desktopCapturer sources
+     * Browser: returns empty (uses getDisplayMedia picker)
+     */
     async getSources() {
-        if (window.electron) {
+        if (this._isTauri) {
+            return await drift.getSources();
+        }
+        if (this._isElectron && window.electron) {
             return await window.electron.getSources();
         }
         return [];
     }
 
+    /**
+     * Select an Electron source using chromeMediaSource (Electron-only)
+     */
     async selectSource(sourceId) {
+        if (this._isElectron) {
+            return this._selectElectronSource(sourceId);
+        }
+        // For Tauri and browser, use getDisplayMedia
+        return this.selectSourceBrowser();
+    }
+
+    async _selectElectronSource(sourceId) {
         try {
             if (this.screenStream) {
                 this.screenStream.getTracks().forEach(t => t.stop());
             }
-            console.log('[Drift] Attempting to select source:', sourceId);
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     mandatory: {
                         chromeMediaSource: 'desktop',
-                        chromeMediaSourceId: sourceId // Added ID for audio too
+                        chromeMediaSourceId: sourceId
                     }
                 },
                 video: {
@@ -105,18 +183,23 @@ export class DriftEngine {
                     }
                 }
             });
-
             this.screenStream = stream;
 
-            // Preview in hidden video element
+            // Update source resolution from Electron stream
+            const vTrack = stream.getVideoTracks()[0];
+            const settings = vTrack?.getSettings?.();
+            if (settings?.width && settings?.height) {
+                this._sourceWidth = settings.width;
+                this._sourceHeight = settings.height;
+            }
+
             if (this.video) {
                 this.video.srcObject = stream;
                 await this.video.play().catch(e => console.warn("Auto-play preview failed:", e));
             }
-
             return true;
         } catch (e) {
-            console.error("Source select with audio failed, falling back to video only:", e);
+            console.error("Source select with audio failed, falling back:", e);
             // Fallback for ANY error
             return this.selectSourceVideoOnly(sourceId);
         }
@@ -155,15 +238,21 @@ export class DriftEngine {
                 this.screenStream.getTracks().forEach(t => t.stop());
             }
 
-            // Standard browser API
+            // Standard browser/Tauri API - getDisplayMedia works in WebView2
             const stream = await navigator.mediaDevices.getDisplayMedia({
-                video: true,
+                video: {
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 },
+                    frameRate: { ideal: 60 },
+                    cursor: 'never',
+                },
                 audio: {
                     echoCancellation: true,
                     noiseSuppression: true,
                     autoGainControl: true
                 },
-                systemAudio: "include"
+                systemAudio: "include",
+                selfBrowserSurface: "exclude",
             });
 
             this.screenStream = stream;
@@ -176,13 +265,22 @@ export class DriftEngine {
                 }
             };
 
+            // Update source resolution from actual stream for accurate normalization
+            const vTrack = stream.getVideoTracks()[0];
+            const settings = vTrack?.getSettings?.();
+            if (settings?.width && settings?.height) {
+                this._sourceWidth = settings.width;
+                this._sourceHeight = settings.height;
+                console.log('[Drift] Source resolution:', this._sourceWidth, 'x', this._sourceHeight);
+            }
+
             if (this.video) {
                 this.video.srcObject = stream;
                 await this.video.play().catch(e => console.warn("Auto-play preview failed:", e));
             }
             return true;
         } catch (e) {
-            console.error("Browser source select failed:", e);
+            console.error("[Drift] Source select failed:", e);
             return false;
         }
     }
@@ -262,14 +360,18 @@ export class DriftEngine {
         ]);
 
         // Higher quality recording settings for polished output
-        const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+        const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+            ? 'video/webm;codecs=vp9,opus'
+            : MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+                ? 'video/webm;codecs=vp9'
+                : 'video/webm';
         this.mediaRecorder = new MediaRecorder(combinedStream, {
             mimeType: mime,
-            videoBitsPerSecond: 15000000 // 15 Mbps for high quality
+            videoBitsPerSecond: 25_000_000, // 25 Mbps — lossless-quality source
         });
 
         this.mediaRecorder.ondataavailable = e => { if (e.data.size > 0) this.recordedChunks.push(e.data); };
-        this.mediaRecorder.start(50); // Smaller timeslice for smoother capture
+        this.mediaRecorder.start(1000); // 1s timeslice — less overhead, still fast stop
 
         // Timer Loop
         this.timerInt = setInterval(() => {
@@ -292,12 +394,20 @@ export class DriftEngine {
         };
     }
 
-    // --- RENDER & EXPORT LOGIC (Simplified from original) ---
+    // --- RENDER LOOP WITH CINEMA ZOOM ---
     renderLoop() {
         const loop = () => {
             const c = this.canvas;
             const ctx = this.ctx;
             const v = this.video;
+
+            // Update cinema zoom engine every frame while recording
+            if (this.isRecording && this.zoomEnabled) {
+                const t = Date.now() - this.startTime;
+                this.zoomEngine.update(t);
+                const state = this.zoomEngine.getState();
+                this.camera = { x: state.x, y: state.y, scale: state.scale };
+            }
 
             // Clear
             ctx.fillStyle = '#1a1a2e';
@@ -316,39 +426,60 @@ export class DriftEngine {
                     vw = vh * aspectRatio;
                 }
 
-                const x = (c.width - vw) / 2;
-                const y = (c.height - vh) / 2;
+                const frameX = (c.width - vw) / 2;
+                const frameY = (c.height - vh) / 2;
                 const r = 12;
+
+                // Apply camera transform for zoom preview
+                ctx.save();
+                const cx = c.width / 2;
+                const cy = c.height / 2;
+                ctx.translate(cx, cy);
+                ctx.scale(this.camera.scale, this.camera.scale);
+                const panX = (this.camera.x - 0.5) * vw;
+                const panY = (this.camera.y - 0.5) * vh;
+                ctx.translate(-panX, -panY);
+                ctx.translate(-cx, -cy);
 
                 // Drop Shadow
                 ctx.shadowColor = 'rgba(0,0,0,0.5)';
                 ctx.shadowBlur = 40;
                 ctx.shadowOffsetY = 20;
                 ctx.fillStyle = '#000';
-                this.roundRect(ctx, x, y, vw, vh, r);
+                this.roundRect(ctx, frameX, frameY, vw, vh, r);
                 ctx.fill();
                 ctx.shadowColor = 'transparent';
 
                 // Clip & Draw Video
                 ctx.save();
-                this.roundRect(ctx, x, y, vw, vh, r);
+                this.roundRect(ctx, frameX, frameY, vw, vh, r);
                 ctx.clip();
-                ctx.drawImage(v, x, y, vw, vh);
+                ctx.drawImage(v, frameX, frameY, vw, vh);
                 ctx.restore();
 
                 // Border
                 ctx.strokeStyle = 'rgba(255,255,255,0.15)';
                 ctx.lineWidth = 1;
-                this.roundRect(ctx, x, y, vw, vh, r);
+                this.roundRect(ctx, frameX, frameY, vw, vh, r);
                 ctx.stroke();
 
                 // Traffic Lights (Mac style)
-                const bx = x + 20;
-                const by = y + 18;
+                const bx = frameX + 20;
+                const by = frameY + 18;
                 const gap = 22;
                 ctx.fillStyle = '#FF5F56'; ctx.beginPath(); ctx.arc(bx, by, 6, 0, Math.PI * 2); ctx.fill();
                 ctx.fillStyle = '#FFBD2E'; ctx.beginPath(); ctx.arc(bx + gap, by, 6, 0, Math.PI * 2); ctx.fill();
                 ctx.fillStyle = '#27C93F'; ctx.beginPath(); ctx.arc(bx + gap * 2, by, 6, 0, Math.PI * 2); ctx.fill();
+
+                ctx.restore(); // Restore camera transform
+
+                // Draw zoom state indicator
+                if (this.isRecording && this.camera.scale > 1.05) {
+                    ctx.fillStyle = 'rgba(220, 254, 80, 0.9)';
+                    ctx.font = 'bold 11px system-ui';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(`⊕ ${this.camera.scale.toFixed(1)}x`, 12, c.height - 12);
+                }
             } else {
                 // Placeholder
                 ctx.fillStyle = '#333';
@@ -364,7 +495,39 @@ export class DriftEngine {
 
     stop() {
         this.isActive = false;
+        // Clean up engines
+        if (this.zoomEngine) this.zoomEngine.destroy();
+        // Clean up Tauri global listeners
+        if (this._globalClickUnlisten) {
+            this._globalClickUnlisten();
+            this._globalClickUnlisten = null;
+        }
+        if (this._globalMoveUnlisten) {
+            this._globalMoveUnlisten();
+            this._globalMoveUnlisten = null;
+        }
+        if (this._isTauri) {
+            drift.stopGlobalListener().catch(() => {});
+        }
         console.log('[Drift] Engine stopped');
+    }
+
+    /**
+     * Set zoom level (called from UI)
+     */
+    setZoomLevel(level) {
+        this.zoomLevel = level;
+        this.zoomEngine.setZoomLevel(level);
+    }
+
+    /**
+     * Enable/disable live zoom preview
+     */
+    setZoomEnabled(enabled) {
+        this.zoomEnabled = enabled;
+        if (!enabled) {
+            this.camera = { x: 0.5, y: 0.5, scale: 1 };
+        }
     }
 
     roundRect(ctx, x, y, w, h, r) {
