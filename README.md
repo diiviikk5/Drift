@@ -1,93 +1,94 @@
 # Drift
-## Browser Recording, and 1250 file conversions
+
 > **Cinema-grade screen recording. Zero cost. Privacy-first.**
 
-Professional screen recording studio that runs entirely in your browser. Powered by native browser APIs and client-side WebAssembly.
+A lightweight desktop app for screen recording with cinematic auto-zoom, webcam overlay, and timeline editing. Built with Tauri + Next.js.
 
-## INTRODUCING Drift Labs  - 0 upload file conversions for audio , video , images  .
+[![Website](https://img.shields.io/badge/Website-dvkk.dev-blue)](https://dvkk.dev)
+[![Download](https://img.shields.io/badge/Download-Windows%20Installer-green)](https://dvkk.dev/downloads/Drift_2.0.0_x64-setup.exe)
+[![Stars](https://img.shields.io/github/stars/diiviikk5/Drift?style=social)](https://github.com/diiviikk5/Drift)
+
+---
+
+## Download
+
+**[⬇ Download Drift v2.0 for Windows (21 MB)](https://dvkk.dev/downloads/Drift_2.0.0_x64-setup.exe)**
+
+Run the installer → takes ~10 seconds → launch from Start Menu. Done.
+
+---
+
 ## Features
 
-- **Unified Capture** - Record screen, window, or browser tab
-- **Webcam Overlay** - Picture-in-picture with customizable shapes
-- **The Drift Effect** - Cinematic auto-zoom with smooth cursor tracking
-- **Privacy First** - 100% local processing, no uploads
-- **Timeline Editor** - Adjust zoom keyframes after recording
-- **Export Anywhere** - MP4, WebM, or high-quality GIF
+- **Screen Recording** — Capture your entire screen, a window, or a browser tab
+- **Webcam Overlay** — Picture-in-picture with customizable shapes and positioning
+- **The Drift Effect** — Cinematic auto-zoom that smoothly follows your cursor
+- **Timeline Editor** — Adjust zoom keyframes and timing after recording
+- **Export** — MP4, WebM, or high-quality GIF
+- **100% Local** — No uploads, no accounts, no tracking
 
-##  Getting Started
+## Drift Labs
 
-### Prerequisites
+Browser-based file conversion tool — 1250+ format conversions for audio, video, and images. Zero uploads, runs entirely client-side.
 
-- Node.js 18+ 
-- npm or pnpm
+**[Try Drift Labs →](https://dvkk.dev/labs)**
 
-### Installation
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Desktop | Tauri v2 (Rust) |
+| Frontend | Next.js 16 (App Router) |
+| Styling | Tailwind CSS + CSS Variables |
+| Animations | Framer Motion |
+| Export | FFmpeg WASM / WebCodecs |
+| Installer | NSIS (21 MB) |
+
+## Development
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/drift.git
-cd drift
+# Clone
+git clone https://github.com/diiviikk5/Drift.git
+cd Drift
 
 # Install dependencies
 npm install
 
-# Start development server
+# Run the web app
 npm run dev
+
+# Run the desktop app (requires Rust)
+npm run tauri:dev
+
+# Build the installer
+npm run tauri:build
 ```
-
-Open [http://localhost:3000](http://localhost:3000) to see the app.
-
-### Build for Production
-
-```bash
-npm run build
-npm start
-```
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|-------|------------|
-| Framework | Next.js 16 (App Router) |
-| Styling | Vanilla CSS + CSS Variables |
-| Animations | Framer Motion |
-| Fonts | Geist Sans & Geist Mono |
 
 ## Project Structure
 
 ```
-drift/
+Drift/
 ├── src/
 │   └── app/
-│       ├── components/      # UI components
-│       │   ├── DriftBackground.jsx
-│       │   ├── Hero.jsx
-│       │   ├── Features.jsx
-│       │   ├── HowItWorks.jsx
-│       │   ├── WaitlistForm.jsx
-│       │   ├── Navbar.jsx
-│       │   └── Footer.jsx
-│       ├── globals.css      # Design system
-│       ├── layout.js        # Root layout
-│       └── page.js          # Landing page
-├── public/                  # Static assets
+│       ├── components/       # UI components
+│       ├── recorder/         # Recording studio page
+│       ├── editor/           # Timeline editor page
+│       ├── labs/             # File conversion tools
+│       └── studio/           # Recording studio
+├── src-tauri/                # Tauri/Rust backend
+│   ├── src/
+│   │   └── lib.rs            # Rust commands
+│   ├── Cargo.toml
+│   └── tauri.conf.json
+├── public/
+│   └── downloads/            # Installer binary
 └── package.json
 ```
 
-##  Design System
-
-The design uses a premium dark theme with purple/cyan gradient accents:
-
-```css
---bg-primary: #030303;
---accent-purple: #a855f7;
---accent-cyan: #06b6d4;
---accent-pink: #ec4899;
-```
-
-
-MIT License - see [LICENSE](LICENSE) for details.
-
 ---
 
-**Building in public.** Follow the journey on [Twitter/X](https://twitter.com).
+MIT License
+
+**[dvkk.dev](https://dvkk.dev)** · Built by [@diiviikk5](https://github.com/diiviikk5)
