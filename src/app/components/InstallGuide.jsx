@@ -11,7 +11,7 @@ export default function InstallGuide() {
         {
             number: "01",
             title: "Download",
-            description: "Grab the latest .zip from GitHub releases",
+            description: "Click 'Download' on the homepage — it's a 21 MB installer, no sign-up needed",
             icon: (
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="square" strokeWidth={3} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -21,8 +21,8 @@ export default function InstallGuide() {
         },
         {
             number: "02",
-            title: "Extract",
-            description: "Unzip anywhere on your machine",
+            title: "Install",
+            description: "Run the installer — it takes ~10 seconds",
             icon: (
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="square" strokeWidth={3} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
@@ -32,8 +32,8 @@ export default function InstallGuide() {
         },
         {
             number: "03",
-            title: "Run",
-            description: "Double-click Drift.exe — That's it!",
+            title: "Launch",
+            description: "Open Drift from Start Menu — that's it!",
             icon: (
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="square" strokeWidth={3} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
