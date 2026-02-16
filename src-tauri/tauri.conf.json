@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Drift",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "identifier": "com.drift.desktop",
   "build": {
     "frontendDist": "../out",
@@ -29,7 +29,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "msi"],
+    "targets": ["nsis"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -40,6 +40,10 @@
     "windows": {
       "nsis": {
         "installMode": "both"
+      },
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
       }
     }
   },
