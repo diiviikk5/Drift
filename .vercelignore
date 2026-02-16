@@ -1,3 +1,4 @@
+electron/
 # Electron build outputs
 dist/
 build/
@@ -9,12 +10,30 @@ electron/
 extension/
 extension.crx
 
-# Large media files
-*.mp4
+# Tauri build artifacts
+src-tauri/target/
+src-tauri/bundle/
+src-tauri/gen/
+
+# Large binaries/archives (keep payload small)
 *.zip
+*.7z
+*.msi
+*.dmg
+*.pkg
+*.deb
+*.rpm
+*.AppImage
+*.snap
+*.mp4
+
+# Allow the public download
+!public/downloads/
 
 # Node modules (handled by Vercel)
 node_modules/
 
-# Development cache
-.next/cache/
+# Build caches
+.next/
+.vercel/
+out/
