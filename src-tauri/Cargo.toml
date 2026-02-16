@@ -1,6 +1,6 @@
 [package]
 name = "drift"
-version = "0.1.0"
+version = "2.0.0"
 description = "Cinema-grade screen recording with AI-powered zoom"
 authors = ["Drift Team"]
 license = "MIT"
@@ -48,3 +48,10 @@ windows-sys = { version = "0.59", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
 ] }
+
+[profile.release]
+opt-level = "s"          # Optimize for size
+lto = true                # Link-time optimization — strips unused code
+codegen-units = 1         # Single codegen unit — slower compile, smaller binary
+panic = "abort"           # No unwind tables
+strip = true              # Strip symbols from binary
