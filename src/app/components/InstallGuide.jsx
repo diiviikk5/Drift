@@ -88,7 +88,7 @@ export default function InstallGuide() {
                         </span>
                     </h2>
                     <p className="font-mono text-lg text-[var(--text-secondary)] max-w-xl mx-auto">
-                        No admin rights. No installers. No BS.
+                        No sign-ups. No bloatware. No BS.
                     </p>
                 </motion.div>
 
