@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 
-export const dynamic = 'force-dynamic';
+const isTauri = process.env.TAURI_ENV_PLATFORM !== undefined;
+export const dynamic = "force-static";
+export const revalidate = 0;
 
 // Your email to receive notifications
 const NOTIFY_EMAIL = "divikstudy100@gmail.com";
@@ -102,14 +104,25 @@ async function sendWelcomeEmail(userEmail) {
 
 // GET - Return count
 export async function GET() {
-    return NextResponse.json({
-        success: true,
-        count: signupCount,
-    });
+  if (isTauri) {
+    return NextResponse.json({ success: true, count: 0 });
+  }
+
+  return NextResponse.json({
+    success: true,
+    count: signupCount,
+  });
 }
 
 // POST - Add email to waitlist
 export async function POST(request) {
+  if (isTauri) {
+    return NextResponse.json(
+      { success: false, error: "Waitlist API is disabled in offline desktop build." },
+      { status: 200 }
+    );
+  }
+
     try {
         const { email } = await request.json();
 
