@@ -4,15 +4,15 @@
 
 A lightweight desktop app for screen recording with cinematic auto-zoom, webcam overlay, and timeline editing. Built with Tauri + Next.js.
 
-[![Website](https://img.shields.io/badge/Website-dvkk.dev-blue)](https://dvkk.dev)
-[![Download](https://img.shields.io/badge/Download-Windows%20Installer-green)](https://dvkk.dev/downloads/Drift_2.0.0_x64-setup.exe)
+[![Website](https://img.shields.io/badge/Website-drift.dvkk.dev-blue)](https://drift.dvkk.dev)
+[![Download](https://img.shields.io/badge/Download-Windows%20Installer-green)](https://drift.dvkk.dev/downloads/Drift_2.0.0_x64-setup.exe)
 [![Stars](https://img.shields.io/github/stars/diiviikk5/Drift?style=social)](https://github.com/diiviikk5/Drift)
 
 ---
 
 ## Download
 
-**[⬇ Download Drift v2.0 for Windows (21 MB)](https://dvkk.dev/downloads/Drift_2.0.0_x64-setup.exe)**
+**[⬇ Download Drift v2.0 for Windows (21 MB)](https://drift.dvkk.dev/downloads/Drift_2.0.0_x64-setup.exe)**
 
 Run the installer → takes ~10 seconds → launch from Start Menu. Done.
 
@@ -31,7 +31,7 @@ Run the installer → takes ~10 seconds → launch from Start Menu. Done.
 
 Browser-based file conversion tool — 1250+ format conversions for audio, video, and images. Zero uploads, runs entirely client-side.
 
-**[Try Drift Labs →](https://dvkk.dev/labs)**
+**[Try Drift Labs →](https://drift.dvkk.dev/labs)**
 
 ---
 
@@ -91,4 +91,4 @@ Drift/
 
 MIT License
 
-**[dvkk.dev](https://dvkk.dev)** · Built by [@diiviikk5](https://github.com/diiviikk5)
+**[drift.dvkk.dev](https://drift.dvkk.dev)** · Built by [@diiviikk5](https://github.com/diiviikk5)
