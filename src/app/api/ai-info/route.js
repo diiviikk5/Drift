@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-static";
+export const revalidate = 3600; // cache static JSON for 1h
+
 /**
  * AI Info API Endpoint
  * 
