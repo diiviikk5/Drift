@@ -1,5 +1,8 @@
 import { getAllSlugs, getPopularConversions, getAllTools } from '@/lib/labs/conversions';
 
+export const revalidate = 3600; // 1h
+export const dynamic = "force-static";
+
 export default function sitemap() {
     const baseUrl = 'https://drift.dvkk.dev';
     const now = new Date();
