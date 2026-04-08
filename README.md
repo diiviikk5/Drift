@@ -1,94 +1,97 @@
-# Drift
+<p align="center">
+  <p align="center">
+   <img width="150" height="150" src="https://github.com/CapSoftware/Cap/blob/main/apps/desktop/src-tauri/icons/Square310x310Logo.png" alt="Logo">
+  </p>
+	<h1 align="center"><b>Cap</b></h1>
+	<p align="center">
+		The open source Loom alternative.
+    <br />
+    <a href="https://cap.so"><strong>Cap.so »</strong></a>
+    <br />
+    <br />
+    <b>Downloads for </b>
+		<a href="https://cap.so/download">macOS & Windows</a>
+    <br />
+  </p>
+</p>
+<br/>
 
-> **Cinema-grade screen recording. Zero cost. Privacy-first.**
+[![Open Bounties](https://img.shields.io/endpoint?url=https%3A%2F%2Fconsole.algora.io%2Fapi%2Fshields%2FCapSoftware%2Fbounties%3Fstatus%3Dopen)](https://console.algora.io/org/CapSoftware/bounties?status=open)
 
-A lightweight desktop app for screen recording with cinematic auto-zoom, webcam overlay, and timeline editing. Built with Tauri + Next.js.
+Cap is the open source alternative to Loom. It's a video messaging tool that allows you to record, edit and share videos in seconds.
 
-[![Website](https://img.shields.io/badge/Website-drift.dvkk.dev-blue)](https://drift.dvkk.dev)
-[![Download](https://img.shields.io/badge/Download-Windows%20Installer-green)](https://drift.dvkk.dev/downloads/Drift_2.0.0_x64-setup.exe)
-[![Stars](https://img.shields.io/github/stars/diiviikk5/Drift?style=social)](https://github.com/diiviikk5/Drift)
+<img src="https://raw.githubusercontent.com/CapSoftware/Cap/refs/heads/main/apps/web/public/landing-cover.png"/>
 
----
+# Self Hosting
 
-## Download
-
-**[⬇ Download Drift v2.0 for Windows (21 MB)](https://drift.dvkk.dev/downloads/Drift_2.0.0_x64-setup.exe)**
-
-Run the installer → takes ~10 seconds → launch from Start Menu. Done.
-
----
-
-## Features
-
-- **Screen Recording** — Capture your entire screen, a window, or a browser tab
-- **Webcam Overlay** — Picture-in-picture with customizable shapes and positioning
-- **The Drift Effect** — Cinematic auto-zoom that smoothly follows your cursor
-- **Timeline Editor** — Adjust zoom keyframes and timing after recording
-- **Export** — MP4, WebM, or high-quality GIF
-- **100% Local** — No uploads, no accounts, no tracking
-
-## Drift Labs
-
-Browser-based file conversion tool — 1250+ format conversions for audio, video, and images. Zero uploads, runs entirely client-side.
-
-**[Try Drift Labs →](https://drift.dvkk.dev/labs)**
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|------------|
-| Desktop | Tauri v2 (Rust) |
-| Frontend | Next.js 16 (App Router) |
-| Styling | Tailwind CSS + CSS Variables |
-| Animations | Framer Motion |
-| Export | FFmpeg WASM / WebCodecs |
-| Installer | NSIS (21 MB) |
-
-## Development
+### Quick Start (One Command)
 
 ```bash
-# Clone
-git clone https://github.com/diiviikk5/Drift.git
-cd Drift
-
-# Install dependencies
-npm install
-
-# Run the web app
-npm run dev
-
-# Run the desktop app (requires Rust)
-npm run tauri:dev
-
-# Build the installer
-npm run tauri:build
+git clone https://github.com/CapSoftware/Cap.git && cd Cap && docker compose up -d
 ```
 
-## Project Structure
+Cap will be running at `http://localhost:3000`. That's it!
 
+> **Note:** Login links appear in the logs (`docker compose logs cap-web`) since email isn't configured by default.
+
+### Other Deployment Options
+
+| Method | Best For |
+|--------|----------|
+| **Docker Compose** | VPS, home servers, any Docker host |
+| **[Railway](https://railway.com/new/template/PwpGcf)** | One-click managed hosting |
+| **Coolify** | Self-hosted PaaS (use `docker-compose.coolify.yml`) |
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template/PwpGcf)
+
+### Production Configuration
+
+For production, create a `.env` file:
+
+```bash
+CAP_URL=https://cap.yourdomain.com
+S3_PUBLIC_URL=https://s3.yourdomain.com
 ```
-Drift/
-├── src/
-│   └── app/
-│       ├── components/       # UI components
-│       ├── recorder/         # Recording studio page
-│       ├── editor/           # Timeline editor page
-│       ├── labs/             # File conversion tools
-│       └── studio/           # Recording studio
-├── src-tauri/                # Tauri/Rust backend
-│   ├── src/
-│   │   └── lib.rs            # Rust commands
-│   ├── Cargo.toml
-│   └── tauri.conf.json
-├── public/
-│   └── downloads/            # Installer binary
-└── package.json
-```
 
----
+See our [self-hosting docs](https://cap.so/docs/self-hosting) for full configuration options including email setup, AI features, and SSL.
 
-MIT License
+Cap Desktop can connect to your self-hosted instance via Settings → Cap Server URL.
 
-**[drift.dvkk.dev](https://drift.dvkk.dev)** · Built by [@diiviikk5](https://github.com/diiviikk5)
+# Monorepo App Architecture
+
+We use a combination of Rust, React (Next.js), TypeScript, Tauri, Drizzle (ORM), MySQL, TailwindCSS throughout this Turborepo powered monorepo.
+
+> A note about database: The codebase is currently designed to work with MySQL only. MariaDB or other compatible databases might partially work but are not officially supported.
+
+### Apps:
+
+- `desktop`: A [Tauri](https://tauri.app) (Rust) app, using [SolidStart](https://start.solidjs.com) on the frontend.
+- `web`: A [Next.js](https://nextjs.org) web app.
+
+### Packages:
+
+- `ui`: A [React](https://reactjs.org) Shared component library.
+- `utils`: A [React](https://reactjs.org) Shared utility library.
+- `tsconfig`: Shared `tsconfig` configurations used throughout the monorepo.
+- `database`: A [React](https://reactjs.org) and [Drizzle ORM](https://orm.drizzle.team/) Shared database library.
+- `config`: `eslint` configurations (includes `eslint-config-next`, `eslint-config-prettier` other configs used throughout the monorepo).
+
+### License:
+Portions of this software are licensed as follows:
+
+- All code residing in the `cap-camera*` and `scap-*` families of crates is licensed under the MIT License (see [licenses/LICENSE-MIT](https://github.com/CapSoftware/Cap/blob/main/licenses/LICENSE-MIT)).
+- All third party components are licensed under the original license provided by the owner of the applicable component
+- All other content not mentioned above is available under the AGPLv3 license as defined in [LICENSE](https://github.com/CapSoftware/Cap/blob/main/LICENSE)
+  
+# Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for more information. This guide is a work in progress, and is updated regularly as the app matures.
+
+## Analytics (Tinybird)
+
+Cap uses [Tinybird](https://www.tinybird.co) to ingest viewer telemetry for dashboards. The Tinybird admin token (`TINYBIRD_ADMIN_TOKEN` or `TINYBIRD_TOKEN`) must be available in your environment. Once the token is present you can:
+
+- Provision the required data sources and materialized views via `pnpm analytics:setup`. This command installs the Tinybird CLI (if needed), runs `tb login` when a `.tinyb` credential file is missing, copies that credential into `scripts/analytics/tinybird`, and finally executes `tb deploy --allow-destructive-operations --wait` from that directory. **It synchronizes the Tinybird workspace to the resources defined in `scripts/analytics/tinybird`, removing any other datasources/pipes in that workspace.**
+- Validate that the schema and materialized views match what the app expects via `pnpm analytics:check`.
+
+Both commands target the workspace pointed to by `TINYBIRD_HOST` (defaults to `https://api.tinybird.co`). Make sure you are comfortable with the destructive nature of the deploy step before running `analytics:setup`.

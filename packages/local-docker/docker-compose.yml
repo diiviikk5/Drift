@@ -1,0 +1,66 @@
+# This is meant for local development only. Do not use this in production.
+name: cap-so-dev
+
+services:
+  ps-mysql:
+    container_name: mysql-primary-db
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: planetscale
+      MYSQL_ROOT_HOST: "%"
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    command:
+      [
+        "--max_connections=1000",
+        "--default-authentication-plugin=mysql_native_password",
+      ]
+    ports:
+      - 3306:3306
+    volumes:
+      - ps-mysql:/var/lib/mysql
+
+  cap-media-server:
+    container_name: cap-media-server-dev
+    build:
+      context: ../..
+      dockerfile: apps/media-server/Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 3456
+    ports:
+      - "3456:3456"
+
+  # Local S3 Strorage
+  minio:
+    container_name: minio-storage
+    image: "minio/minio:latest"
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: capS3root
+      MINIO_ROOT_PASSWORD: capS3root
+    volumes:
+      - ~/minio/data:/data
+    command: server /data --console-address ":9001"
+
+  createbuckets:
+    container_name: minio-bucket-creation
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 10;
+      /usr/bin/mc alias set myminio http://minio:9000 capS3root capS3root;
+      /usr/bin/mc mb myminio/capso;
+      echo '{\"Version\": \"2012-10-17\",\"Statement\": [{\"Effect\": \"Allow\",\"Principal\": {\"AWS\": [\"*\"]},\"Action\": [\"s3:GetObject\"],\"Resource\": [\"arn:aws:s3:::capso/*\"]}]}' > /tmp/policy.json;
+      /usr/bin/mc anonymous set-json /tmp/policy.json myminio/capso;
+      exit 0;
+      "
+volumes:
+  ps-mysql:
+  minio-data:
+  minio-certs:

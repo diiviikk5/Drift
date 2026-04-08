@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+	font-family: "Geist Sans", sans-serif;
+}
+
+.custom-bg {
+	background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+}

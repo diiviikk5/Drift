@@ -1,45 +1,71 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-/dist
-*.zip
-
-# misc
-.DS_Store
-*.pem
-
-# debug
+# Logs
+logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# env files
-.env*
+node_modules
+dist
+dist-ssr
+*.local
+.env
+.env.production
+.env.development
+.env.test
+target
+.cursorrules
+.github/hooks
 
-# vercel
-.vercel
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.turbo
+pnpm-lock.yaml
+.zed
+.output
+.vinxi
+native-deps*
+apps/storybook/storybook-static
+.tinyb
 
-# typescript
+**/.tinyb
+
 *.tsbuildinfo
-next-env.d.ts
-
+.cargo/config.toml
+tauri.windows.conf.json
 .vercel
+
+# sst
+.sst
+
+# Cursor
+.cursor
+.env*.local
+.docs/
+.claude/
+.claude/settings.local.json
+
+# Release backfill scripts (one-time use)
+scripts/backfill-releases.sh
+scripts/update-github-releases.sh
+scripts/releases-backfill-data.txt
+
+# SEO agent state (machine-local, contains sensitive ranking data)
+/seo/
+/docs/
+
+# OpenCode commands (local)
+.opencode/
+analysis/
+analysis/plans/
+.ralphy
