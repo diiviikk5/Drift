@@ -89,7 +89,7 @@ const queryClient = new QueryClient({
 export default function App() {
 	return (
 		<QueryClientProvider client={queryClient}>
-			<Suspense>
+			<Suspense fallback={<LoadingScreen />}>
 				<Inner />
 			</Suspense>
 		</QueryClientProvider>
@@ -143,15 +143,7 @@ function Inner() {
 						});
 
 						return (
-							<Suspense
-								fallback={
-									(() => {
-										console.log("Root suspense fallback showing");
-									}) as any
-								}
-							>
-								{props.children}
-							</Suspense>
+							<Suspense fallback={<LoadingScreen />}>{props.children}</Suspense>
 						);
 					}}
 				>
@@ -210,9 +202,13 @@ function Inner() {
 }
 
 function getSafeCurrentWebviewWindow() {
-	const tauriInternals = (window as typeof window & {
-		__TAURI_INTERNALS__?: { metadata?: { currentWindow?: { label?: string } } };
-	}).__TAURI_INTERNALS__;
+	const tauriInternals = (
+		window as typeof window & {
+			__TAURI_INTERNALS__?: {
+				metadata?: { currentWindow?: { label?: string } };
+			};
+		}
+	).__TAURI_INTERNALS__;
 
 	if (!tauriInternals?.metadata?.currentWindow?.label) {
 		return null;
@@ -247,9 +243,9 @@ function createThemeListener(currentWindow: WebviewWindow) {
 
 		try {
 			if (appTheme === "system") {
-				localStorage.removeItem("cap-theme");
+				localStorage.removeItem("drift-theme");
 			} else {
-				localStorage.setItem("cap-theme", appTheme);
+				localStorage.setItem("drift-theme", appTheme);
 			}
 		} catch {}
 
@@ -257,4 +253,22 @@ function createThemeListener(currentWindow: WebviewWindow) {
 			document.documentElement.classList.toggle("dark", isDark);
 		});
 	}
+}
+
+function LoadingScreen() {
+	return (
+		<div class="flex h-screen w-screen items-center justify-center bg-[#0d111a]/95 p-6">
+			<div class="drift-panel flex min-w-[18rem] items-center gap-4 rounded-[28px] px-6 py-5">
+				<div class="h-11 w-11 animate-spin rounded-full border-[3px] border-white/40 border-t-[#ff7a18]" />
+				<div class="flex flex-col">
+					<span class="text-[0.68rem] uppercase tracking-[0.24em] text-[--text-tertiary]">
+						Drift
+					</span>
+					<span class="text-base font-semibold text-[--text-primary]">
+						Loading desktop workspace
+					</span>
+				</div>
+			</div>
+		</div>
+	);
 }

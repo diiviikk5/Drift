@@ -768,6 +768,7 @@ pub async fn start_recording(
             win.hide().ok();
         }
     }
+    tokio::time::sleep(Duration::from_millis(120)).await;
     let _ = ShowCapWindow::InProgressRecording { countdown }
         .show(&app)
         .await;

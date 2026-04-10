@@ -17,6 +17,7 @@ import {
 	PredefinedMenuItem,
 } from "@tauri-apps/api/menu";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { type as ostype } from "@tauri-apps/plugin-os";
 import {
 	createEffect,
@@ -826,7 +827,7 @@ function Inner() {
 								try {
 									const allWindows = await WebviewWindow.getAll();
 									for (const win of allWindows) {
-										if (win.label.startsWith("target-select-overlay-")) {
+										if (win.label.startsWith("target-select-overlay")) {
 											await win.hide();
 										}
 									}
@@ -1338,10 +1339,17 @@ function RecordingControls(props: {
 	}
 
 	const startDisabled = () => !!props.disabled;
+	const [isStartingRecording, setIsStartingRecording] = createSignal(false);
+	const isStartBlocked = () => startDisabled() || isStartingRecording();
 
 	return (
 		<>
-			<div class="flex flex-col gap-2.5 items-stretch my-2.5 w-[26rem] max-w-[90vw]">
+			<div
+				class="flex flex-col gap-2.5 items-stretch my-2.5 w-[26rem] max-w-[90vw] transition-opacity"
+				classList={{
+					"opacity-0 pointer-events-none": isStartingRecording(),
+				}}
+			>
 				<div class="drift-panel p-3 rounded-[24px]">
 					<div class="flex gap-2.5 items-center">
 						<div
@@ -1354,92 +1362,75 @@ function RecordingControls(props: {
 							<IconCapX class="invert will-change-transform size-3 dark:invert-0" />
 						</div>
 						<div
-							data-disabled={startDisabled()}
-							class="drift-gradient-button flex flex-1 min-w-0 max-w-[18rem] overflow-hidden flex-row h-11 rounded-full text-white group"
+							data-disabled={isStartBlocked()}
+							class="drift-gradient-button flex flex-1 min-w-0 max-w-[18rem] overflow-hidden flex-row h-11 rounded-full text-white"
 							onClick={async () => {
-								if (startDisabled()) return;
+								if (isStartBlocked()) return;
 
-								if (props.target.variant === "area") {
-									setOptions(
-										"captureTarget",
-										reconcile({
-											variant: "area",
-											screen: props.target.screen,
-											bounds: {
-												position: {
-													x: props.target.bounds.position.x,
-													y: props.target.bounds.position.y,
+								setIsStartingRecording(true);
+
+								try {
+									if (props.target.variant === "area") {
+										setOptions(
+											"captureTarget",
+											reconcile({
+												variant: "area",
+												screen: props.target.screen,
+												bounds: {
+													position: {
+														x: props.target.bounds.position.x,
+														y: props.target.bounds.position.y,
+													},
+													size: {
+														width: props.target.bounds.size.width,
+														height: props.target.bounds.size.height,
+													},
 												},
-												size: {
-													width: props.target.bounds.size.width,
-													height: props.target.bounds.size.height,
-												},
-											},
-										}),
-									);
-								}
-
-								props.onRecordingStart?.();
-
-								if (rawOptions.mode === "screenshot") {
-									try {
-										const path = await invoke<string>("take_screenshot", {
-											target: props.target,
-										});
-										commands.showWindow({ ScreenshotEditor: { path } });
-										commands.closeTargetSelectOverlays();
-									} catch (e) {
-										const message = e instanceof Error ? e.message : String(e);
-										toast.error(`Failed to take screenshot: ${message}`);
-										console.error("Failed to take screenshot", e);
+											}),
+										);
 									}
-									return;
-								}
 
-								commands.startRecording({
-									capture_target: props.target,
-									mode: rawOptions.mode,
-									capture_system_audio: rawOptions.captureSystemAudio,
-								});
+									props.onRecordingStart?.();
+
+									setOptions("targetMode", null);
+									const windows = await WebviewWindow.getAll().catch(() => []);
+									await Promise.all(
+										windows
+											.filter((win) =>
+												win.label.startsWith("target-select-overlay"),
+											)
+											.map((win) => win.hide().catch(() => {})),
+									);
+									await getCurrentWindow()
+										.hide()
+										.catch(() => {});
+									await new Promise((resolve) => setTimeout(resolve, 120));
+									await commands.startRecording({
+										capture_target: props.target,
+										mode: "studio",
+										capture_system_audio: rawOptions.captureSystemAudio,
+									});
+								} catch (error) {
+									setIsStartingRecording(false);
+									throw error;
+								}
 							}}
 						>
 							<div
-								class="flex flex-1 items-center py-1 pl-4 transition-colors hover:bg-white/10 min-w-0"
+								class="flex flex-1 items-center py-1 pl-4 min-w-0"
 								classList={{
-									"opacity-60 cursor-not-allowed hover:bg-transparent":
-										startDisabled(),
+									"opacity-60 cursor-not-allowed": isStartBlocked(),
 								}}
 							>
-								<Switch>
-									<Match when={rawOptions.mode === "studio"}>
-										<IconCapFilmCut class="size-4 flex-shrink-0" />
-									</Match>
-									<Match when={rawOptions.mode === "instant"}>
-										<IconCapInstant class="size-4 flex-shrink-0" />
-									</Match>
-									<Match when={(rawOptions.mode as string) === "screenshot"}>
-										<IconCapCamera class="size-4 flex-shrink-0" />
-									</Match>
-								</Switch>
+								<IconCapFilmCut class="size-4 flex-shrink-0" />
 								<div class="flex flex-col mr-2 ml-3 min-w-0">
 									<span class="text-[0.95rem] font-medium text-white text-nowrap">
-										{(() => {
-											if (rawOptions.mode === "screenshot")
-												return "Take Screenshot";
-											return "Start Recording";
-										})()}
+										Start Recording
 									</span>
-									<span class="text-[11px] flex items-center text-nowrap gap-1 transition-opacity duration-200 text-white/90 font-light -mt-0.5">
-										{`${capitalize(rawOptions.mode)} Mode`}
+									<span class="text-[11px] flex items-center text-nowrap gap-1 text-white/90 font-light -mt-0.5">
+										Studio workflow
 									</span>
 								</div>
-							</div>
-							<div
-								class="pl-2.5 pr-3 py-1.5 flex items-center border-l border-white/20 bg-white/5 transition-colors group-hover:bg-white/10"
-								onMouseDown={(e) => showMenu(menuModes(), e)}
-								onClick={(e) => showMenu(menuModes(), e)}
-							>
-								<IconCapCaretDown class="pointer-events-none" />
 							</div>
 						</div>
 						<div
@@ -1492,22 +1483,6 @@ function RecordingControls(props: {
 						</div>
 					</div>
 				</Show>
-			</div>
-			<div class="flex justify-center items-center w-full">
-				<div
-					onClick={() => props.setToggleModeSelect?.(true)}
-					class="drift-soft-button flex gap-1 justify-center items-center self-center mb-5 transition-opacity duration-200 w-fit rounded-full px-3 py-2 hover:opacity-80"
-					classList={{
-						"border border-white/10": props.showBackground,
-						"border border-transparent": !props.showBackground,
-					}}
-				>
-					<IconCapInfo class="opacity-70 will-change-transform size-3" />
-					<p class="text-sm text-white drop-shadow-md">
-						<span class="opacity-70">What is </span>
-						<span class="font-medium">{capitalize(rawOptions.mode)} Mode</span>?
-					</p>
-				</div>
 			</div>
 		</>
 	);
