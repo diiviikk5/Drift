@@ -97,8 +97,11 @@ export default function App() {
 }
 
 function Inner() {
-	const currentWindow = getCurrentWebviewWindow();
-	createThemeListener(currentWindow);
+	const currentWindow = getSafeCurrentWebviewWindow();
+
+	if (currentWindow) {
+		createThemeListener(currentWindow);
+	}
 
 	onMount(() => {
 		initAnonymousUser();
@@ -134,7 +137,9 @@ function Inner() {
 								if (match.route.info?.AUTO_SHOW_WINDOW === false) return;
 							}
 
-							if (location.pathname !== "/camera") currentWindow.show();
+							if (location.pathname !== "/camera") {
+								currentWindow?.show();
+							}
 						});
 
 						return (
@@ -202,6 +207,18 @@ function Inner() {
 			</CapErrorBoundary>
 		</>
 	);
+}
+
+function getSafeCurrentWebviewWindow() {
+	const tauriInternals = (window as typeof window & {
+		__TAURI_INTERNALS__?: { metadata?: { currentWindow?: { label?: string } } };
+	}).__TAURI_INTERNALS__;
+
+	if (!tauriInternals?.metadata?.currentWindow?.label) {
+		return null;
+	}
+
+	return getCurrentWebviewWindow();
 }
 
 function createThemeListener(currentWindow: WebviewWindow) {

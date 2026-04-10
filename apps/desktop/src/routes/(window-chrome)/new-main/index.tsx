@@ -6,12 +6,7 @@ import {
 	useQuery,
 	useQueryClient,
 } from "@tanstack/solid-query";
-import { Channel } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import {
-	getAllWebviewWindows,
-	WebviewWindow,
-} from "@tauri-apps/api/webviewWindow";
+import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import * as dialog from "@tauri-apps/plugin-dialog";
 import { type as ostype } from "@tauri-apps/plugin-os";
@@ -35,8 +30,6 @@ import Mode from "~/components/Mode";
 import { RecoveryToast } from "~/components/RecoveryToast";
 import Tooltip from "~/components/Tooltip";
 import { Input } from "~/routes/editor/ui";
-import { authStore } from "~/store";
-import { createSignInMutation } from "~/utils/auth";
 import { createTauriEventListener } from "~/utils/createEventListener";
 import {
 	type CameraWithDetails,
@@ -46,7 +39,6 @@ import {
 import {
 	createCameraMutation,
 	createCurrentRecordingQuery,
-	createLicenseQuery,
 	listDisplaysWithThumbnails,
 	listRecordings,
 	listScreens,
@@ -64,10 +56,7 @@ import {
 	type OSPermissionsCheck,
 	type RecordingTargetMode,
 	type ScreenCaptureTarget,
-	type UploadProgress,
 } from "~/utils/tauri";
-import IconCapLogoFull from "~icons/cap/logo-full";
-import IconCapLogoFullDark from "~icons/cap/logo-full-dark";
 import IconCapSettings from "~icons/cap/settings";
 import IconLucideAppWindowMac from "~icons/lucide/app-window-mac";
 import IconLucideArrowLeft from "~icons/lucide/arrow-left";
@@ -161,9 +150,6 @@ type TargetMenuPanelProps =
 			targets?: RecordingWithPath[];
 			onSelect: (target: RecordingWithPath) => void;
 			onViewAll: () => void;
-			uploadProgress?: Record<string, number>;
-			reuploadingPaths?: Set<string>;
-			onReupload?: (path: string) => void;
 			onRefetch?: () => void;
 	  }
 	| {
@@ -855,9 +841,6 @@ function TargetMenuPanel(props: TargetMenuPanelProps & SharedTargetMenuProps) {
 							disabled={props.disabled}
 							highlightQuery={trimmedSearch()}
 							emptyMessage={trimmedSearch() ? noResultsMessage : undefined}
-							uploadProgress={props.uploadProgress}
-							reuploadingPaths={props.reuploadingPaths}
-							onReupload={props.onReupload}
 							onRefetch={props.onRefetch}
 							onViewAll={props.onViewAll}
 						/>
@@ -935,7 +918,7 @@ function createUpdateCheck() {
 		} catch (e) {
 			console.error("Failed to check for updates:", e);
 			await dialog.message(
-				"Unable to check for updates. Please download the latest version manually from cap.so/download. Your data will not be lost.\n\nIf this issue persists, please contact support.",
+				"Unable to check for updates. Please download the latest version manually from the Drift release channel. Your data will not be lost.\n\nIf this issue persists, please contact support.",
 				{ title: "Update Error", kind: "error" },
 			);
 			return;
@@ -946,8 +929,8 @@ function createUpdateCheck() {
 		let shouldUpdate: boolean | undefined;
 		try {
 			shouldUpdate = await dialog.confirm(
-				`Version ${update.version} of Cap is available, would you like to install it?`,
-				{ title: "Update Cap", okLabel: "Update", cancelLabel: "Ignore" },
+				`Version ${update.version} of Drift is available, would you like to install it?`,
+				{ title: "Update Drift", okLabel: "Update", cancelLabel: "Ignore" },
 			);
 		} catch (e) {
 			console.error("Failed to show update dialog:", e);
@@ -963,7 +946,6 @@ function Page() {
 	const { rawOptions, setOptions } = useRecordingOptions();
 	const currentRecording = createCurrentRecordingQuery();
 	const isRecording = () => !!currentRecording.data;
-	const auth = authStore.createQuery();
 
 	const [hasHiddenMainWindowForPicker, setHasHiddenMainWindowForPicker] =
 		createSignal(false);
@@ -1042,49 +1024,9 @@ function Page() {
 
 	const recordings = useQuery(() => listRecordings);
 
-	const [uploadProgress, setUploadProgress] = createStore<
-		Record<string, number>
-	>({});
-	const [reuploadingPaths, setReuploadingPaths] = createSignal<Set<string>>(
-		new Set(),
-	);
-
-	createTauriEventListener(events.uploadProgressEvent, (e) => {
-		if (e.uploaded === "0" && e.total === "0") {
-			setUploadProgress(
-				produce((s) => {
-					delete s[e.video_id];
-				}),
-			);
-		} else {
-			const total = Number(e.total);
-			const progress = total > 0 ? (Number(e.uploaded) / total) * 100 : 0;
-			setUploadProgress(e.video_id, progress);
-		}
-	});
-
 	createTauriEventListener(events.recordingDeleted, () => recordings.refetch());
 	createTauriEventListener(events.recordingStarted, () => recordings.refetch());
 	createTauriEventListener(events.recordingStopped, () => recordings.refetch());
-
-	const handleReupload = async (path: string) => {
-		setReuploadingPaths((prev) => new Set([...prev, path]));
-		try {
-			await commands.uploadExportedVideo(
-				path,
-				"Reupload",
-				new Channel<UploadProgress>(() => {}),
-				null,
-			);
-		} finally {
-			setReuploadingPaths((prev) => {
-				const next = new Set(prev);
-				next.delete(path);
-				return next;
-			});
-			recordings.refetch();
-		}
-	};
 
 	const screenshots = useQuery(() =>
 		queryOptions<ScreenshotWithPath[]>({
@@ -1292,8 +1234,6 @@ function Page() {
 			},
 		);
 
-		commands.updateAuthPlan();
-
 		onCleanup(async () => {
 			(await unlistenFocus)?.();
 			(await unlistenResize)?.();
@@ -1489,10 +1429,6 @@ function Page() {
 		else setCamera.mutate({ model: null });
 	});
 
-	const license = createLicenseQuery();
-
-	const signIn = createSignInMutation();
-
 	const BaseControls = () => (
 		<div class="space-y-2">
 			<CameraSelect
@@ -1660,24 +1596,6 @@ function Page() {
 		</Transition>
 	);
 
-	const startSignInCleanup = listen("start-sign-in", async () => {
-		const abort = new AbortController();
-		for (const win of await getAllWebviewWindows()) {
-			if (win.label.startsWith("target-select-overlay")) {
-				await win.hide();
-			}
-		}
-
-		await signIn.mutateAsync(abort).catch(() => {});
-
-		for (const win of await getAllWebviewWindows()) {
-			if (win.label.startsWith("target-select-overlay")) {
-				await win.show();
-			}
-		}
-	});
-	onCleanup(() => startSignInCleanup.then((cb) => cb()));
-
 	return (
 		<div
 			onMouseEnter={handleMouseEnter}
@@ -1763,41 +1681,12 @@ function Page() {
 			<Show when={!activeMenu()}>
 				<div class="flex items-center justify-between mt-[16px] mb-[6px]">
 					<div class="flex items-center space-x-1">
-						<a
-							class="*:w-[92px] *:h-auto text-[--text-primary]"
-							target="_blank"
-							href={
-								auth.data
-									? `${import.meta.env.VITE_SERVER_URL}/dashboard`
-									: import.meta.env.VITE_SERVER_URL
-							}
-						>
-							<IconCapLogoFullDark class="hidden dark:block" />
-							<IconCapLogoFull class="block dark:hidden" />
-						</a>
-						<ErrorBoundary fallback={null}>
-							<Suspense>
-								<span
-									onClick={async () => {
-										if (license.data?.type !== "pro") {
-											await commands.showWindow("Upgrade");
-										}
-									}}
-									class={cx(
-										"text-[0.6rem] ml-2 rounded-lg border border-gray-5 px-1 py-0.5",
-										license.data?.type === "pro"
-											? "bg-[--blue-400] text-gray-1 dark:text-gray-12"
-											: "bg-gray-3 cursor-pointer hover:bg-gray-5",
-									)}
-								>
-									{license.data?.type === "commercial"
-										? "Commercial"
-										: license.data?.type === "pro"
-											? "Pro"
-											: "Personal"}
-								</span>
-							</Suspense>
-						</ErrorBoundary>
+						<div class="text-[--text-primary] font-semibold text-lg tracking-[0.18em] uppercase">
+							Drift
+						</div>
+						<span class="text-[0.6rem] ml-2 rounded-lg border border-gray-5 px-1 py-0.5 bg-[--blue-400] text-gray-1 dark:text-gray-12">
+							Local
+						</span>
 					</div>
 					<Mode
 						onInfoClick={() => {
@@ -1813,26 +1702,7 @@ function Page() {
 				</div>
 			</Show>
 			<div class="flex-1 min-h-0 w-full flex flex-col">
-				<Show when={signIn.isPending}>
-					<div class="flex absolute inset-0 justify-center items-center bg-gray-1 animate-in fade-in">
-						<div class="flex flex-col gap-4 justify-center items-center">
-							<span>Signing In...</span>
-
-							<Button
-								onClick={() => {
-									signIn.variables?.abort();
-									signIn.reset();
-								}}
-								variant="gray"
-								class="w-full"
-							>
-								Cancel Sign In
-							</Button>
-						</div>
-					</div>
-				</Show>
-				<Show when={!signIn.isPending}>
-					<Show when={activeMenu()} keyed fallback={<TargetSelectionHome />}>
+				<Show when={activeMenu()} keyed fallback={<TargetSelectionHome />}>
 						{(variant) =>
 							variant === "display" ? (
 								<TargetMenuPanel
@@ -1905,9 +1775,6 @@ function Page() {
 										});
 										getCurrentWindow().hide();
 									}}
-									uploadProgress={uploadProgress}
-									reuploadingPaths={reuploadingPaths()}
-									onReupload={handleReupload}
 									onRefetch={() => recordings.refetch()}
 								/>
 							) : variant === "screenshot" ? (
@@ -1980,7 +1847,6 @@ function Page() {
 							)
 						}
 					</Show>
-				</Show>
 			</div>
 			<RecoveryToast />
 		</div>

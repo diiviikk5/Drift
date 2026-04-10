@@ -42,7 +42,7 @@ import {
 } from "~/components/Cropper";
 import ModeSelect from "~/components/ModeSelect";
 import SelectionHint from "~/components/selection-hint";
-import { authStore, generalSettingsStore } from "~/store";
+import { generalSettingsStore } from "~/store";
 import { createDevicesQuery } from "~/utils/devices";
 import {
 	createCameraMutation,
@@ -1208,7 +1208,6 @@ function RecordingControls(props: {
 	disabled?: boolean;
 	onRecordingStart?: () => void;
 }) {
-	const auth = authStore.createQuery();
 	const { setOptions, rawOptions } = useRecordingOptions();
 
 	const generalSetings = generalSettingsStore.createQuery();
@@ -1355,14 +1354,9 @@ function RecordingControls(props: {
 							<IconCapX class="invert will-change-transform size-3 dark:invert-0" />
 						</div>
 						<div
-							data-inactive={rawOptions.mode === "instant" && !auth.data}
 							data-disabled={startDisabled()}
 							class="flex flex-1 min-w-0 max-w-[18rem] overflow-hidden flex-row h-11 rounded-full text-white bg-gradient-to-r from-blue-10 via-blue-10 to-blue-11 dark:from-blue-9 dark:via-blue-9 dark:to-blue-10 group"
 							onClick={async () => {
-								if (rawOptions.mode === "instant" && !auth.data) {
-									emit("start-sign-in");
-									return;
-								}
 								if (startDisabled()) return;
 
 								if (props.target.variant === "area") {
@@ -1430,8 +1424,6 @@ function RecordingControls(props: {
 								<div class="flex flex-col mr-2 ml-3 min-w-0">
 									<span class="text-[0.95rem] font-medium text-white text-nowrap">
 										{(() => {
-											if (rawOptions.mode === "instant" && !auth.data)
-												return "Sign In To Use";
 											if (rawOptions.mode === "screenshot")
 												return "Take Screenshot";
 											return "Start Recording";
@@ -1523,21 +1515,5 @@ function RecordingControls(props: {
 }
 
 function ShowCapFreeWarning(props: { isInstantMode: boolean }) {
-	const auth = authStore.createQuery();
-
-	return (
-		<Suspense>
-			<Show when={props.isInstantMode && auth.data?.plan?.upgraded === false}>
-				<p class="text-sm text-center max-w-64">
-					Instant Mode recordings are limited to 5 mins,{" "}
-					<button
-						class="underline"
-						onClick={() => commands.showWindow("Upgrade")}
-					>
-						Upgrade to Pro
-					</button>
-				</p>
-			</Show>
-		</Suspense>
-	);
+	return null;
 }

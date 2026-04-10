@@ -27,8 +27,8 @@ export default function () {
 				<div class="flex flex-col gap-4 items-center text-center max-w-md">
 					<p class="text-[--text-primary]">{updateError()}</p>
 					<p class="text-[--text-tertiary]">
-						Please download the latest version manually from cap.so/download.
-						Your data will not be lost.
+						Please download the latest Drift build manually. Your data will
+						not be lost.
 					</p>
 					<p class="text-[--text-tertiary] text-xs">
 						If this issue persists, please contact support.
@@ -95,13 +95,14 @@ export default function () {
 						<div>
 							<Switch
 								fallback={
-									<IconCapLogo class="animate-spin size-4 text-[--text-primary]" />
+									<div class="size-4 rounded-full bg-[linear-gradient(135deg,#ff7a18_0%,#ff2d55_42%,#6f5cff_100%)] animate-spin" />
 								}
 							>
 								<Match when={updateStatus()?.type === "done"}>
 									<div class="flex flex-col gap-4 items-center">
 										<p class="text-[--text-tertiary]">
-											Update has been installed. Restart Cap to finish updating.
+											Update has been installed. Restart Drift to finish
+											updating.
 										</p>
 										<Button onClick={() => relaunch()}>Restart Now</Button>
 									</div>

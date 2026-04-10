@@ -42,28 +42,27 @@ const permissions: readonly SetupPermission[] = [
 		name: "Screen Recording",
 		key: "screenRecording" as const,
 		description:
-			"Add Cap in System Settings, then restart the app for changes to take effect.",
+			"Add Drift in System Settings, then restart the app for changes to take effect.",
 		requiresManualGrant: true,
 	},
 	{
 		name: "Accessibility",
 		key: "accessibility" as const,
 		description:
-			"During recording, Cap collects mouse activity locally to generate automatic zoom in segments.",
+			"During recording, Drift collects mouse activity locally to generate automatic zoom segments.",
 		requiresManualGrant: false,
 	},
 	{
 		name: "Microphone",
 		key: "microphone" as const,
-		description: "This permission is required to record audio in your Caps.",
+		description: "This permission is required to record audio in your Drift captures.",
 		requiresManualGrant: false,
 		optional: true,
 	},
 	{
 		name: "Camera",
 		key: "camera" as const,
-		description:
-			"This permission is required to record your camera in your Caps.",
+		description: "This permission is required to record your camera in Drift.",
 		requiresManualGrant: false,
 		optional: true,
 	},
@@ -101,7 +100,7 @@ export default function () {
 		await commands.openPermissionSettings(permission);
 		if (permission === "screenRecording") {
 			const shouldRestart = await ask(
-				"After adding Cap in System Settings, you'll need to restart the app for the permission to take effect.",
+				"After adding Drift in System Settings, you'll need to restart the app for the permission to take effect.",
 				{
 					title: "Restart Required",
 					kind: "info",
@@ -116,12 +115,7 @@ export default function () {
 		setInitialCheck(false);
 	};
 
-	const [showStartup, showStartupActions] = createResource(() =>
-		generalSettingsStore.get().then((s) => {
-			if (s === undefined) return true;
-			return !s.hasCompletedStartup;
-		}),
-	);
+	const [showStartup] = createResource(async () => false);
 
 	const handleContinue = () => {
 		commands.showWindow({ Main: { init_target_mode: null } }).then(() => {
@@ -131,21 +125,17 @@ export default function () {
 
 	return (
 		<div class="flex flex-col px-[2rem] text-[0.875rem] font-[400] flex-1 bg-gray-1 justify-evenly items-center">
-			{showStartup() && (
-				<Startup
-					onClose={() => {
-						showStartupActions.mutate(false);
-					}}
-				/>
-			)}
+			<Show when={showStartup()}>
+				<Startup onClose={() => {}} />
+			</Show>
 
 			<Show when={currentStep() === "permissions"}>
 				<div class="flex flex-col items-center">
-					<IconCapLogo class="size-14 mb-3" />
+					<div class="size-14 mb-3 rounded-2xl bg-[linear-gradient(135deg,#ff7a18_0%,#ff2d55_42%,#6f5cff_100%)] shadow-[0_20px_60px_rgba(111,92,255,0.28)]" />
 					<h1 class="text-[1.2rem] font-[700] mb-1 text-[--text-primary]">
 						Permissions Required
 					</h1>
-					<p class="text-gray-11">Cap needs permissions to run properly.</p>
+					<p class="text-gray-11">Drift needs permissions to run properly.</p>
 				</div>
 
 				<ul class="flex flex-col gap-4 py-8">
@@ -204,12 +194,12 @@ export default function () {
 
 			<Show when={currentStep() === "mode"}>
 				<div class="flex flex-col items-center">
-					<IconCapLogo class="size-14 mb-3" />
+					<div class="size-14 mb-3 rounded-2xl bg-[linear-gradient(135deg,#ff7a18_0%,#ff2d55_42%,#6f5cff_100%)] shadow-[0_20px_60px_rgba(111,92,255,0.28)]" />
 					<h1 class="text-[1.2rem] font-[700] mb-1 text-[--text-primary]">
 						Select Recording Mode
 					</h1>
 					<p class="text-gray-11">
-						Choose how you want to record with Cap. You can change this later.
+						Choose how you want to record with Drift. You can change this later.
 					</p>
 				</div>
 
@@ -218,7 +208,7 @@ export default function () {
 				</div>
 
 				<Button class="px-12" size="lg" onClick={handleContinue}>
-					Continue to Cap
+					Continue to Drift
 				</Button>
 			</Show>
 		</div>
