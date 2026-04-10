@@ -594,7 +594,7 @@ function createRecordingMutations(media: MediaEntry) {
 			}
 
 			const defaultName = isRecording
-				? "Cap Recording"
+				? "Drift Recording"
 				: media.path.split(".cap/")[1];
 			const suggestedName = meta.pretty_name || defaultName;
 

@@ -27,7 +27,6 @@ import Tooltip from "~/components/Tooltip";
 import CaptionControlsWindows11 from "~/components/titlebar/controls/CaptionControlsWindows11";
 import { authStore } from "~/store";
 import { trackEvent } from "~/utils/analytics";
-import { createSignInMutation } from "~/utils/auth";
 import { createExportTask } from "~/utils/export";
 import { createOrganizationsQuery } from "~/utils/queries";
 import {
@@ -517,29 +516,12 @@ export function ExportPage() {
 			setIsCancelled(false);
 			if (exportState.type !== "idle") return;
 			setExportState(reconcile({ action: "upload", type: "starting" }));
-
-			const existingAuth = await authStore.get();
-			if (!existingAuth) createSignInMutation();
 			trackEvent("create_shareable_link_clicked", {
 				resolution: settings.resolution,
 				fps: settings.fps,
-				has_existing_auth: !!existingAuth,
+				has_existing_auth: false,
 			});
-
-			const metadata = await commands.getVideoMetadata(projectPath);
-			const plan = await commands.checkUpgradedAndUpdate();
-			const canShare = {
-				allowed: plan || metadata.duration < 300,
-				reason: !plan && metadata.duration >= 300 ? "upgrade_required" : null,
-			};
-
-			if (!canShare.allowed) {
-				if (canShare.reason === "upgrade_required") {
-					await commands.showWindow("Upgrade");
-					await new Promise((resolve) => setTimeout(resolve, 1000));
-					throw new SilentError();
-				}
-			}
+			throw new Error("Link sharing is unavailable in local Drift mode");
 
 			const uploadChannel = new Channel<UploadProgress>((progress) => {
 				console.log("Upload progress:", progress);
@@ -578,11 +560,11 @@ export function ExportPage() {
 					);
 
 			if (result === "NotAuthenticated")
-				throw new Error("You need to sign in to share recordings");
+				throw new Error("Link sharing is unavailable in local Drift mode");
 			else if (result === "PlanCheckFailed")
-				throw new Error("Failed to verify your subscription status");
+				throw new Error("Failed to verify link sharing availability");
 			else if (result === "UpgradeRequired")
-				throw new Error("This feature requires an upgraded plan");
+				throw new Error("Link sharing is unavailable in local Drift mode");
 		},
 		onSuccess: async () => {
 			await refetchMeta();
@@ -1129,10 +1111,10 @@ export function ExportPage() {
 
 					<div class="p-4 border-t border-gray-3">
 						{settings.exportTo === "link" && !auth.data ? (
-							<SignInButton class="w-full justify-center">
+							<Button class="w-full justify-center gap-2 h-12 text-base" variant="gray" size="lg" disabled>
 								<IconCapLink class="size-4" />
-								<span>Sign in to share</span>
-							</SignInButton>
+								<span>Link sharing unavailable in local mode</span>
+							</Button>
 						) : (
 							<Button
 								class="w-full gap-2 h-12 text-base"

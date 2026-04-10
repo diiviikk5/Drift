@@ -122,7 +122,7 @@ export default function FeedbackTab() {
 							Debug Information
 						</h3>
 						<p class="text-sm text-gray-10 mb-3">
-							Upload your logs to help us diagnose issues with Cap. No personal
+							Upload your logs to help us diagnose issues with Drift. No personal
 							information is included.
 						</p>
 						<Button

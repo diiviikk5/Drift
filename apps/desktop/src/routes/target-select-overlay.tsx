@@ -1342,7 +1342,7 @@ function RecordingControls(props: {
 	return (
 		<>
 			<div class="flex flex-col gap-2.5 items-stretch my-2.5 w-[26rem] max-w-[90vw]">
-				<div class="p-3 rounded-2xl border border-white/30 dark:border-white/10 bg-white/70 dark:bg-gray-2/70 shadow-lg backdrop-blur-xl">
+				<div class="drift-panel p-3 rounded-[24px]">
 					<div class="flex gap-2.5 items-center">
 						<div
 							onClick={() => {
@@ -1355,7 +1355,7 @@ function RecordingControls(props: {
 						</div>
 						<div
 							data-disabled={startDisabled()}
-							class="flex flex-1 min-w-0 max-w-[18rem] overflow-hidden flex-row h-11 rounded-full text-white bg-gradient-to-r from-blue-10 via-blue-10 to-blue-11 dark:from-blue-9 dark:via-blue-9 dark:to-blue-10 group"
+							class="drift-gradient-button flex flex-1 min-w-0 max-w-[18rem] overflow-hidden flex-row h-11 rounded-full text-white group"
 							onClick={async () => {
 								if (startDisabled()) return;
 
@@ -1443,7 +1443,7 @@ function RecordingControls(props: {
 							</div>
 						</div>
 						<div
-							class="flex justify-center items-center rounded-full border transition-opacity bg-gray-6 text-gray-12 size-9 hover:opacity-80"
+							class="drift-soft-button flex justify-center items-center rounded-full transition-opacity text-gray-12 size-9 hover:opacity-80"
 							onMouseDown={(e) => showMenu(preRecordingMenu(), e)}
 							onClick={(e) => showMenu(preRecordingMenu(), e)}
 						>
@@ -1452,7 +1452,7 @@ function RecordingControls(props: {
 					</div>
 				</div>
 				<Show when={(rawOptions.mode as string) !== "screenshot"}>
-					<div class="p-3 rounded-2xl border border-white/30 dark:border-white/10 bg-white/70 dark:bg-gray-2/70 shadow-lg backdrop-blur-xl">
+					<div class="drift-panel p-3 rounded-[24px]">
 						<div class="grid grid-cols-2 gap-2 w-full">
 							<CameraSelectBase
 								disabled={devices.isPending}
@@ -1496,11 +1496,10 @@ function RecordingControls(props: {
 			<div class="flex justify-center items-center w-full">
 				<div
 					onClick={() => props.setToggleModeSelect?.(true)}
-					class="flex gap-1 justify-center items-center self-center mb-5 transition-opacity duration-200 w-fit hover:opacity-60"
+					class="drift-soft-button flex gap-1 justify-center items-center self-center mb-5 transition-opacity duration-200 w-fit rounded-full px-3 py-2 hover:opacity-80"
 					classList={{
-						"bg-black/50 p-2 rounded-lg border border-white/10 hover:bg-black/50 hover:opacity-80":
-							props.showBackground,
-						"hover:opacity-60": !props.showBackground,
+						"border border-white/10": props.showBackground,
+						"border border-transparent": !props.showBackground,
 					}}
 				>
 					<IconCapInfo class="opacity-70 will-change-transform size-3" />

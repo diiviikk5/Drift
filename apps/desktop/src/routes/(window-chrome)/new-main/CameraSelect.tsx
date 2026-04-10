@@ -95,7 +95,7 @@ export default function CameraSelect(props: {
 					}
 					props.onOpen?.();
 				}}
-				class="flex flex-row gap-2 items-center px-2 w-full h-[42px] rounded-lg border border-gray-5 transition-colors cursor-default disabled:opacity-70 bg-gray-3 disabled:text-gray-11 KSelect"
+				class="flex flex-row gap-2.5 items-center px-3 w-full h-[46px] rounded-lg border border-gray-5 transition-colors cursor-default disabled:opacity-70 bg-gray-3 disabled:text-gray-11 KSelect"
 			>
 				<IconCapCamera class="text-gray-10 size-4" />
 				<p class="flex-1 text-sm text-left truncate">

@@ -58,7 +58,7 @@ export default function MicrophoneSelect(props: {
 			<button
 				type="button"
 				disabled={!!currentRecording.data || props.disabled}
-				class="flex overflow-hidden relative z-10 flex-row gap-2 items-center px-2 w-full h-[42px] rounded-lg border border-gray-5 transition-colors cursor-default disabled:opacity-70 bg-gray-3 disabled:text-gray-11 KSelect"
+				class="flex overflow-hidden relative z-10 flex-row gap-2.5 items-center px-3 w-full h-[46px] rounded-lg border border-gray-5 transition-colors cursor-default disabled:opacity-70 bg-gray-3 disabled:text-gray-11 KSelect"
 				onClick={() => {
 					if (!permissionGranted()) {
 						requestPermission("microphone", props.permissions?.microphone);

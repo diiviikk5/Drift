@@ -38,8 +38,8 @@ export default function Debug() {
 		setUpdateStatus(`Simulating update to v${fakeVersion}...`);
 
 		const shouldUpdate = await dialog.confirm(
-			`Version ${fakeVersion} of Cap is available, would you like to install it?`,
-			{ title: "Update Cap", okLabel: "Update", cancelLabel: "Ignore" },
+			`Version ${fakeVersion} of Drift is available, would you like to install it?`,
+			{ title: "Update Drift", okLabel: "Update", cancelLabel: "Ignore" },
 		);
 
 		if (shouldUpdate) {

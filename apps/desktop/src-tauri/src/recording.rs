@@ -3,10 +3,11 @@ use cap_fail::fail;
 use cap_project::CursorMoveEvent;
 use cap_project::cursor::SHORT_CURSOR_SHAPE_DEBOUNCE_MS;
 use cap_project::{
-    CameraShape, CursorClickEvent, GlideDirection, InstantRecordingMeta, MultipleSegments,
-    Platform, ProjectConfiguration, RecordingMeta, RecordingMetaInner, SharingMeta,
-    StudioRecordingMeta, StudioRecordingStatus, TimelineConfiguration, TimelineSegment, UploadMeta,
-    ZoomMode, ZoomSegment, cursor::CursorEvents,
+    CameraShape, ClickSpringConfig, CursorAnimationStyle, CursorClickEvent, GlideDirection,
+    InstantRecordingMeta, MultipleSegments, Platform, ProjectConfiguration, RecordingMeta,
+    RecordingMetaInner, SharingMeta, StudioRecordingMeta, StudioRecordingStatus,
+    TimelineConfiguration, TimelineSegment, UploadMeta, ZoomMode, ZoomSegment,
+    cursor::CursorEvents,
 };
 #[cfg(target_os = "macos")]
 use cap_recording::SendableShareableContent;
@@ -56,12 +57,12 @@ use crate::permissions;
 use crate::web_api::AuthedApiError;
 use crate::{
     App, CameraWindowOperationLock, CurrentRecordingChanged, FinalizingRecordings, MutableState,
-    NewStudioRecordingAdded, RecordingStarted, RecordingState, RecordingStopped, VideoUploadInfo,
+    RecordingStarted, RecordingState, RecordingStopped, VideoUploadInfo,
     api::PresignedS3PutRequestMethod,
     audio::AppSounds,
     auth::AuthStore,
     create_screenshot,
-    general_settings::{GeneralSettingsStore, PostDeletionBehaviour, PostStudioRecordingBehaviour},
+    general_settings::{GeneralSettingsStore, PostDeletionBehaviour},
     open_external_link,
     presets::PresetsStore,
     thumbnails::*,
@@ -550,6 +551,27 @@ pub fn format_project_name<'a>(
     result.into_owned()
 }
 
+fn apply_legacy_drift_motion(config: &mut ProjectConfiguration) {
+    config.cursor.animation_style = CursorAnimationStyle::Custom;
+    config.cursor.raw = false;
+    config.cursor.size = config.cursor.size.max(170);
+    config.cursor.tension = 420.0;
+    config.cursor.mass = 2.4;
+    config.cursor.friction = 34.0;
+    config.cursor.motion_blur = 0.85;
+    config.cursor.rotation_amount = 1.15;
+    config.cursor.base_rotation = -2.0;
+    config.cursor.click_spring = Some(ClickSpringConfig {
+        tension: 900.0,
+        mass: 0.9,
+        friction: 28.0,
+    });
+    config.screen_motion_blur = 0.9;
+    config.screen_movement_spring.stiffness = 235.0;
+    config.screen_movement_spring.damping = 26.0;
+    config.screen_movement_spring.mass = 1.6;
+}
+
 #[tauri::command]
 #[specta::specta]
 #[tracing::instrument(name = "recording", skip_all)]
@@ -613,7 +635,7 @@ pub async fn start_recording(
     );
 
     let filename = project_name.replace(":", ".");
-    let filename = format!("{}.cap", sanitize_filename::sanitize(&filename));
+    let filename = format!("{}.drift", sanitize_filename::sanitize(&filename));
 
     let recordings_base_dir = app.path().app_data_dir().unwrap().join("recordings");
 
@@ -1386,7 +1408,7 @@ pub async fn take_screenshot(
     let image_data = image.into_bytes();
 
     let filename = project_name.replace(":", ".");
-    let filename = format!("{}.cap", sanitize_filename::sanitize(&filename));
+    let filename = format!("{}.drift", sanitize_filename::sanitize(&filename));
 
     let screenshots_base_dir = app.path().app_data_dir().unwrap().join("screenshots");
 
@@ -1637,34 +1659,11 @@ async fn handle_recording_finish(
                 let finalizing_state = app.state::<FinalizingRecordings>();
                 finalizing_state.start_finalizing(recording_dir.clone());
 
-                let post_behaviour = GeneralSettingsStore::get(app)
-                    .ok()
-                    .flatten()
-                    .map(|v| v.post_studio_recording_behaviour)
-                    .unwrap_or(PostStudioRecordingBehaviour::OpenEditor);
-
-                match post_behaviour {
-                    PostStudioRecordingBehaviour::OpenEditor => {
-                        let _ = ShowCapWindow::Editor {
-                            project_path: recording_dir.clone(),
-                        }
-                        .show(app)
-                        .await;
-                    }
-                    PostStudioRecordingBehaviour::ShowOverlay => {
-                        let _ = ShowCapWindow::RecordingsOverlay.show(app).await;
-
-                        let app_clone = AppHandle::clone(app);
-                        let recording_dir_clone = recording_dir.clone();
-                        tokio::spawn(async move {
-                            tokio::time::sleep(Duration::from_millis(1000)).await;
-                            let _ = NewStudioRecordingAdded {
-                                path: recording_dir_clone,
-                            }
-                            .emit(&app_clone);
-                        });
-                    }
+                let _ = ShowCapWindow::Editor {
+                    project_path: recording_dir.clone(),
                 }
+                .show(app)
+                .await;
 
                 AppSounds::StopRecording.play();
 
@@ -1888,33 +1887,11 @@ async fn handle_recording_finish(
     }
 
     if let RecordingMetaInner::Studio(_) = meta_inner {
-        match GeneralSettingsStore::get(app)
-            .ok()
-            .flatten()
-            .map(|v| v.post_studio_recording_behaviour)
-            .unwrap_or(PostStudioRecordingBehaviour::OpenEditor)
-        {
-            PostStudioRecordingBehaviour::OpenEditor => {
-                let _ = ShowCapWindow::Editor {
-                    project_path: recording_dir,
-                }
-                .show(app)
-                .await;
-            }
-            PostStudioRecordingBehaviour::ShowOverlay => {
-                let _ = ShowCapWindow::RecordingsOverlay.show(app).await;
-
-                let app = AppHandle::clone(app);
-                tokio::spawn(async move {
-                    tokio::time::sleep(Duration::from_millis(1000)).await;
-
-                    let _ = NewStudioRecordingAdded {
-                        path: recording_dir.clone(),
-                    }
-                    .emit(&app);
-                });
-            }
-        };
+        let _ = ShowCapWindow::Editor {
+            project_path: recording_dir,
+        }
+        .show(app)
+        .await;
     }
 
     // Play sound to indicate recording has stopped
@@ -2359,6 +2336,10 @@ fn project_config_from_recording(
     } else {
         Vec::new()
     };
+
+    if settings.legacy_drift_motion {
+        apply_legacy_drift_motion(&mut config);
+    }
 
     if !zoom_segments.is_empty() {
         config.cursor.size = 200;

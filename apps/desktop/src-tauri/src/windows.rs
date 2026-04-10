@@ -448,18 +448,18 @@ impl CapWindowId {
 
     pub fn title(&self) -> String {
         match self {
-            Self::Setup => "Cap Setup".to_string(),
-            Self::Settings => "Cap Settings".to_string(),
-            Self::WindowCaptureOccluder { .. } => "Cap Window Capture Occluder".to_string(),
-            Self::CaptureArea => "Cap Capture Area".to_string(),
-            Self::RecordingControls => "Cap Recording Controls".to_string(),
-            Self::Editor { .. } => "Cap Editor".to_string(),
-            Self::ScreenshotEditor { .. } => "Cap Screenshot Editor".to_string(),
-            Self::ModeSelect => "Cap Mode Selection".to_string(),
-            Self::Camera => "Cap Camera".to_string(),
-            Self::RecordingsOverlay => "Cap Recordings Overlay".to_string(),
-            Self::TargetSelectOverlay { .. } => "Cap Target Select".to_string(),
-            _ => "Cap".to_string(),
+            Self::Setup => "Drift Setup".to_string(),
+            Self::Settings => "Drift Settings".to_string(),
+            Self::WindowCaptureOccluder { .. } => "Drift Window Capture".to_string(),
+            Self::CaptureArea => "Drift Capture Area".to_string(),
+            Self::RecordingControls => "Drift Recorder".to_string(),
+            Self::Editor { .. } => "Drift Editor".to_string(),
+            Self::ScreenshotEditor { .. } => "Drift Screenshot Editor".to_string(),
+            Self::ModeSelect => "Drift Mode Selection".to_string(),
+            Self::Camera => "Drift Camera".to_string(),
+            Self::RecordingsOverlay => "Drift Recordings".to_string(),
+            Self::TargetSelectOverlay { .. } => "Drift Target Select".to_string(),
+            _ => "Drift".to_string(),
         }
     }
 
@@ -514,7 +514,7 @@ impl CapWindowId {
     pub fn min_size(&self) -> Option<(f64, f64)> {
         Some(match self {
             Self::Setup => (600.0, 600.0),
-            Self::Main => (330.0, 395.0),
+            Self::Main => (470.0, 650.0),
             Self::Editor { .. } => (1275.0, 800.0),
             Self::ScreenshotEditor { .. } => (800.0, 600.0),
             Self::Settings => (700.0, 540.0),
@@ -1007,7 +1007,7 @@ impl ShowCapWindow {
                 let (pos_x, pos_y) = if let Some(pos) = saved_position {
                     (pos.x, pos.y)
                 } else {
-                    cursor_monitor.center_position(330.0, 395.0)
+                    cursor_monitor.center_position(470.0, 650.0)
                 };
 
                 #[cfg(target_os = "macos")]

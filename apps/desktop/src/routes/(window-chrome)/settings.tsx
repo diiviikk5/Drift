@@ -2,27 +2,14 @@ import { Button } from "@cap/ui-solid";
 import { A, type RouteSectionProps } from "@solidjs/router";
 import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
-import * as shell from "@tauri-apps/plugin-shell";
 import "@total-typescript/ts-reset/filter-boolean";
 import { createResource, For, onMount, Show, Suspense } from "solid-js";
 import { CapErrorBoundary } from "~/components/CapErrorBoundary";
-import { SignInButton } from "~/components/SignInButton";
-
-import { authStore } from "~/store";
-import { trackEvent } from "~/utils/analytics";
 
 const WINDOW_SIZE = { width: 700, height: 540 } as const;
 
 export default function Settings(props: RouteSectionProps) {
-	const auth = authStore.createQuery();
 	const [version] = createResource(() => getVersion());
-
-	const handleAuth = async () => {
-		if (auth.data) {
-			trackEvent("user_signed_out", { platform: "desktop" });
-			authStore.set(undefined);
-		}
-	};
 
 	onMount(() => {
 		const currentWindow = getCurrentWindow();
@@ -104,27 +91,13 @@ export default function Settings(props: RouteSectionProps) {
 						{(v) => (
 							<div class="mb-2 text-xs text-gray-11 flex flex-col items-start gap-0.5">
 								<span>v{v()}</span>
-								<button
-									type="button"
-									class="text-gray-11 hover:text-gray-12 underline transition-colors"
-									onClick={() => shell.open("https://cap.so/download/versions")}
-								>
-									View previous versions
-								</button>
+								<span>Desktop build</span>
 							</div>
 						)}
 					</Show>
-					{auth.data ? (
-						<Button
-							onClick={handleAuth}
-							variant={auth.data ? "gray" : "dark"}
-							class="w-full"
-						>
-							Sign Out
-						</Button>
-					) : (
-						<SignInButton>Sign In</SignInButton>
-					)}
+					<div class="w-full rounded-lg border border-gray-4 bg-gray-3 px-3 py-2 text-xs text-gray-11">
+						Drift is running in local mode.
+					</div>
 				</div>
 			</div>
 			<div class="overflow-y-hidden flex-1 animate-in">

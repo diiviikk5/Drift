@@ -15,12 +15,12 @@
 :root {
 	/* Light theme variables */
 	--gray-50: #ffffff; /* Pure white background */
-	--gray-100: #f8f9fb; /* Soft background */
-	--gray-200: #e4e6ed; /* Light borders/dividers */
-	--gray-300: #c7ccda; /* Subtle highlights */
-	--gray-400: #868e9f; /* Secondary text - slightly softened */
-	--gray-450: #4a4a4a; /* Adjusted to maintain balance */
-	--gray-500: #161b26; /* Primary text - deep, rich contrast */
+	--gray-100: #fff6f2;
+	--gray-200: #f3d7ca;
+	--gray-300: #d7b4c2;
+	--gray-400: #8f7788;
+	--gray-450: #4e3f4f;
+	--gray-500: #1f1827;
 
 	--gray-50-transparent-50: rgba(255, 255, 255, 0.5);
 	--gray-100-transparent-50: rgba(248, 249, 251, 0.5);
@@ -30,11 +30,11 @@
 	--gray-450-transparent-50: rgba(234, 236, 239, 0.5);
 	--gray-500-transparent-50: rgba(22, 27, 38, 0.5);
 
-	--transparent-window: rgba(255, 255, 255, 0.7);
+	--transparent-window: rgba(255, 247, 243, 0.72);
 
-	--text-primary: rgba(18, 22, 31, 0.95); /* Section titles, headings */
-	--text-secondary: rgba(18, 22, 31, 0.85); /* Important labels */
-	--text-tertiary: rgba(18, 22, 31, 0.65); /* Descriptions */
+	--text-primary: rgba(32, 21, 37, 0.96);
+	--text-secondary: rgba(32, 21, 37, 0.82);
+	--text-tertiary: rgba(32, 21, 37, 0.62);
 
 	--black-transparent-5: rgba(18, 22, 31, 0.05);
 	--black-transparent-10: rgba(18, 22, 31, 0.1);
@@ -52,12 +52,12 @@
 
 	--solid-white: #ffffff;
 
-	--blue-50: #ebf1ff;
-	--blue-100: #adc9ff;
-	--blue-200: #85adff;
-	--blue-300: #4785ff;
-	--blue-400: #3f75e0;
-	--blue-500: rgb(54, 102, 197);
+	--blue-50: #fff0ea;
+	--blue-100: #ffc6b2;
+	--blue-200: #ff9f80;
+	--blue-300: #ff6d55;
+	--blue-400: #ff5b4d;
+	--blue-500: #f04f69;
 
 	--blue-transparent-0: rgba(34, 64, 122, 0);
 	--blue-transparent-10: rgba(34, 64, 122, 0.1);
@@ -71,20 +71,20 @@
 
 	--red-transparent-20: rgba(255, 71, 102, 0.2);
 
-	--shadow-s: 0px 8px 16px 0px rgba(18, 22, 31, 0.04);
+	--shadow-s: 0px 20px 60px 0px rgba(31, 24, 39, 0.12);
 }
 
 /* Dark theme variables */
 :root.dark {
 	color-scheme: dark;
 	/* Main background colors */
-	--gray-50: #141414; /* Main background - slightly darker */
-	--gray-100: #181818; /* Secondary background */
-	--gray-200: #222222; /* Borders and dividers */
-	--gray-300: #323232; /* Subtle highlights */
-	--gray-400: #868686; /* Secondary text - slightly softer */
-	--gray-450: #eaeaea; /* Adjusted to be more balanced */
-	--gray-500: #ffffff; /* Primary text - titles/headings */
+	--gray-50: #120f18;
+	--gray-100: #171320;
+	--gray-200: #261d31;
+	--gray-300: #3b2d4a;
+	--gray-400: #ac98b6;
+	--gray-450: #f4e8f7;
+	--gray-500: #ffffff;
 
 	--gray-50-transparent-50: rgba(20, 20, 20, 0.5);
 	--gray-100-transparent-50: rgba(24, 24, 24, 0.5);
@@ -94,12 +94,12 @@
 	--gray-450-transparent-50: rgba(234, 234, 234, 0.5);
 	--gray-500-transparent-50: rgba(255, 255, 255, 0.5);
 
-	--transparent-window: rgba(22, 22, 22, 0.7);
+	--transparent-window: rgba(18, 15, 24, 0.76);
 
 	/* Add new variables for text hierarchy */
-	--text-primary: rgba(255, 255, 255, 0.95); /* Section titles, headings */
-	--text-secondary: rgba(255, 255, 255, 0.85); /* Important labels */
-	--text-tertiary: rgba(255, 255, 255, 0.65); /* Descriptions */
+	--text-primary: rgba(255, 246, 251, 0.96);
+	--text-secondary: rgba(255, 246, 251, 0.84);
+	--text-tertiary: rgba(255, 246, 251, 0.64);
 
 	/* Transparent overlays - adjusted for better contrast */
 	--black-transparent-5: rgba(255, 255, 255, 0.05);
@@ -120,11 +120,11 @@
 	--solid-white: #ffffff;
 
 	/* Accent colors remain mostly the same but adjusted for dark theme */
-	--blue-50: #1a2438;
-	--blue-100: #243352;
-	--blue-200: #2e426b;
-	--blue-300: #4785ff;
-	--blue-400: #5c8fff;
+	--blue-50: #2c1822;
+	--blue-100: #54233b;
+	--blue-200: #71335a;
+	--blue-300: #ff7a59;
+	--blue-400: #ff8e68;
 
 	--blue-transparent-10: rgba(71, 133, 255, 0.1);
 	--blue-transparent-20: rgba(71, 133, 255, 0.2);
@@ -137,7 +137,84 @@
 
 	--red-transparent-20: rgba(255, 71, 102, 0.2);
 
-	--shadow-s: 0px 8px 16px 0px rgba(0, 0, 0, 0.4);
+	--shadow-s: 0px 24px 80px 0px rgba(0, 0, 0, 0.46);
+}
+
+body {
+	background:
+		radial-gradient(circle at top left, rgba(255, 122, 24, 0.16), transparent 30%),
+		radial-gradient(circle at bottom right, rgba(111, 92, 255, 0.18), transparent 32%),
+		linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 245, 240, 0.98));
+}
+
+.dark body {
+	background:
+		radial-gradient(circle at top left, rgba(255, 122, 24, 0.16), transparent 28%),
+		radial-gradient(circle at bottom right, rgba(111, 92, 255, 0.22), transparent 30%),
+		linear-gradient(180deg, rgba(18, 15, 24, 0.98), rgba(24, 18, 33, 0.98));
+}
+
+.drift-main-shell {
+	background:
+		linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 244, 240, 0.74));
+	border-radius: 24px;
+	border: 1px solid rgba(255, 255, 255, 0.58);
+	box-shadow:
+		0 24px 80px rgba(31, 24, 39, 0.12),
+		inset 0 1px 0 rgba(255, 255, 255, 0.55);
+	backdrop-filter: blur(22px);
+}
+
+.dark .drift-main-shell {
+	background:
+		linear-gradient(180deg, rgba(31, 24, 39, 0.76), rgba(19, 15, 27, 0.84));
+	border-color: rgba(255, 255, 255, 0.08);
+	box-shadow:
+		0 30px 90px rgba(0, 0, 0, 0.38),
+		inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.drift-panel {
+	background:
+		linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 243, 239, 0.76));
+	border: 1px solid rgba(255, 255, 255, 0.58);
+	box-shadow:
+		0 16px 48px rgba(31, 24, 39, 0.1),
+		inset 0 1px 0 rgba(255, 255, 255, 0.5);
+	backdrop-filter: blur(18px);
+}
+
+.dark .drift-panel {
+	background:
+		linear-gradient(180deg, rgba(36, 27, 47, 0.72), rgba(22, 18, 31, 0.8));
+	border-color: rgba(255, 255, 255, 0.08);
+	box-shadow:
+		0 18px 56px rgba(0, 0, 0, 0.34),
+		inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.drift-pill {
+	background: linear-gradient(135deg, #ff7a18 0%, #ff4d6d 44%, #6f5cff 100%);
+	color: white;
+	box-shadow: 0 14px 36px rgba(111, 92, 255, 0.24);
+}
+
+.drift-gradient-button {
+	background: linear-gradient(135deg, #ff7a18 0%, #ff4d6d 42%, #6f5cff 100%);
+	box-shadow:
+		0 20px 45px rgba(111, 92, 255, 0.28),
+		inset 0 1px 0 rgba(255, 255, 255, 0.26);
+}
+
+.drift-soft-button {
+	background: rgba(255, 255, 255, 0.58);
+	border: 1px solid rgba(255, 255, 255, 0.5);
+	backdrop-filter: blur(16px);
+}
+
+.dark .drift-soft-button {
+	background: rgba(255, 255, 255, 0.06);
+	border-color: rgba(255, 255, 255, 0.08);
 }
 
 .dark .dark-button-shadow {

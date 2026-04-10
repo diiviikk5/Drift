@@ -545,12 +545,12 @@ function Inner(props: { initialStore: GeneralSettingsStore | null }) {
 				</SettingGroup>
 
 				<SettingGroup
-					title="Cap Pro Settings"
+					title="Drift Link Settings"
 					titleStyling="bg-blue-500 py-1.5 mb-4 text-white text-xs px-2 rounded-lg"
 				>
 					<ToggleSettingItem
 						label="Automatically open shareable links"
-						description="Whether Cap should automatically open instant recordings in your browser"
+						description="Whether Drift should automatically open instant recordings in your browser"
 						value={!settings.disableAutoOpenLinks}
 						onChange={(v) => handleChange("disableAutoOpenLinks", !v)}
 					/>
@@ -582,7 +582,7 @@ function Inner(props: { initialStore: GeneralSettingsStore | null }) {
 
 						if (
 							!(await confirm(
-								`Are you sure you want to change the server URL to '${origin}'? You will need to sign in again.`,
+								`Are you sure you want to change the server URL to '${origin}'? This will reset your local desktop session.`,
 							))
 						)
 							return;

@@ -24,6 +24,7 @@ import {
 	type OSPermissionStatus,
 } from "~/utils/tauri";
 import IconLucideVolumeX from "~icons/lucide/volume-x";
+import driftIcon from "../../assets/drift-icon.jpg";
 
 function isPermitted(status?: OSPermissionStatus): boolean {
 	return status === "granted" || status === "notNeeded";
@@ -131,7 +132,7 @@ export default function () {
 
 			<Show when={currentStep() === "permissions"}>
 				<div class="flex flex-col items-center">
-					<div class="size-14 mb-3 rounded-2xl bg-[linear-gradient(135deg,#ff7a18_0%,#ff2d55_42%,#6f5cff_100%)] shadow-[0_20px_60px_rgba(111,92,255,0.28)]" />
+					<img src={driftIcon} alt="Drift" class="size-16 mb-3 rounded-[20px] shadow-[0_20px_60px_rgba(111,92,255,0.28)]" />
 					<h1 class="text-[1.2rem] font-[700] mb-1 text-[--text-primary]">
 						Permissions Required
 					</h1>
@@ -194,7 +195,7 @@ export default function () {
 
 			<Show when={currentStep() === "mode"}>
 				<div class="flex flex-col items-center">
-					<div class="size-14 mb-3 rounded-2xl bg-[linear-gradient(135deg,#ff7a18_0%,#ff2d55_42%,#6f5cff_100%)] shadow-[0_20px_60px_rgba(111,92,255,0.28)]" />
+					<img src={driftIcon} alt="Drift" class="size-16 mb-3 rounded-[20px] shadow-[0_20px_60px_rgba(111,92,255,0.28)]" />
 					<h1 class="text-[1.2rem] font-[700] mb-1 text-[--text-primary]">
 						Select Recording Mode
 					</h1>
@@ -509,13 +510,14 @@ function Startup(props: { onClose: () => void }) {
 								onClick={handleLogoClick}
 								class="cursor-pointer inline-block"
 							>
-								<IconCapLogo
-									class={`w-20 h-24 mx-auto drop-shadow-[0_0_100px_rgba(0,0,0,0.2)]
-                  ${isLogoAnimating() ? "logo-bounce" : ""}`}
+								<img
+									src={driftIcon}
+									alt="Drift"
+									class={`w-20 h-24 mx-auto rounded-[24px] drop-shadow-[0_0_100px_rgba(0,0,0,0.2)] ${isLogoAnimating() ? "logo-bounce" : ""}`}
 								/>
 							</div>
 							<h1 class="text-5xl md:text-5xl font-bold mb-4 drop-shadow-[0_0_20px_rgba(0,0,0,0.2)]">
-								Welcome to Cap
+								Welcome to Drift
 							</h1>
 							<p class="text-2xl opacity-80 max-w-md mx-auto drop-shadow-[0_0_20px_rgba(0,0,0,0.2)]">
 								Beautiful screen recordings, owned by you.
@@ -545,7 +547,7 @@ function Startup(props: { onClose: () => void }) {
 										getCurrentWindow().close();
 									}}
 								>
-									Continue to Cap
+									Continue to Drift
 								</Button>
 							</Match>
 						</Switch>
