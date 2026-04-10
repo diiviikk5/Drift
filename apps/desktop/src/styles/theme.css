@@ -142,21 +142,43 @@
 
 body {
 	background:
-		radial-gradient(circle at top left, rgba(255, 122, 24, 0.16), transparent 30%),
-		radial-gradient(circle at bottom right, rgba(111, 92, 255, 0.18), transparent 32%),
-		linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 245, 240, 0.98));
+		radial-gradient(
+			circle at top left,
+			rgba(255, 122, 24, 0.16),
+			transparent 30%
+		),
+		radial-gradient(
+			circle at bottom right,
+			rgba(111, 92, 255, 0.18),
+			transparent 32%
+		),
+		linear-gradient(
+			180deg,
+			rgba(255, 255, 255, 0.98),
+			rgba(255, 245, 240, 0.98)
+		);
 }
 
 .dark body {
 	background:
-		radial-gradient(circle at top left, rgba(255, 122, 24, 0.16), transparent 28%),
-		radial-gradient(circle at bottom right, rgba(111, 92, 255, 0.22), transparent 30%),
-		linear-gradient(180deg, rgba(18, 15, 24, 0.98), rgba(24, 18, 33, 0.98));
+		radial-gradient(
+			circle at top left,
+			rgba(255, 122, 24, 0.16),
+			transparent 28%
+		),
+		radial-gradient(
+			circle at bottom right,
+			rgba(111, 92, 255, 0.22),
+			transparent 30%
+		), linear-gradient(180deg, rgba(18, 15, 24, 0.98), rgba(24, 18, 33, 0.98));
 }
 
 .drift-main-shell {
-	background:
-		linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 244, 240, 0.74));
+	background: linear-gradient(
+		180deg,
+		rgba(255, 255, 255, 0.62),
+		rgba(255, 244, 240, 0.74)
+	);
 	border-radius: 24px;
 	border: 1px solid rgba(255, 255, 255, 0.58);
 	box-shadow:
@@ -166,8 +188,11 @@ body {
 }
 
 .dark .drift-main-shell {
-	background:
-		linear-gradient(180deg, rgba(31, 24, 39, 0.76), rgba(19, 15, 27, 0.84));
+	background: linear-gradient(
+		180deg,
+		rgba(31, 24, 39, 0.76),
+		rgba(19, 15, 27, 0.84)
+	);
 	border-color: rgba(255, 255, 255, 0.08);
 	box-shadow:
 		0 30px 90px rgba(0, 0, 0, 0.38),
@@ -175,8 +200,11 @@ body {
 }
 
 .drift-panel {
-	background:
-		linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 243, 239, 0.76));
+	background: linear-gradient(
+		180deg,
+		rgba(255, 255, 255, 0.7),
+		rgba(255, 243, 239, 0.76)
+	);
 	border: 1px solid rgba(255, 255, 255, 0.58);
 	box-shadow:
 		0 16px 48px rgba(31, 24, 39, 0.1),
@@ -185,8 +213,11 @@ body {
 }
 
 .dark .drift-panel {
-	background:
-		linear-gradient(180deg, rgba(36, 27, 47, 0.72), rgba(22, 18, 31, 0.8));
+	background: linear-gradient(
+		180deg,
+		rgba(36, 27, 47, 0.72),
+		rgba(22, 18, 31, 0.8)
+	);
 	border-color: rgba(255, 255, 255, 0.08);
 	box-shadow:
 		0 18px 56px rgba(0, 0, 0, 0.34),
@@ -212,9 +243,26 @@ body {
 	backdrop-filter: blur(16px);
 }
 
+.drift-recorder-hud {
+	background: rgba(16, 18, 26, 0.82);
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	box-shadow:
+		0 18px 42px rgba(0, 0, 0, 0.38),
+		inset 0 1px 0 rgba(255, 255, 255, 0.12);
+	backdrop-filter: blur(18px);
+}
+
 .dark .drift-soft-button {
 	background: rgba(255, 255, 255, 0.06);
 	border-color: rgba(255, 255, 255, 0.08);
+}
+
+.dark .drift-recorder-hud {
+	background: rgba(10, 11, 18, 0.9);
+	border-color: rgba(255, 255, 255, 0.16);
+	box-shadow:
+		0 22px 48px rgba(0, 0, 0, 0.5),
+		inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .dark .dark-button-shadow {

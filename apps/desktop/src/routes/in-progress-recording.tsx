@@ -544,8 +544,8 @@ function InProgressRecordingInner() {
 						</button>
 					</div>
 				</Show>
-				<div class="h-10 w-full rounded-[24px]">
-					<div class="drift-main-shell flex h-full w-full flex-row items-stretch overflow-hidden rounded-[24px] animate-in fade-in">
+				<div class="h-10 w-full rounded-[20px]">
+					<div class="drift-recorder-hud flex h-full w-full flex-row items-stretch overflow-hidden rounded-[20px] animate-in fade-in">
 						<div class="flex flex-1 flex-col gap-2 p-[0.25rem]">
 							<div class="flex flex-1 flex-row justify-between">
 								<button
