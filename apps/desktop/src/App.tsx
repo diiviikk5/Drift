@@ -256,6 +256,14 @@ function createThemeListener(currentWindow: WebviewWindow) {
 }
 
 function LoadingScreen() {
+	if (
+		location.pathname === "/target-select-overlay" ||
+		location.pathname === "/window-capture-occluder" ||
+		location.pathname === "/recordings-overlay"
+	) {
+		return <div class="h-screen w-screen bg-transparent" />;
+	}
+
 	return (
 		<div class="flex h-screen w-screen items-center justify-center bg-[#0d111a]/95 p-6">
 			<div class="drift-panel flex min-w-[18rem] items-center gap-4 rounded-[28px] px-6 py-5">
