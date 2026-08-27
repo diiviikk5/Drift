@@ -18,6 +18,14 @@ Run the installer → takes ~10 seconds → launch from Start Menu. Done.
 
 ---
 
+## Documentation
+
+- **[Architecture & Technical Design](ARCHITECTURE.md)** — Deep dive into the Tauri v2 core, spring physics, and WebCodecs pipeline.
+- **[Contributing Guide](CONTRIBUTING.md)** — Guidelines for local setup, code style, and submitting pull requests.
+- **[Keyboard Shortcuts](docs/SHORTCUTS.md)** — Global hotkeys and studio playback controls.
+
+---
+
 ## Features
 
 - **Screen Recording** — Capture your entire screen, a window, or a browser tab
