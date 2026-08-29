@@ -50,6 +50,7 @@ export default function RecorderPage() {
     const [isRecording, setIsRecording] = useState(false);
     const [timer, setTimer] = useState('00:00');
     const [clickCount, setClickCount] = useState(0);
+    const [countdown, setCountdown] = useState(0);
     const [loadingSources, setLoadingSources] = useState(true);
     const [micEnabled, setMicEnabled] = useState(false);
     const [sourceThumbnails, setSourceThumbnails] = useState({});
@@ -331,29 +332,46 @@ export default function RecorderPage() {
 
     const toggleMic = () => setMicEnabled(!micEnabled);
 
+    const startRecordingActual = async () => {
+        try {
+            setClickCount(0);
+            await engineRef.current.startRecording((s) => {
+                const m = Math.floor(s / 60).toString().padStart(2, '0');
+                const sec = Math.floor(s % 60).toString().padStart(2, '0');
+                setTimer(`${m}:${sec}`);
+            });
+            setIsRecording(true);
+        } catch (e) {
+            console.error('[Drift] Start recording failed:', e);
+        }
+    };
+
     const toggleRecord = async () => {
         if (isRecording) {
             engineRef.current.stopRecording();
             setIsRecording(false);
         } else {
-            try {
-                if (!selectedSource || platform !== 'electron') {
-                    if (!engineRef.current?.screenStream?.active) {
-                        const ok = await engineRef.current.selectSourceBrowser();
-                        if (!ok) return;
-                        setSelectedSource('browser-source');
-                    }
+            if (!selectedSource || (platform !== 'electron' && !window.electron)) {
+                if (!engineRef.current?.screenStream?.active) {
+                    const ok = await engineRef.current.selectSourceBrowser();
+                    if (!ok) return;
+                    setSelectedSource('browser-source');
                 }
-                setClickCount(0);
-                await engineRef.current.startRecording((s) => {
-                    const m = Math.floor(s / 60).toString().padStart(2, '0');
-                    const sec = Math.floor(s % 60).toString().padStart(2, '0');
-                    setTimer(`${m}:${sec}`);
-                });
-                setIsRecording(true);
-            } catch (e) {
-                console.error('[Drift] Start recording failed:', e);
             }
+
+            // 3-second OpenScreen countdown overlay
+            setCountdown(3);
+            let count = 3;
+            const countInterval = setInterval(() => {
+                count -= 1;
+                if (count > 0) {
+                    setCountdown(count);
+                } else {
+                    clearInterval(countInterval);
+                    setCountdown(0);
+                    startRecordingActual();
+                }
+            }, 800);
         }
     };
 
@@ -1164,6 +1182,21 @@ export default function RecorderPage() {
                 )}
 
             </div>
+
+            
+            {/* ═══ 3-2-1 OPENSCREEN COUNTDOWN OVERLAY ═══ */}
+            {countdown > 0 && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="flex flex-col items-center">
+                        <div className="text-9xl font-black text-[#DCFE50] tracking-tighter drop-shadow-[0_0_40px_rgba(220,254,80,0.6)] animate-pulse">
+                            {countdown}
+                        </div>
+                        <div className="text-sm font-bold text-gray-300 mt-4 tracking-widest uppercase">
+                            Recording Starting...
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ═══ EXPORT PROGRESS MODAL ═══ */}
             {isExporting && (

@@ -3,6 +3,12 @@ const path = require('path');
 const fs = require('fs');
 const { startNextServer, stopNextServer } = require('./server');
 
+// Optimize Chromium capture & hardware acceleration flags
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-zero-copy');
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+app.commandLine.appendSwitch('log-level', '3');
+
 // Global Input Hook for unthrottled 120Hz/240Hz telemetry & clicks
 let uIOhook, UiohookKey;
 try {
