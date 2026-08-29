@@ -229,26 +229,25 @@ export async function exportWithFFmpeg(inputBlob, options = {}) {
     return new Blob([data.buffer], { type: mimeType });
 }
 
-// ============================================================
-// TAURI SYSTEM FFMPEG EXPORTER (Desktop — fast, native)
-// ============================================================
-
 async function exportWithTauriFfmpeg(webmBlob, options = {}) {
     const { quality = '1080p', onProgress } = options;
 
     const { invoke } = await import('@tauri-apps/api/core');
+    const { listen } = await import('@tauri-apps/api/event');
+
+    let unlistenProgress = null;
+    try {
+        unlistenProgress = await listen('export-progress', (event) => {
+            if (event.payload && typeof event.payload.progress === 'number' && onProgress) {
+                onProgress(event.payload.progress / 100);
+            }
+        });
+    } catch {
+        // Event listen fallback
+    }
 
     if (onProgress) onProgress(0.05);
 
-    // Convert blob to Uint8Array for IPC
-    const arrayBuffer = await webmBlob.arrayBuffer();
-    const webmData = Array.from(new Uint8Array(arrayBuffer));
-
-    if (onProgress) onProgress(0.1);
-
-    console.log('[MediaExporter] Sending', (webmData.length / 1024 / 1024).toFixed(1), 'MB to Rust ffmpeg');
-
-    // Ask user where to save via Tauri dialog
     let outputPath = '';
     try {
         const { save } = await import('@tauri-apps/plugin-dialog');
@@ -259,41 +258,66 @@ async function exportWithTauriFfmpeg(webmBlob, options = {}) {
         if (chosen) {
             outputPath = chosen;
         }
-    } catch (e) {
+    } catch {
         console.log('[MediaExporter] Dialog not available, using default path');
     }
 
     if (onProgress) onProgress(0.15);
 
     const preset = QUALITY_PRESETS[quality] || QUALITY_PRESETS['1080p'];
+    const arrayBuffer = await webmBlob.arrayBuffer();
+    const uint8Data = new Uint8Array(arrayBuffer);
 
-    // Call Rust — system ffmpeg converts WebM→MP4
-    const resultPath = await invoke('convert_webm_to_mp4', {
-        webmData,
-        config: {
-            crf: 18,
-            preset: 'medium',
-            fps: preset.fps || 60,
-            use_hw_accel: true,
-            output_path: outputPath,
-        },
-    });
+    let resultPath = '';
+    let usedFileTransfer = false;
+
+    // Try direct file write to avoid large IPC buffer transfer
+    try {
+        const { writeFile, BaseDirectory } = await import('@tauri-apps/plugin-fs');
+        const tempFileName = `drift_input_${Date.now()}.webm`;
+        await writeFile(tempFileName, uint8Data, { baseDir: BaseDirectory.Temp });
+        
+        // Pass temp file path to Rust
+        resultPath = await invoke('convert_webm_file_to_mp4', {
+            inputFilePath: tempFileName,
+            config: {
+                crf: 18,
+                preset: 'ultrafast',
+                fps: preset.fps || 60,
+                use_hw_accel: true,
+                output_path: outputPath,
+            },
+        });
+        usedFileTransfer = true;
+    } catch (fsErr) {
+        console.log('[MediaExporter] Direct file transfer skipped, using binary IPC fallback:', fsErr?.message);
+    }
+
+    if (!usedFileTransfer) {
+        resultPath = await invoke('convert_webm_to_mp4', {
+            webmData: uint8Data,
+            config: {
+                crf: 18,
+                preset: 'ultrafast',
+                fps: preset.fps || 60,
+                use_hw_accel: true,
+                output_path: outputPath,
+            },
+        });
+    }
+
+    if (unlistenProgress) {
+        try { unlistenProgress(); } catch {}
+    }
 
     console.log('[MediaExporter] MP4 saved to:', resultPath);
+    if (onProgress) onProgress(1.0);
 
-    if (onProgress) onProgress(0.95);
-
-    // Read the MP4 back as a blob for the download UI
     try {
         const { readFile } = await import('@tauri-apps/plugin-fs');
         const mp4Bytes = await readFile(resultPath);
-        if (onProgress) onProgress(1.0);
         return new Blob([mp4Bytes], { type: 'video/mp4' });
     } catch {
-        // If fs plugin not available, just return a marker blob
-        // The file is already saved to disk
-        if (onProgress) onProgress(1.0);
-        console.log('[MediaExporter] MP4 saved to disk at:', resultPath);
         return new Blob([], { type: 'video/mp4' });
     }
 }

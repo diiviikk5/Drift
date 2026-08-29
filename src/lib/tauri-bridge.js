@@ -123,6 +123,27 @@ export async function stopGlobalListener() {
 }
 
 /**
+ * Get batch of recorded unthrottled global input events (120Hz/240Hz)
+ */
+export async function getRecordedInputEvents() {
+    if (isTauri()) {
+        const api = await getTauriApi();
+        return api.invoke('get_recorded_input_events');
+    }
+    return { moves: [], clicks: [] };
+}
+
+/**
+ * Clear recorded input events
+ */
+export async function clearRecordedInputEvents() {
+    if (isTauri()) {
+        const api = await getTauriApi();
+        return api.invoke('clear_recorded_input_events');
+    }
+}
+
+/**
  * Get hotkey configuration
  */
 export async function getHotkeys() {
@@ -454,6 +475,8 @@ export const drift = {
     onGlobalClick,
     onGlobalMouseMove,
     stopGlobalListener,
+    getRecordedInputEvents,
+    clearRecordedInputEvents,
     getHotkeys,
     setHotkeys,
     aiCompletion,

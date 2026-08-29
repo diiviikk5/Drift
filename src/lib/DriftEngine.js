@@ -67,30 +67,52 @@ export class DriftEngine {
      * Browser: no global listeners (only click-on-canvas)
      */
     async initPlatformListeners() {
+        // Universal window pointer listeners
+        window.addEventListener('pointerdown', (e) => {
+            if (!this.isRecording) return;
+            const t = Date.now() - this.startTime;
+            const nx = e.clientX / (window.innerWidth || 1920);
+            const ny = e.clientY / (window.innerHeight || 1080);
+
+            const lastClick = this.clicks[this.clicks.length - 1];
+            if (lastClick && Math.abs(lastClick.time - t) < 60) return;
+
+            this.clicks.push({ time: t, x: nx, y: ny });
+            if (this.zoomEnabled) {
+                this.zoomEngine.addClick(t, nx, ny);
+            }
+            this.cursorEngine.addClick(t, e.clientX, e.clientY);
+            if (this.onclickCallback) this.onclickCallback(this.clicks.length);
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (!this.isRecording) return;
+            const t = Date.now() - this.startTime;
+            const nx = e.clientX / (window.innerWidth || 1920);
+            const ny = e.clientY / (window.innerHeight || 1080);
+            this.mouseMoves.push({ time: t, x: nx, y: ny });
+            this.zoomEngine.updateCursor(nx, ny, t);
+            this.cursorEngine.addMove(t, e.clientX, e.clientY);
+        });
+
         if (this._isTauri) {
             console.log('[Drift] Init Tauri platform listeners');
 
-            // Global click listener via Rust rdev
             this._globalClickUnlisten = await drift.onGlobalClick((data) => {
                 if (!this.isRecording) return;
                 const t = Date.now() - this.startTime;
-                // Normalize to 0-1 using actual source/screen resolution
                 const nx = data.x / this._sourceWidth;
                 const ny = data.y / this._sourceHeight;
                 this.clicks.push({ time: t, x: nx, y: ny });
 
-                // Feed into Cinema Zoom Engine (live zoom preview)
                 if (this.zoomEnabled) {
                     this.zoomEngine.addClick(t, nx, ny);
                 }
-                // Feed into Cinema Cursor Engine (normalized coords)
                 this.cursorEngine.addClick(t, data.x, data.y);
 
-                console.log('[Drift] Tauri global click:', this.clicks.length);
                 if (this.onclickCallback) this.onclickCallback(this.clicks.length);
             });
 
-            // Global mouse move listener for cursor tracking
             this._globalMoveUnlisten = await drift.onGlobalMouseMove((data) => {
                 if (!this.isRecording) return;
                 const t = Date.now() - this.startTime;
@@ -98,9 +120,7 @@ export class DriftEngine {
                 const ny = data.y / this._sourceHeight;
                 this.mouseMoves.push({ time: t, x: nx, y: ny });
 
-                // Feed cursor position into zoom engine (for camera following)
                 this.zoomEngine.updateCursor(nx, ny, t);
-                // Feed into cursor engine (raw pixels — engine normalizes internally)
                 this.cursorEngine.addMove(t, data.x, data.y);
             });
 
@@ -110,24 +130,51 @@ export class DriftEngine {
                 window.electron.onGlobalClick((data) => {
                     if (!this.isRecording) return;
                     const t = Date.now() - this.startTime;
-                    const nx = data.x / this._sourceWidth;
-                    const ny = data.y / this._sourceHeight;
+                    const nx = data.x;
+                    const ny = data.y;
                     this.clicks.push({ time: t, x: nx, y: ny });
 
                     if (this.zoomEnabled) {
                         this.zoomEngine.addClick(t, nx, ny);
                     }
-                    this.cursorEngine.addClick(t, data.x, data.y);
+                    this.cursorEngine.addClick(t, data.rawX || (nx * this._sourceWidth), data.rawY || (ny * this._sourceHeight));
 
                     if (this.onclickCallback) this.onclickCallback(this.clicks.length);
                 });
 
+                if (window.electron.onGlobalMouseMove) {
+                    window.electron.onGlobalMouseMove((data) => {
+                        if (!this.isRecording) return;
+                        const t = Date.now() - this.startTime;
+                        const nx = data.x;
+                        const ny = data.y;
+                        this.mouseMoves.push({ time: t, x: nx, y: ny });
+                        this.zoomEngine.updateCursor(nx, ny, t);
+                        this.cursorEngine.addMove(t, data.rawX || (nx * this._sourceWidth), data.rawY || (ny * this._sourceHeight));
+                    });
+                }
+
                 window.electron.onGlobalHotkey((action) => {
                     if (action === 'STOP') {
                         if (this.isRecording) this.stopRecording();
-                    } else if (action === 'START') {
+                    } else if (action === 'START' || action === 'TOGGLE_RECORDING') {
                         if (!this.isRecording && this.screenStream?.active && this.onHotkeyStart) {
                             this.onHotkeyStart();
+                        } else if (this.isRecording) {
+                            this.stopRecording();
+                        }
+                    } else if (action === 'ADD_ZOOM') {
+                        if (this.isRecording) {
+                            const t = Date.now() - this.startTime;
+                            const lastMove = this.mouseMoves[this.mouseMoves.length - 1];
+                            const nx = lastMove ? lastMove.x : 0.5;
+                            const ny = lastMove ? lastMove.y : 0.5;
+                            this.clicks.push({ time: t, x: nx, y: ny });
+                            if (this.zoomEnabled) {
+                                this.zoomEngine.addClick(t, nx, ny);
+                            }
+                            if (this.onclickCallback) this.onclickCallback(this.clicks.length);
+                            console.log('[Drift] Zoom marker bookmarked at t=' + (t/1000).toFixed(1) + 's');
                         }
                     }
                 });
@@ -137,12 +184,6 @@ export class DriftEngine {
         }
     }
 
-    /**
-     * Get available recording sources
-     * Tauri: returns monitors from Rust xcap
-     * Electron: returns desktopCapturer sources
-     * Browser: returns empty (uses getDisplayMedia picker)
-     */
     async getSources() {
         if (this._isTauri) {
             return await drift.getSources();
@@ -302,6 +343,18 @@ export class DriftEngine {
         this.startTime = Date.now();
         this.isRecording = true;
 
+        if (window.electron?.showControllerPill) {
+            try { window.electron.showControllerPill(); } catch (e) { }
+        }
+
+        if (this._isTauri) {
+            try {
+                await drift.clearRecordedInputEvents();
+            } catch (e) {
+                console.warn('[Drift] Could not clear recorded inputs:', e);
+            }
+        }
+
         // Ensure Mic is active if enabled
         if (this.micEnabled && !this.micStream) {
             try {
@@ -311,7 +364,6 @@ export class DriftEngine {
                         echoCancellation: true,
                         noiseSuppression: true,
                         autoGainControl: true,
-                        // Don't specify deviceId to use default mic (usually headphone mic)
                     }
                 });
                 console.log('[Drift] Mic stream acquired:', this.micStream.getAudioTracks()[0]?.label);
@@ -319,7 +371,6 @@ export class DriftEngine {
                 console.error("Failed to get mic stream:", e);
             }
         } else if (!this.micEnabled && this.micStream) {
-            // Cleanup if disabled
             this.micStream.getTracks().forEach(t => t.stop());
             this.micStream = null;
         }
@@ -334,7 +385,6 @@ export class DriftEngine {
         const sysTracks = this.screenStream.getAudioTracks();
         if (sysTracks.length > 0) {
             const src = ctx.createMediaStreamSource(new MediaStream([sysTracks[0]]));
-            // Add slight gain?
             src.connect(dest);
             hasAudio = true;
         }
@@ -345,7 +395,7 @@ export class DriftEngine {
             if (micTracks.length > 0) {
                 const src = ctx.createMediaStreamSource(new MediaStream([micTracks[0]]));
                 const gain = ctx.createGain();
-                gain.gain.value = 1.0; // Adjustable?
+                gain.gain.value = 1.0;
                 src.connect(gain);
                 gain.connect(dest);
                 hasAudio = true;
@@ -367,11 +417,11 @@ export class DriftEngine {
                 : 'video/webm';
         this.mediaRecorder = new MediaRecorder(combinedStream, {
             mimeType: mime,
-            videoBitsPerSecond: 25_000_000, // 25 Mbps — lossless-quality source
+            videoBitsPerSecond: 25_000_000,
         });
 
         this.mediaRecorder.ondataavailable = e => { if (e.data.size > 0) this.recordedChunks.push(e.data); };
-        this.mediaRecorder.start(1000); // 1s timeslice — less overhead, still fast stop
+        this.mediaRecorder.start(1000);
 
         // Timer Loop
         this.timerInt = setInterval(() => {
@@ -387,7 +437,30 @@ export class DriftEngine {
         this.isRecording = false;
         clearInterval(this.timerInt);
 
-        this.mediaRecorder.onstop = () => {
+        this.mediaRecorder.onstop = async () => {
+            if (this._isTauri) {
+                try {
+                    const session = await drift.getRecordedInputEvents();
+                    if (session && Array.isArray(session.moves) && session.moves.length > 0) {
+                        this.mouseMoves = session.moves.map(m => ({
+                            time: m.time,
+                            x: m.x / this._sourceWidth,
+                            y: m.y / this._sourceHeight,
+                        }));
+                    }
+                    if (session && Array.isArray(session.clicks) && session.clicks.length > 0) {
+                        this.clicks = session.clicks.map(c => ({
+                            time: c.time,
+                            x: c.x / this._sourceWidth,
+                            y: c.y / this._sourceHeight,
+                        }));
+                    }
+                    console.log('[Drift] Fetched unthrottled telemetry:', this.mouseMoves.length, 'moves,', this.clicks.length, 'clicks');
+                } catch (e) {
+                    console.warn('[Drift] Could not fetch batch recorded inputs:', e);
+                }
+            }
+
             const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
             const duration = (Date.now() - this.startTime) / 1000;
             if (this.onStopCallback) this.onStopCallback(blob, this.clicks, duration);
