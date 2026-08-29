@@ -5,14 +5,16 @@
   "identifier": "com.drift.desktop",
   "build": {
     "frontendDist": "../out",
-    "devUrl": "http://localhost:3000/recorder",
+    "devUrl": "http://localhost:3000",
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build:tauri"
   },
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Drift",
+        "url": "recorder",
         "width": 1280,
         "height": 800,
         "minWidth": 900,
@@ -20,7 +22,10 @@
         "resizable": true,
         "fullscreen": false,
         "decorations": true,
-        "transparent": false
+        "transparent": false,
+        "visible": true,
+        "center": true,
+        "focus": true
       }
     ],
     "security": {

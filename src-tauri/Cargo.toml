@@ -49,9 +49,15 @@ windows-sys = { version = "0.59", features = [
     "Win32_UI_WindowsAndMessaging",
 ] }
 
+[profile.dev]
+debug = 0
+strip = "debuginfo"
+opt-level = 1
+
 [profile.release]
 opt-level = "s"          # Optimize for size
 lto = true                # Link-time optimization — strips unused code
 codegen-units = 1         # Single codegen unit — slower compile, smaller binary
 panic = "abort"           # No unwind tables
 strip = true              # Strip symbols from binary
+

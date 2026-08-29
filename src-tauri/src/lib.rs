@@ -3,6 +3,7 @@ mod rendering;
 
 use commands::input::InputListenerState;
 use commands::native_capture::NativeRecorderState;
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -16,6 +17,10 @@ pub fn run() {
         .manage(InputListenerState::default())
         .manage(NativeRecorderState::default())
         .setup(|app| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
@@ -30,6 +35,8 @@ pub fn run() {
             commands::capture::capture_screenshot,
             commands::input::start_global_listener,
             commands::input::stop_global_listener,
+            commands::input::get_recorded_input_events,
+            commands::input::clear_recorded_input_events,
             commands::hotkeys::get_hotkeys,
             commands::hotkeys::set_hotkeys,
             commands::ai::ai_completion,
@@ -37,11 +44,15 @@ pub fn run() {
             commands::native_capture::stop_native_capture,
             commands::native_capture::get_recording_stats,
             commands::native_capture::get_frame_count,
+            commands::native_capture::get_native_session_info,
+            commands::native_capture::discard_native_session,
             commands::export::export_mp4,
             commands::export::export_composited_mp4,
+            commands::export::export_native_session,
             commands::export::check_ffmpeg,
             commands::export::clear_frame_buffer,
             commands::export::convert_webm_to_mp4,
+            commands::export::convert_webm_file_to_mp4,
             commands::compositor::init_compositor,
             commands::zoom::generate_zoom_segments,
             commands::zoom::evaluate_zoom_at_time,

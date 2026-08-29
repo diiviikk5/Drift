@@ -20,37 +20,47 @@ pub struct GlobalMoveEvent {
     pub time: f64,
 }
 
-/// State to control the global input listener
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecordedInputSession {
+    pub moves: Vec<GlobalMoveEvent>,
+    pub clicks: Vec<GlobalClickEvent>,
+}
+
 pub struct InputListenerState {
     pub is_listening: Arc<Mutex<bool>>,
+    pub recorded_moves: Arc<Mutex<Vec<GlobalMoveEvent>>>,
+    pub recorded_clicks: Arc<Mutex<Vec<GlobalClickEvent>>>,
 }
 
 impl Default for InputListenerState {
     fn default() -> Self {
         Self {
             is_listening: Arc::new(Mutex::new(false)),
+            recorded_moves: Arc::new(Mutex::new(Vec::new())),
+            recorded_clicks: Arc::new(Mutex::new(Vec::new())),
         }
     }
 }
 
-/// Start listening for global mouse events (clicks + movement)
 #[tauri::command]
 pub fn start_global_listener(app: AppHandle) {
     let state = app.state::<InputListenerState>();
     let mut listening = state.is_listening.lock();
 
     if *listening {
-        return; // Already listening
+        return;
     }
     *listening = true;
     drop(listening);
 
     let is_listening = state.is_listening.clone();
+    let recorded_moves = state.recorded_moves.clone();
+    let recorded_clicks = state.recorded_clicks.clone();
     let app_handle = app.clone();
 
     thread::spawn(move || {
         let start_time = std::time::Instant::now();
-        let mut last_move_time: f64 = 0.0;
+        let mut last_ipc_time: f64 = 0.0;
 
         listen(move |event: Event| {
             if !*is_listening.lock() {
@@ -75,18 +85,26 @@ pub fn start_global_listener(app: AppHandle) {
                             time: elapsed,
                             button: btn_name.to_string(),
                         };
+                        {
+                            let mut clicks = recorded_clicks.lock();
+                            clicks.push(click.clone());
+                        }
                         let _ = app_handle.emit("global-click", &click);
                     }
                 }
                 EventType::MouseMove { x, y } => {
-                    // Throttle mouse move events to ~30fps
-                    if elapsed - last_move_time > 33.0 {
-                        last_move_time = elapsed;
-                        let move_evt = GlobalMoveEvent {
-                            x,
-                            y,
-                            time: elapsed,
-                        };
+                    let move_evt = GlobalMoveEvent {
+                        x,
+                        y,
+                        time: elapsed,
+                    };
+                    {
+                        let mut moves = recorded_moves.lock();
+                        moves.push(move_evt.clone());
+                    }
+
+                    if elapsed - last_ipc_time >= 8.0 {
+                        last_ipc_time = elapsed;
                         let _ = app_handle.emit("global-mouse-move", &move_evt);
                     }
                 }
@@ -99,7 +117,6 @@ pub fn start_global_listener(app: AppHandle) {
     });
 }
 
-/// Stop listening for global events
 #[tauri::command]
 pub fn stop_global_listener(app: AppHandle) {
     let state = app.state::<InputListenerState>();
@@ -107,11 +124,24 @@ pub fn stop_global_listener(app: AppHandle) {
     *listening = false;
 }
 
+#[tauri::command]
+pub fn get_recorded_input_events(app: AppHandle) -> RecordedInputSession {
+    let state = app.state::<InputListenerState>();
+    let moves = state.recorded_moves.lock().clone();
+    let clicks = state.recorded_clicks.lock().clone();
+    RecordedInputSession { moves, clicks }
+}
+
+#[tauri::command]
+pub fn clear_recorded_input_events(app: AppHandle) {
+    let state = app.state::<InputListenerState>();
+    state.recorded_moves.lock().clear();
+    state.recorded_clicks.lock().clear();
+}
+
 fn get_mouse_position(event: &Event) -> Option<(f64, f64)> {
     match event.event_type {
         EventType::ButtonPress(_) | EventType::ButtonRelease(_) => {
-            // rdev doesn't include position in button events on all platforms
-            // Use a fallback — on Windows we can get cursor pos
             #[cfg(target_os = "windows")]
             {
                 use std::mem::MaybeUninit;
@@ -135,3 +165,4 @@ fn get_mouse_position(event: &Event) -> Option<(f64, f64)> {
         _ => None,
     }
 }
+
