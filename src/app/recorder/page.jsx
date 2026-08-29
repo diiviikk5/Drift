@@ -314,6 +314,37 @@ export default function RecorderPage() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [viewMode]);
 
+
+    // Compute audio waveform peaks from recorded blob
+    useEffect(() => {
+        if (!recordedBlob) {
+            setAudioPeaks(null);
+            return;
+        }
+        (async () => {
+            try {
+                const arrayBuffer = await recordedBlob.arrayBuffer();
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                const rawData = audioBuffer.getChannelData(0);
+                const samples = 70; // 70 visual bars across the timeline
+                const blockSize = Math.floor(rawData.length / samples);
+                const peaks = [];
+                for (let i = 0; i < samples; i++) {
+                    let sum = 0;
+                    for (let j = 0; j < blockSize; j++) {
+                        sum += Math.abs(rawData[i * blockSize + j] || 0);
+                    }
+                    peaks.push(Math.min(1.0, (sum / blockSize) * 4.5));
+                }
+                setAudioPeaks(peaks);
+            } catch (err) {
+                // If no audio track exists, silent fallback
+                setAudioPeaks(null);
+            }
+        })();
+    }, [recordedBlob]);
+
     // --- ACTIONS ---
     const selectSource = async (id) => {
         if (platform === 'tauri') {
