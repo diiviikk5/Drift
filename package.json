@@ -42,7 +42,7 @@
         "nsis",
         "zip"
       ],
-      "icon": "build/icon.ico",
+      "icon": "public/icon.ico",
       "sign": null,
       "signDlls": false,
       "signAndEditExecutable": false,
@@ -53,21 +53,19 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico",
-      "installerHeaderIcon": "build/icon.ico"
+      "installerIcon": "public/icon.ico",
+      "uninstallerIcon": "public/icon.ico",
+      "installerHeaderIcon": "public/icon.ico"
     },
     "mac": {
       "target": [
         "dmg"
-      ],
-      "icon": "build/icon.png"
+      ]
     },
     "linux": {
       "target": [
         "AppImage"
-      ],
-      "icon": "build/icon.png"
+      ]
     },
     "compression": "store",
     "asar": true,
