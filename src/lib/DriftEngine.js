@@ -198,10 +198,9 @@ export class DriftEngine {
      * Select an Electron source using chromeMediaSource (Electron-only)
      */
     async selectSource(sourceId) {
-        if (this._isElectron) {
+        if (this._isElectron && sourceId && sourceId !== 'browser-source') {
             return this._selectElectronSource(sourceId);
         }
-        // For Tauri and browser, use getDisplayMedia
         return this.selectSourceBrowser();
     }
 
@@ -211,22 +210,17 @@ export class DriftEngine {
                 this.screenStream.getTracks().forEach(t => t.stop());
             }
             const stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    mandatory: {
-                        chromeMediaSource: 'desktop',
-                        chromeMediaSourceId: sourceId
-                    }
-                },
+                audio: false,
                 video: {
                     mandatory: {
                         chromeMediaSource: 'desktop',
-                        chromeMediaSourceId: sourceId
+                        chromeMediaSourceId: sourceId,
+                        maxFrameRate: 60,
                     }
                 }
             });
             this.screenStream = stream;
 
-            // Update source resolution from Electron stream
             const vTrack = stream.getVideoTracks()[0];
             const settings = vTrack?.getSettings?.();
             if (settings?.width && settings?.height) {
@@ -240,36 +234,8 @@ export class DriftEngine {
             }
             return true;
         } catch (e) {
-            console.error("Source select with audio failed, falling back:", e);
-            // Fallback for ANY error
-            return this.selectSourceVideoOnly(sourceId);
-        }
-    }
-
-    async selectSourceVideoOnly(sourceId) {
-        try {
-            if (this.screenStream) {
-                this.screenStream.getTracks().forEach(t => t.stop());
-            }
-
-            const stream = await navigator.mediaDevices.getUserMedia({
-                audio: false,
-                video: {
-                    mandatory: {
-                        chromeMediaSource: 'desktop',
-                        chromeMediaSourceId: sourceId
-                    }
-                }
-            });
-            this.screenStream = stream;
-            if (this.video) {
-                this.video.srcObject = stream;
-                await this.video.play().catch(e => console.warn("Auto-play preview failed:", e));
-            }
-            return true;
-        } catch (e) {
-            console.error("Video-only select failed:", e);
-            return false;
+            console.warn("[Drift] Electron getUserMedia failed, falling back to getDisplayMedia:", e);
+            return this.selectSourceBrowser();
         }
     }
 
@@ -279,7 +245,7 @@ export class DriftEngine {
                 this.screenStream.getTracks().forEach(t => t.stop());
             }
 
-            // Standard browser/Tauri API - getDisplayMedia works in WebView2
+            // Standard browser/Tauri/Electron universal screen picker
             const stream = await navigator.mediaDevices.getDisplayMedia({
                 video: {
                     width: { ideal: 1920 },
@@ -298,7 +264,7 @@ export class DriftEngine {
 
             this.screenStream = stream;
 
-            // Handle external stop (browser UI stop button)
+            // Handle external stop
             stream.getVideoTracks()[0].onended = () => {
                 console.log('[Drift] Stream ended by user');
                 if (this.isRecording) {
@@ -306,7 +272,6 @@ export class DriftEngine {
                 }
             };
 
-            // Update source resolution from actual stream for accurate normalization
             const vTrack = stream.getVideoTracks()[0];
             const settings = vTrack?.getSettings?.();
             if (settings?.width && settings?.height) {
