@@ -38,6 +38,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# rust / build artifacts
+target/
+packages/
+src-tauri/target/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
