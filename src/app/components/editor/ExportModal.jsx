@@ -12,6 +12,19 @@ export default function ExportModal({ videoBlob, onClose }) {
     const [progress, setProgress] = useState(0);
     const [downloadUrl, setDownloadUrl] = useState(null);
     const [error, setError] = useState(null);
+    const [hwInfo, setHwInfo] = useState(null);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && window.__TAURI_INTERNALS__) {
+            import('@tauri-apps/api/core').then(({ invoke }) => {
+                invoke('check_ffmpeg').then((info) => {
+                    if (info && typeof info === 'object') {
+                        setHwInfo(info);
+                    }
+                }).catch(() => {});
+            }).catch(() => {});
+        }
+    }, []);
 
     const formats = [
         { id: "mp4", label: "MP4", icon: Film, description: "H.264 · Universal" },
@@ -91,10 +104,18 @@ export default function ExportModal({ videoBlob, onClose }) {
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="font-mono font-bold text-xl uppercase">
-                        Export Recording
-                    </h2>
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2.5">
+                        <h2 className="font-mono font-bold text-xl uppercase">
+                            Export Recording
+                        </h2>
+                        {hwInfo && (
+                            <span className="text-[11px] font-mono font-bold px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded flex items-center gap-1">
+                                <Sparkles className="w-3 h-3 text-emerald-400" />
+                                {hwInfo.hardware_accelerated ? `HW: ${hwInfo.preferred_encoder}` : `CPU: ${hwInfo.preferred_encoder}`}
+                            </span>
+                        )}
+                    </div>
                     <motion.button
                         onClick={onClose}
                         className="p-2 border-2 border-[var(--border-default)] hover:bg-[var(--brutal-pink)] 
