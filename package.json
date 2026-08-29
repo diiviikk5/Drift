@@ -44,7 +44,9 @@
       ],
       "icon": "public/icon.ico",
       "sign": null,
-      "signDlls": false
+      "signDlls": false,
+      "signAndEditExecutable": false,
+      "forceCodeSigning": false
     },
     "mac": {
       "target": [
