@@ -548,6 +548,68 @@ export default function RecorderPage() {
         a.click();
     };
 
+
+    const loadSampleDemoStudio = async () => {
+        try {
+            // Generate synthetic 5-second demo video canvas
+            const demoCanvas = document.createElement('canvas');
+            demoCanvas.width = 1920;
+            demoCanvas.height = 1080;
+            const ctx = demoCanvas.getContext('2d');
+            
+            // Draw a high-tech demo interface
+            ctx.fillStyle = '#0c0c14';
+            ctx.fillRect(0, 0, 1920, 1080);
+            ctx.fillStyle = '#181824';
+            ctx.roundRect(80, 80, 1760, 920, 24);
+            ctx.fill();
+            
+            // Header
+            ctx.fillStyle = '#DCFE50';
+            ctx.font = 'bold 36px sans-serif';
+            ctx.fillText('Drift Cinema Studio — Interactive Demo', 140, 160);
+            
+            // Cards
+            ctx.fillStyle = '#222234';
+            ctx.roundRect(140, 220, 500, 320, 16);
+            ctx.fill();
+            ctx.roundRect(680, 220, 500, 320, 16);
+            ctx.fill();
+            ctx.roundRect(1220, 220, 500, 320, 16);
+            ctx.fill();
+
+            const stream = demoCanvas.captureStream(30);
+            const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+            const chunks = [];
+            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+            
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                const sampleClicks = [
+                    { x: 0.2, y: 0.3, time: 1.2, duration: 1.8 },
+                    { x: 0.5, y: 0.4, time: 2.8, duration: 1.6 },
+                    { x: 0.8, y: 0.3, time: 4.2, duration: 1.5 },
+                ];
+                const sampleMoves = [];
+                for (let i = 0; i < 50; i++) {
+                    const t = i / 10;
+                    sampleMoves.push({ x: 0.2 + (i / 50) * 0.6, y: 0.3 + Math.sin(i / 5) * 0.1, time: t });
+                }
+                recordedDataRef.current = { blob, clicks: sampleClicks, moves: sampleMoves, dur: 5.0 };
+                setRecordedBlob(blob);
+                setRecordedClicks(sampleClicks);
+                setRecordedMoves(sampleMoves);
+                recDurationRef.current = 5.0;
+                setViewMode('studio');
+            };
+
+            mediaRecorder.start();
+            setTimeout(() => mediaRecorder.stop(), 500);
+        } catch (e) {
+            console.error('Demo studio loader failed:', e);
+        }
+    };
+
     const formatTime = (seconds) => {
         if (!isFinite(seconds) || isNaN(seconds)) return '00:00';
         const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -581,6 +643,14 @@ export default function RecorderPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    
+                    <button
+                        onClick={loadSampleDemoStudio}
+                        className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-500/20 to-blue-500/20 hover:from-purple-500/30 hover:to-blue-500/30 text-purple-300 hover:text-white text-[11px] font-bold border border-purple-500/30 transition-all flex items-center gap-1.5"
+                    >
+                        <span>🎬</span> Try Studio Demo
+                    </button>
+
                     {viewMode === 'studio' && (
                         <button
                             onClick={() => {
