@@ -9,7 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "clean": "npx rimraf dist out",
+    "clean": "npx rimraf dist out .next",
     "build:tauri": "next build",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
@@ -28,18 +28,21 @@
     "files": [
       "electron/**/*",
       ".next/**/*",
+      "!.next/cache/**/*",
+      "!.next/dev/**/*",
       "public/**/*",
       "package.json",
       "!src/**/*",
       "!extension/**/*",
-      "!build/**/*"
+      "!build/**/*",
+      "!src-tauri/**/*"
     ],
     "win": {
       "target": [
         "nsis",
         "zip"
       ],
-      "icon": "build/icon.ico",
+      "icon": "public/icon.ico",
       "sign": null,
       "signDlls": false
     },
