@@ -71,13 +71,7 @@
     "asar": true,
     "asarUnpack": [
       "**/node_modules/uiohook-napi/**/*"
-    ],
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "installerIcon": "build/icon.png",
-      "uninstallerIcon": "build/icon.png"
-    }
+    ]
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",
