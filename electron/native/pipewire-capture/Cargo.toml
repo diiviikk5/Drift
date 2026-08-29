@@ -1,0 +1,65 @@
+# OpenScreen Linux capture helper (PipeWire + xdg-desktop-portal).
+#
+# WHY IT LIVES HERE AND NOT IN crates/.
+#
+# `crates/` is the compositor workspace: a rendering library plus the napi addon
+# the app links, sharing wgpu/ffmpeg/windows dependencies and a French comment
+# convention. This is not that. It is a sidecar executable spawned over stdio,
+# exactly like `electron/native/screencapturekit/` (Swift) and
+# `electron/native/wgc-capture/` (C++). Putting it in the compositor workspace
+# would drag its dependency tree (ashpd/zbus, cc, png) into every
+# `cargo build -p compositor-view-napi` resolution for no benefit, and would put
+# a Linux-only binary behind a workspace whose default member is a Windows POC.
+#
+# IT DOES SHARE FFMPEG — and only ffmpeg. Stage 2 encodes H.264 here, against the
+# same vendored tree the compositor uses (crates/thirdparty/). The crucial
+# difference from the addon is that this is a separate PROCESS: it never enters
+# Electron's address space, so the flat-namespace collision with Chromium's
+# `libffmpeg.so` (see scripts/build-linux-compositor-addon.mjs) does not apply
+# and no symbol prefixing is needed. Linking it normally is safe HERE and only
+# here.
+#
+# It is therefore a standalone package. `[workspace]` below makes that explicit
+# so that a future root Cargo.toml cannot silently adopt it.
+
+[package]
+name = "openscreen-pipewire-helper"
+version = "0.0.0"
+edition = "2021"
+publish = false
+license = "MIT"
+
+[workspace]
+
+[[bin]]
+name = "openscreen-pipewire-helper"
+path = "src/main.rs"
+
+[dependencies]
+# Pure-Rust D-Bus. Deliberately NOT the `pipewire` feature (that one pulls
+# pipewire-rs, which needs libpipewire-0.3-dev at build time — the exact
+# dependency this crate exists to avoid) and NOT `gtk4`.
+ashpd = { version = "0.9", default-features = false, features = ["async-std"] }
+# ashpd's async-std feature routes zbus through async-io, whose reactor lives on
+# its own thread, so a plain block_on is all the executor we need.
+pollster = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Cursor sprites: the renderer wants a PNG data URL (see NativeCursorAsset in
+# src/native/contracts.ts). Both crates are pure Rust, no C dependency.
+png = "0.17"
+base64 = "0.22"
+sha2 = "0.10"
+evdev = "0.13"
+
+[build-dependencies]
+cc = "1"
+# Same generator the compositor uses on its copy of these headers. Hand-writing
+# AVCodecContext/AVFrame layouts is the one thing guaranteed to break silently on
+# an ffmpeg bump, so the layouts are always generated, never typed out.
+bindgen = "0.70"
+
+[profile.release]
+opt-level = 2
+lto = true
+strip = true
