@@ -66,6 +66,7 @@ export default function RecorderPage() {
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
+    const [audioPeaks, setAudioPeaks] = useState(null);
     const [trimStart, setTrimStart] = useState(0);
     const [trimEnd, setTrimEnd] = useState(0);
     const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
