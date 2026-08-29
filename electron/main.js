@@ -1,35 +1,37 @@
-const { app, BrowserWindow, ipcMain, screen, desktopCapturer } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, desktopCapturer, dialog, globalShortcut, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { startNextServer, stopNextServer } = require('./server');
 
-// Safe Import for Global Input Hook
+// Global Input Hook for unthrottled 120Hz/240Hz telemetry & clicks
 let uIOhook, UiohookKey;
 try {
     const hook = require('uiohook-napi');
     uIOhook = hook.uIOhook;
     UiohookKey = hook.UiohookKey;
 } catch (e) {
-    console.warn("Global Input Hook (uiohook-napi) failed to load. Click tracking will be disabled.", e);
+    console.warn("[Drift Main] Global Input Hook (uiohook-napi) failed to load:", e);
 }
 
-let mainWindow;
+let mainWindow = null;
+let controllerWindow = null;
+let tray = null;
 
-// Hotkey configuration with defaults
+// Hotkey configuration
 let hotkeyConfig = {
-    start: { key: 'S', ctrl: true, shift: true, alt: false },
-    stop: { key: 'X', ctrl: true, shift: true, alt: false }
+    toggle_recording: 'CommandOrControl+Shift+R',
+    stop_recording: 'CommandOrControl+Shift+S',
+    toggle_pause: 'CommandOrControl+Shift+P',
+    toggle_zoom: 'CommandOrControl+Shift+Z',
 };
 
-// Config file path
 const configPath = path.join(app.getPath('userData'), 'hotkeys.json');
 
-// Load saved hotkeys
 function loadHotkeys() {
     try {
         if (fs.existsSync(configPath)) {
             const data = fs.readFileSync(configPath, 'utf8');
-            hotkeyConfig = JSON.parse(data);
+            hotkeyConfig = { ...hotkeyConfig, ...JSON.parse(data) };
             console.log('[Drift Main] Loaded hotkeys:', hotkeyConfig);
         }
     } catch (e) {
@@ -37,53 +39,38 @@ function loadHotkeys() {
     }
 }
 
-// Save hotkeys to file
 function saveHotkeys() {
     try {
         fs.writeFileSync(configPath, JSON.stringify(hotkeyConfig, null, 2));
-        console.log('[Drift Main] Saved hotkeys:', hotkeyConfig);
     } catch (e) {
         console.error('[Drift Main] Error saving hotkeys:', e);
     }
 }
 
-// Get keycode from key letter
-function getKeycode(key) {
-    const keyMap = {
-        'A': UiohookKey?.A, 'B': UiohookKey?.B, 'C': UiohookKey?.C, 'D': UiohookKey?.D,
-        'E': UiohookKey?.E, 'F': UiohookKey?.F, 'G': UiohookKey?.G, 'H': UiohookKey?.H,
-        'I': UiohookKey?.I, 'J': UiohookKey?.J, 'K': UiohookKey?.K, 'L': UiohookKey?.L,
-        'M': UiohookKey?.M, 'N': UiohookKey?.N, 'O': UiohookKey?.O, 'P': UiohookKey?.P,
-        'Q': UiohookKey?.Q, 'R': UiohookKey?.R, 'S': UiohookKey?.S, 'T': UiohookKey?.T,
-        'U': UiohookKey?.U, 'V': UiohookKey?.V, 'W': UiohookKey?.W, 'X': UiohookKey?.X,
-        'Y': UiohookKey?.Y, 'Z': UiohookKey?.Z,
-        '1': UiohookKey?.Num1, '2': UiohookKey?.Num2, '3': UiohookKey?.Num3,
-        '4': UiohookKey?.Num4, '5': UiohookKey?.Num5, '6': UiohookKey?.Num6,
-        '7': UiohookKey?.Num7, '8': UiohookKey?.Num8, '9': UiohookKey?.Num9, '0': UiohookKey?.Num0,
-        'F1': UiohookKey?.F1, 'F2': UiohookKey?.F2, 'F3': UiohookKey?.F3, 'F4': UiohookKey?.F4,
-        'F5': UiohookKey?.F5, 'F6': UiohookKey?.F6, 'F7': UiohookKey?.F7, 'F8': UiohookKey?.F8,
-        'F9': UiohookKey?.F9, 'F10': UiohookKey?.F10, 'F11': UiohookKey?.F11, 'F12': UiohookKey?.F12,
-    };
-    return keyMap[key.toUpperCase()];
-}
-
-function createWindow(productionUrl) {
-    let dims = { width: 800, height: 600 };
+function createMainWindow(productionUrl) {
+    let dims = { width: 1400, height: 880 };
     try {
         const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-        dims = { width, height };
+        dims = {
+            width: Math.min(1520, Math.floor(width * 0.92)),
+            height: Math.min(960, Math.floor(height * 0.92))
+        };
     } catch (e) { }
 
     mainWindow = new BrowserWindow({
-        width: Math.min(1400, dims.width),
-        height: Math.min(850, dims.height),
-        minWidth: 800,
-        minHeight: 600,
+        width: dims.width,
+        height: dims.height,
+        minWidth: 920,
+        minHeight: 660,
+        backgroundColor: '#07070a',
+        autoHideMenuBar: true,
         icon: path.join(__dirname, '../public/icon.ico'),
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
             nodeIntegration: false,
+            backgroundThrottling: false,
+            webSecurity: true,
         }
     });
 
@@ -91,21 +78,187 @@ function createWindow(productionUrl) {
     console.log('[Drift Main] Loading URL:', startUrl);
     mainWindow.loadURL(startUrl);
 
-    mainWindow.on('closed', () => (mainWindow = null));
+    mainWindow.on('closed', () => {
+        mainWindow = null;
+        if (controllerWindow) controllerWindow.close();
+    });
 
+    setupGlobalShortcuts();
     setupInputHooks();
+    setupTray();
+}
+
+// ── Floating Controller Pill Window (While Recording) ──
+function createControllerWindow() {
+    if (controllerWindow) {
+        controllerWindow.show();
+        return;
+    }
+
+    const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+
+    controllerWindow = new BrowserWindow({
+        width: 320,
+        height: 64,
+        x: Math.floor((width - 320) / 2),
+        y: height - 100,
+        frame: false,
+        transparent: true,
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        resizable: false,
+        hasShadow: true,
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+        }
+    });
+
+    const pillHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+            body { background: transparent; display: flex; align-items: center; justify-content: center; height: 100vh; -webkit-app-region: drag; }
+            .pill {
+                display: flex; align-items: center; gap: 10px;
+                background: rgba(15, 15, 20, 0.85); backdrop-filter: blur(16px);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 40px; padding: 8px 16px;
+                box-shadow: 0 12px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05);
+                color: #fff; font-size: 12px; font-weight: 600;
+            }
+            .rec-dot { width: 10px; height: 10px; background: #ef4444; border-radius: 50%; animation: pulse 1.5s infinite; }
+            @keyframes pulse { 0% { transform: scale(0.9); opacity: 0.8; } 50% { transform: scale(1.15); opacity: 1; filter: drop-shadow(0 0 6px #ef4444); } 100% { transform: scale(0.9); opacity: 0.8; } }
+            .timer { font-variant-numeric: tabular-nums; letter-spacing: 0.5px; color: #f3f4f6; }
+            .btn { -webkit-app-region: no-drag; cursor: pointer; border: none; border-radius: 20px; padding: 5px 10px; font-size: 11px; font-weight: 700; transition: all 0.15s; }
+            .btn-stop { background: #ef4444; color: #fff; }
+            .btn-stop:hover { background: #dc2626; transform: scale(1.04); }
+            .btn-zoom { background: rgba(220, 254, 80, 0.2); color: #DCFE50; border: 1px solid rgba(220, 254, 80, 0.4); }
+            .btn-zoom:hover { background: rgba(220, 254, 80, 0.35); }
+        </style>
+    </head>
+    <body>
+        <div class="pill">
+            <div class="rec-dot"></div>
+            <span class="timer" id="timer">00:00</span>
+            <button class="btn btn-zoom" id="btn-zoom">+ Zoom</button>
+            <button class="btn btn-stop" id="btn-stop">■ Stop</button>
+        </div>
+        <script>
+            let startTime = Date.now();
+            setInterval(() => {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+                const s = String(elapsed % 60).padStart(2, '0');
+                document.getElementById('timer').innerText = m + ':' + s;
+            }, 1000);
+            document.getElementById('btn-stop').onclick = () => window.electron?.sendToMain('PILL_STOP');
+            document.getElementById('btn-zoom').onclick = () => window.electron?.sendToMain('PILL_ADD_ZOOM');
+        </script>
+    </body>
+    </html>
+    `;
+
+    controllerWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(pillHtml)}`);
+    controllerWindow.on('closed', () => (controllerWindow = null));
+}
+
+function hideControllerWindow() {
+    if (controllerWindow) {
+        controllerWindow.hide();
+    }
+}
+
+// ── System Tray ──
+function setupTray() {
+    if (tray) return;
+    try {
+        const iconPath = path.join(__dirname, '../public/icon.ico');
+        const icon = nativeImage.createFromPath(iconPath);
+        tray = new Tray(icon);
+        const contextMenu = Menu.buildFromTemplate([
+            { label: 'Open Drift Studio', click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
+            { type: 'separator' },
+            { label: 'Start Recording (Ctrl+Shift+R)', click: () => { if (mainWindow) mainWindow.webContents.send('GLOBAL_HOTKEY', 'TOGGLE_RECORDING'); } },
+            { label: 'Stop Recording (Ctrl+Shift+S)', click: () => { if (mainWindow) mainWindow.webContents.send('GLOBAL_HOTKEY', 'STOP'); } },
+            { type: 'separator' },
+            { label: 'Quit Drift', click: () => app.quit() }
+        ]);
+        tray.setToolTip('Drift - Screen Studio');
+        tray.setContextMenu(contextMenu);
+        tray.on('click', () => {
+            if (mainWindow) {
+                if (mainWindow.isVisible()) mainWindow.focus();
+                else mainWindow.show();
+            }
+        });
+    } catch (e) {
+        console.warn('[Drift Main] Tray setup failed:', e);
+    }
+}
+
+function setupGlobalShortcuts() {
+    globalShortcut.unregisterAll();
+
+    try {
+        if (hotkeyConfig.toggle_recording) {
+            globalShortcut.register(hotkeyConfig.toggle_recording, () => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('GLOBAL_HOTKEY', 'TOGGLE_RECORDING');
+                }
+            });
+        }
+        if (hotkeyConfig.stop_recording) {
+            globalShortcut.register(hotkeyConfig.stop_recording, () => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('GLOBAL_HOTKEY', 'STOP');
+                }
+            });
+        }
+        if (hotkeyConfig.toggle_zoom) {
+            globalShortcut.register(hotkeyConfig.toggle_zoom, () => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('GLOBAL_HOTKEY', 'ADD_ZOOM');
+                }
+            });
+        }
+    } catch (err) {
+        console.warn('[Drift Main] Failed to register global shortcuts:', err);
+    }
 }
 
 function setupInputHooks() {
     if (!uIOhook) {
-        console.warn('[Drift Main] uIOhook not available - clicks will not be tracked');
+        console.warn('[Drift Main] uIOhook not available');
         return;
     }
 
-    console.log('[Drift Main] Setting up input hooks...');
+    console.log('[Drift Main] Starting unthrottled mouse & click telemetry...');
 
+    // Global Click Listener
     uIOhook.on('mousedown', (e) => {
-        console.log('[Drift Main] Mouse click detected:', e.x, e.y);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            try {
+                const { width, height } = screen.getPrimaryDisplay().bounds;
+                const data = {
+                    x: e.x / width,
+                    y: e.y / height,
+                    rawX: e.x,
+                    rawY: e.y,
+                    button: e.button === 1 ? 'left' : e.button === 2 ? 'right' : 'middle',
+                    timestamp: Date.now()
+                };
+                mainWindow.webContents.send('GLOBAL_CLICK', data);
+            } catch (err) { }
+        }
+    });
+
+    // Global Mouse Move Listener (120Hz/240Hz smooth tracking)
+    uIOhook.on('mousemove', (e) => {
         if (mainWindow && !mainWindow.isDestroyed()) {
             try {
                 const { width, height } = screen.getPrimaryDisplay().bounds;
@@ -116,65 +269,34 @@ function setupInputHooks() {
                     rawY: e.y,
                     timestamp: Date.now()
                 };
-                console.log('[Drift Main] Sending GLOBAL_CLICK:', data);
-                mainWindow.webContents.send('GLOBAL_CLICK', data);
-            } catch (err) { console.error("Error processing click", err); }
-        }
-    });
-
-    uIOhook.on('keydown', (e) => {
-        // Check Stop hotkey
-        const stopKey = getKeycode(hotkeyConfig.stop.key);
-        if (stopKey && e.keycode === stopKey) {
-            const modMatch =
-                (hotkeyConfig.stop.ctrl ? e.ctrlKey : !e.ctrlKey) &&
-                (hotkeyConfig.stop.shift ? e.shiftKey : !e.shiftKey) &&
-                (hotkeyConfig.stop.alt ? e.altKey : !e.altKey);
-
-            // Simpler check - just require the modifiers that are set
-            const simpleMatch =
-                (!hotkeyConfig.stop.ctrl || e.ctrlKey) &&
-                (!hotkeyConfig.stop.shift || e.shiftKey) &&
-                (!hotkeyConfig.stop.alt || e.altKey);
-
-            if (simpleMatch && (hotkeyConfig.stop.ctrl || hotkeyConfig.stop.shift || hotkeyConfig.stop.alt)) {
-                console.log('[Drift Main] Stop hotkey detected');
-                if (mainWindow) mainWindow.webContents.send('GLOBAL_HOTKEY', 'STOP');
-            }
-        }
-
-        // Check Start hotkey
-        const startKey = getKeycode(hotkeyConfig.start.key);
-        if (startKey && e.keycode === startKey) {
-            const simpleMatch =
-                (!hotkeyConfig.start.ctrl || e.ctrlKey) &&
-                (!hotkeyConfig.start.shift || e.shiftKey) &&
-                (!hotkeyConfig.start.alt || e.altKey);
-
-            if (simpleMatch && (hotkeyConfig.start.ctrl || hotkeyConfig.start.shift || hotkeyConfig.start.alt)) {
-                console.log('[Drift Main] Start hotkey detected');
-                if (mainWindow) mainWindow.webContents.send('GLOBAL_HOTKEY', 'START');
-            }
+                mainWindow.webContents.send('GLOBAL_MOVE', data);
+            } catch (err) { }
         }
     });
 
     try {
         uIOhook.start();
-        console.log('[Drift Main] uIOhook started successfully');
-    } catch (e) { console.error("Failed to start input hook", e); }
+        console.log('[Drift Main] uIOhook telemetry active');
+    } catch (e) {
+        console.error('[Drift Main] Failed to start input hook:', e);
+    }
 }
 
-// IPC Handlers
+// ── IPC Handlers ──
+
+// Source enumeration
 ipcMain.handle('GET_SOURCES', async () => {
     try {
         const sources = await desktopCapturer.getSources({
-            types: ['window', 'screen'],
-            thumbnailSize: { width: 150, height: 150 }
+            types: ['screen', 'window'],
+            thumbnailSize: { width: 320, height: 180 },
+            fetchWindowIcons: true,
         });
         return sources.map(s => ({
             id: s.id,
             name: s.name,
-            thumbnailDataUrl: s.thumbnail.toDataURL()
+            thumbnailDataUrl: s.thumbnail.toDataURL(),
+            display_type: s.id.startsWith('screen') ? 'Screen' : 'Window',
         }));
     } catch (e) {
         console.error('[Drift Main] GET_SOURCES error:', e);
@@ -182,16 +304,66 @@ ipcMain.handle('GET_SOURCES', async () => {
     }
 });
 
-ipcMain.handle('GET_HOTKEYS', () => {
-    return hotkeyConfig;
+// Floating controller pill triggers
+ipcMain.handle('SHOW_CONTROLLER_PILL', () => {
+    createControllerWindow();
+    return true;
 });
+
+ipcMain.handle('HIDE_CONTROLLER_PILL', () => {
+    hideControllerWindow();
+    return true;
+});
+
+ipcMain.on('PILL_STOP', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('GLOBAL_HOTKEY', 'STOP');
+    }
+    hideControllerWindow();
+});
+
+ipcMain.on('PILL_ADD_ZOOM', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('GLOBAL_HOTKEY', 'ADD_ZOOM');
+    }
+});
+
+// Save Dialog
+ipcMain.handle('SHOW_SAVE_DIALOG', async (event, options) => {
+    try {
+        const result = await dialog.showSaveDialog(mainWindow, options || {
+            defaultPath: `drift-recording-${Date.now()}.mp4`,
+            filters: [{ name: 'MP4 Video', extensions: ['mp4'] }, { name: 'WebM Video', extensions: ['webm'] }]
+        });
+        return result.canceled ? null : result.filePath;
+    } catch (e) {
+        console.error('[Drift Main] Save dialog error:', e);
+        return null;
+    }
+});
+
+// Native Direct Disk Write
+ipcMain.handle('SAVE_FILE', async (event, filePath, buffer) => {
+    try {
+        await fs.promises.writeFile(filePath, Buffer.from(buffer));
+        console.log('[Drift Main] Successfully wrote file to:', filePath);
+        return true;
+    } catch (e) {
+        console.error('[Drift Main] Failed to write file:', e);
+        throw e;
+    }
+});
+
+ipcMain.handle('GET_HOTKEYS', () => hotkeyConfig);
 
 ipcMain.handle('SET_HOTKEYS', (event, hotkeys) => {
-    hotkeyConfig = hotkeys;
+    hotkeyConfig = { ...hotkeyConfig, ...hotkeys };
     saveHotkeys();
+    setupGlobalShortcuts();
     return hotkeyConfig;
 });
 
+// App Lifecycle
 app.on('ready', async () => {
     loadHotkeys();
     let prodUrl = null;
@@ -199,16 +371,19 @@ app.on('ready', async () => {
         const serverBase = await startNextServer();
         prodUrl = `${serverBase}/recorder`;
     }
-    createWindow(prodUrl);
+    createMainWindow(prodUrl);
 });
 
 app.on('window-all-closed', () => {
-    if (uIOhook) uIOhook.stop();
+    if (uIOhook) {
+        try { uIOhook.stop(); } catch (e) { }
+    }
+    globalShortcut.unregisterAll();
     if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('activate', () => {
-    if (mainWindow === null) createWindow();
+    if (mainWindow === null) createMainWindow();
 });
 
 app.on('before-quit', () => {
