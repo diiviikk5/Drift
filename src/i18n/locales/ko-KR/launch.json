@@ -1,0 +1,99 @@
+{
+	"tooltips": {
+		"hideHUD": "HUD 숨기기",
+		"closeApp": "앱 닫기",
+		"restartRecording": "녹화 다시 시작",
+		"cancelRecording": "녹화 취소",
+		"pauseRecording": "녹화 일시정지",
+		"resumeRecording": "녹화 재개",
+		"useVerticalTray": "세로 트레이 사용",
+		"useHorizontalTray": "가로 트레이 사용",
+		"openStudio": "스튜디오 열기",
+		"openNotes": "노트 열기",
+		"openNotesPlaceholder": "여기에 메모를 입력하세요...",
+		"notesToolbar": {
+			"bold": "굵게",
+			"italic": "기울임꼴",
+			"strikethrough": "취소선",
+			"bulletList": "글머리 기호 목록",
+			"numberedList": "번호 매기기 목록",
+			"blockquote": "인용문",
+			"codeBlock": "코드 블록",
+			"play": "자동 스크롤 시작",
+			"pause": "자동 스크롤 일시 중지",
+			"speed": "스크롤 속도",
+			"decreaseSpeed": "스크롤 속도 낮추기",
+			"increaseSpeed": "스크롤 속도 높이기",
+			"fontSize": "글꼴 크기",
+			"decreaseFontSize": "글꼴 크기 줄이기",
+			"increaseFontSize": "글꼴 크기 늘리기",
+			"mirror": "좌우 반전"
+		}
+	},
+	"audio": {
+		"enableSystemAudio": "시스템 오디오 활성화",
+		"disableSystemAudio": "시스템 오디오 비활성화",
+		"enableMicrophone": "마이크 활성화",
+		"disableMicrophone": "마이크 비활성화",
+		"defaultMicrophone": "기본 마이크",
+		"systemAudio": "시스템 오디오",
+		"microphone": "마이크",
+		"on": "켜짐",
+		"off": "꺼짐",
+		"inputDevice": "입력 장치"
+	},
+	"webcam": {
+		"enableWebcam": "웹캠 활성화",
+		"disableWebcam": "웹캠 비활성화",
+		"defaultCamera": "기본 카메라",
+		"searching": "검색 중...",
+		"noneFound": "카메라를 찾을 수 없음",
+		"unavailable": "카메라를 사용할 수 없음",
+		"camera": "카메라",
+		"cameraDevice": "카메라 장치"
+	},
+	"cursor": {
+		"useEditableCursor": "편집 가능한 커서 사용",
+		"useSystemCursor": "시스템 커서 사용"
+	},
+	"sourceSelector": {
+		"loading": "소스 불러오는 중...",
+		"screens": "화면 ({{count}}개)",
+		"windows": "창 ({{count}}개)",
+		"emptyTitle": "화면이나 창을 찾을 수 없음",
+		"emptyDescription": "화면 녹화 권한을 방금 허용했다면 이 선택기를 새로고침하세요. macOS에서는 Drift을 다시 열어야 할 수도 있습니다.",
+		"loadFailedDescription": "Drift이 캡처 소스를 불러오지 못했습니다. 이 선택기를 새로고침한 후 다시 시도하세요.",
+		"defaultSourceName": "화면"
+	},
+	"recording": {
+		"selectSource": "녹화할 소스를 선택해 주세요",
+		"systemPicker": "공유할 대상을 시스템이 묻습니다",
+		"inProgress": "녹화 중",
+		"saving": "저장 중..."
+	},
+	"language": "언어",
+	"systemLanguagePrompt": {
+		"title": "시스템 언어를 사용하시겠습니까?",
+		"description": "시스템 언어가 {{language}}(으)로 감지되었습니다. Drift을 {{language}}(으)로 전환하시겠습니까?",
+		"switch": "{{language}}(으)로 전환",
+		"keepDefault": "현재 언어 유지"
+	},
+	"softwareEncoderFallback": {
+		"title": "소프트웨어 인코딩으로 전환됨",
+		"description": "기본 GPU 인코더를 시작할 수 없어 Drift이 소프트웨어 H.264 인코딩으로 전환했습니다. 녹화는 정상적으로 계속되지만 CPU 사용량이 높아질 수 있습니다.",
+		"dismiss": "확인",
+		"dontShowAgain": "다시 표시하지 않음"
+	},
+	"deviceSettings": {
+		"title": "장치 설정",
+		"done": "완료",
+		"micLevel": "입력 레벨",
+		"micHint": "마이크를 테스트하려면 말해 보세요",
+		"noMicrophones": "마이크를 찾을 수 없습니다",
+		"preview": "미리 보기",
+		"previewUnavailable": "미리 보기를 사용할 수 없습니다",
+		"about": "정보",
+		"version": "버전 {{version}}",
+		"checkingForUpdates": "확인 중…"
+	}
+}

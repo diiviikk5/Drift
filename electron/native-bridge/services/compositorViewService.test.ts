@@ -25,7 +25,7 @@ describe("ffmpegSharedBinCandidates", () => {
 	let tmpRoot: string;
 
 	beforeEach(() => {
-		tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openscreen-ffmpeg-pin-test-"));
+		tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "drift-ffmpeg-pin-test-"));
 	});
 
 	afterEach(() => {
@@ -105,7 +105,7 @@ describe("buildCandidatePaths", () => {
 	let tmpRoot: string;
 
 	beforeEach(() => {
-		tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openscreen-addon-path-test-"));
+		tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "drift-addon-path-test-"));
 	});
 
 	afterEach(() => {
@@ -176,7 +176,7 @@ describe("CompositorViewService ffmpeg PATH prepend", () => {
 	let originalPlatform: PropertyDescriptor | undefined;
 
 	beforeEach(() => {
-		tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openscreen-compositor-test-"));
+		tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "drift-compositor-test-"));
 		originalPath = process.env.PATH;
 		originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
 		Object.defineProperty(process, "platform", { value: "win32", configurable: true });
@@ -256,7 +256,7 @@ describe("resolveSceneAssetPaths", () => {
 	const themed = CURSOR_THEMES.find((t) => t.assets.arrow);
 
 	beforeEach(() => {
-		resources = fs.mkdtempSync(path.join(os.tmpdir(), "openscreen-scene-assets-"));
+		resources = fs.mkdtempSync(path.join(os.tmpdir(), "drift-scene-assets-"));
 		fs.mkdirSync(path.join(resources, "wallpapers"), { recursive: true });
 		fs.writeFileSync(path.join(resources, "wallpapers", "wallpaper1.jpg"), "jpg");
 		const assetPaths = [

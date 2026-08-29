@@ -17,7 +17,7 @@ import { type ChildProcessWithoutNullStreams, execFile } from "node:child_proces
  * a parent that gave up first would kill a working save.
  *
  * It must stay above the helper's own shutdown ceiling
- * (`OPENSCREEN_WGC_STOP_BUDGET_MS`, 50s — see the stop sequence in
+ * (`DRIFT_WGC_STOP_BUDGET_MS`, 50s — see the stop sequence in
  * `electron/native/wgc-capture/src/main.cpp`), which is what guarantees the
  * helper always ends itself rather than being killed mid-finalize from here.
  * Raise one and raise the other.
@@ -101,7 +101,7 @@ export function readAbandonedStep(output: string) {
  * take the user can still edit beats losing the whole recording over one
  * device. What was missing was anyone listening: nothing read this event, so a
  * recording started WITH a camera came back without one, and without a word
- * (getopenscreen/openscreen#387).
+ * (getdrift/drift#387).
  *
  * A substring test and not a per-line parse, for the reason below.
  */
@@ -116,7 +116,7 @@ export function readWebcamUnavailable(output: string) {
  * It falls back rather than failing, which is right — a take with the wrong
  * microphone still holds the screen and the moment. But it used to fall back in
  * silence, and the only symptom was a recording that sounded wrong
- * (getopenscreen/openscreen#404).
+ * (getdrift/drift#404).
  */
 export function readMicrophoneDefaulted(output: string) {
 	return output.includes('"code":"microphone-defaulted"');

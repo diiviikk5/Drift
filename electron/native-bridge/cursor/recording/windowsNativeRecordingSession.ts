@@ -17,7 +17,7 @@ import type {
 } from "./windowsNativeRecordingSession.types";
 
 function getCursorSamplerCandidates(): string[] {
-	const envPath = process.env.OPENSCREEN_CURSOR_SAMPLER_EXE?.trim();
+	const envPath = process.env.DRIFT_CURSOR_SAMPLER_EXE?.trim();
 	const archTag = process.arch === "arm64" ? "win32-arm64" : "win32-x64";
 	const resolve = (...segs: string[]) => {
 		const p = join(app.getAppPath(), ...segs);

@@ -14,7 +14,7 @@
  * Foundation cannot see opened a different camera instead of falling through to
  * the provider that would have found the right one. The microphone side reached
  * the same place by the same road, "micro" sitting inside the "microphone" that
- * opens nearly every Windows endpoint name (getopenscreen/openscreen#404, #405).
+ * opens nearly every Windows endpoint name (getdrift/drift#404, #405).
  *
  * Dropping that tier costs nothing measurable: on the reporter's machine every
  * camera and microphone resolves at 800 or above without it. What it buys is

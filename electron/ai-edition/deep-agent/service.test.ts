@@ -30,14 +30,14 @@ import {
 import {
 	executeAgentTool,
 	isMutatingTool,
-	OPENSCREEN_TOOL_NAMES,
+	DRIFT_TOOL_NAMES,
 	PHANTOM_TOOL_NAMES,
 } from "../agent-tools";
 import {
 	anthropicCachingMiddleware,
 	buildSystemPrompt,
 	buildTools,
-	type OpenScreenAgentSink,
+	type DriftAgentSink,
 	SYSTEM_PROMPT,
 	TOOL_DESCRIPTIONS,
 } from "./service";
@@ -47,7 +47,7 @@ import {
 // stale at 19 tools — asserting a surface the product had outgrown. One list now,
 // in `agent-tools.ts`; this suite is what pins it to what `buildTools` actually
 // builds, and the bench reads the same array.
-const OPENSCREEN_TOOLS: readonly string[] = OPENSCREEN_TOOL_NAMES;
+const DRIFT_TOOLS: readonly string[] = DRIFT_TOOL_NAMES;
 const PHANTOM_TOOLS: readonly string[] = PHANTOM_TOOL_NAMES;
 
 /** Valid arguments for every tool, chosen so the executor's verdict is split
@@ -143,7 +143,7 @@ interface SinkEvent {
 	summary?: string;
 }
 
-function recordingSink(): { sink: OpenScreenAgentSink; events: SinkEvent[] } {
+function recordingSink(): { sink: DriftAgentSink; events: SinkEvent[] } {
 	const events: SinkEvent[] = [];
 	return {
 		events,
@@ -178,9 +178,9 @@ function toolsFor(document: AxcutDocument) {
 describe("the tool surface handed to the model", () => {
 	// No count in the title: the number moved twice without either copy of the
 	// roster following, and a title is the one place a stale number cannot fail.
-	it("is exactly the tools OpenScreen declares, in that order", () => {
+	it("is exactly the tools Drift declares, in that order", () => {
 		const { tools } = toolsFor(fixtureDocument());
-		expect(tools.map((t) => t.name)).toEqual(OPENSCREEN_TOOLS);
+		expect(tools.map((t) => t.name)).toEqual(DRIFT_TOOLS);
 	});
 
 	it("carries none of the tools deepagents used to inject", () => {
@@ -234,7 +234,7 @@ describe("prompt caching on the Anthropic-wire providers", () => {
 });
 
 describe("the sink announces each call exactly once, with the real verdict", () => {
-	for (const name of OPENSCREEN_TOOLS) {
+	for (const name of DRIFT_TOOLS) {
 		it(`${name}: one start, one end, ok from the executor`, async () => {
 			const document = fixtureDocument();
 			const args = ARGS[name];
@@ -256,7 +256,7 @@ describe("the sink announces each call exactly once, with the real verdict", () 
 
 	it("covers both verdicts, so a sink hard-coding ok:true could not pass", () => {
 		const document = fixtureDocument();
-		const verdicts = OPENSCREEN_TOOLS.map(
+		const verdicts = DRIFT_TOOLS.map(
 			(name) => executeAgentTool(document, name, JSON.stringify(ARGS[name])).ok,
 		);
 		expect(verdicts).toContain(true);
@@ -342,13 +342,13 @@ describe("one description of the tools, not two", () => {
 
 	it("the mutating flag production reads matches the tools that return a document", () => {
 		const document = fixtureDocument();
-		for (const name of OPENSCREEN_TOOLS) {
+		for (const name of DRIFT_TOOLS) {
 			const result = executeAgentTool(document, name, JSON.stringify(ARGS[name]));
 			// A read must never produce a document; a write that succeeded must.
 			if (!isMutatingTool(name)) expect(result.document, `${name} wrote`).toBeUndefined();
 			else if (result.ok) expect(result.document, `${name} returned nothing`).toBeDefined();
 		}
-		expect(OPENSCREEN_TOOLS.filter((n) => !isMutatingTool(n))).toEqual([
+		expect(DRIFT_TOOLS.filter((n) => !isMutatingTool(n))).toEqual([
 			"getCurrentDocument",
 			"getTranscript",
 			"getCursorTrack",
@@ -409,7 +409,7 @@ describe("the tools when the user has turned project edits off", () => {
 	it("still builds every one — the model has to be able to NAME the edit", () => {
 		const { sink } = recordingSink();
 		const tools: BuiltTool[] = buildTools({ current: fixtureDocument() }, sink, false);
-		expect(tools.map((t) => t.name)).toEqual(OPENSCREEN_TOOLS);
+		expect(tools.map((t) => t.name)).toEqual(DRIFT_TOOLS);
 	});
 
 	it("refuses every write through the tool, and the sink says so", async () => {
@@ -418,7 +418,7 @@ describe("the tools when the user has turned project edits off", () => {
 		const tools: BuiltTool[] = buildTools(holder, sink, false);
 		const before = holder.current;
 
-		for (const name of OPENSCREEN_TOOLS.filter((n) => isMutatingTool(n))) {
+		for (const name of DRIFT_TOOLS.filter((n) => isMutatingTool(n))) {
 			const tool = tools.find((t) => t.name === name);
 			if (!tool) throw new Error(`${name} is not built`);
 			const result = await tool.invoke(ARGS[name] ?? {});

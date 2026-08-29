@@ -1,0 +1,99 @@
+{
+	"tooltips": {
+		"hideHUD": "Ocultar HUD",
+		"closeApp": "Cerrar aplicación",
+		"restartRecording": "Reiniciar grabación",
+		"cancelRecording": "Cancelar grabación",
+		"pauseRecording": "Pausar grabación",
+		"resumeRecording": "Reanudar grabación",
+		"useVerticalTray": "Usar bandeja vertical",
+		"useHorizontalTray": "Usar bandeja horizontal",
+		"openStudio": "Abrir Studio",
+		"openNotes": "Abrir notas",
+		"openNotesPlaceholder": "Escribe tus notas aquí...",
+		"notesToolbar": {
+			"bold": "Negrita",
+			"italic": "Cursiva",
+			"strikethrough": "Tachado",
+			"bulletList": "Lista con viñetas",
+			"numberedList": "Lista numerada",
+			"blockquote": "Cita",
+			"codeBlock": "Bloque de código",
+			"play": "Iniciar desplazamiento automático",
+			"pause": "Pausar desplazamiento automático",
+			"speed": "Velocidad de desplazamiento",
+			"decreaseSpeed": "Reducir velocidad de desplazamiento",
+			"increaseSpeed": "Aumentar velocidad de desplazamiento",
+			"fontSize": "Tamaño de fuente",
+			"decreaseFontSize": "Reducir tamaño de fuente",
+			"increaseFontSize": "Aumentar tamaño de fuente",
+			"mirror": "Reflejar horizontalmente"
+		}
+	},
+	"audio": {
+		"enableSystemAudio": "Activar audio del sistema",
+		"disableSystemAudio": "Desactivar audio del sistema",
+		"enableMicrophone": "Activar micrófono",
+		"disableMicrophone": "Desactivar micrófono",
+		"defaultMicrophone": "Micrófono predeterminado",
+		"systemAudio": "Audio del sistema",
+		"microphone": "Micrófono",
+		"on": "Activado",
+		"off": "Desactivado",
+		"inputDevice": "Dispositivo de entrada"
+	},
+	"webcam": {
+		"enableWebcam": "Activar cámara web",
+		"disableWebcam": "Desactivar cámara web",
+		"defaultCamera": "Cámara predeterminada",
+		"searching": "Buscando...",
+		"noneFound": "No se encontró cámara",
+		"unavailable": "Cámara no disponible",
+		"camera": "Cámara",
+		"cameraDevice": "Dispositivo de cámara"
+	},
+	"cursor": {
+		"useEditableCursor": "Usar cursor editable",
+		"useSystemCursor": "Usar cursor del sistema"
+	},
+	"sourceSelector": {
+		"loading": "Cargando fuentes...",
+		"screens": "Pantallas ({{count}})",
+		"windows": "Ventanas ({{count}})",
+		"emptyTitle": "No se encontraron pantallas ni ventanas",
+		"emptyDescription": "Si acabas de conceder permiso de grabación de pantalla, recarga este selector. En macOS puede que debas volver a abrir Drift.",
+		"loadFailedDescription": "Drift no pudo cargar las fuentes de captura. Recarga este selector e inténtalo de nuevo.",
+		"defaultSourceName": "Pantalla"
+	},
+	"recording": {
+		"selectSource": "Por favor selecciona una fuente para grabar",
+		"systemPicker": "El sistema te preguntará qué compartir",
+		"inProgress": "Grabando",
+		"saving": "Guardando..."
+	},
+	"language": "Idioma",
+	"systemLanguagePrompt": {
+		"title": "¿Usar el idioma del sistema?",
+		"description": "Detectamos {{language}} como idioma de tu sistema. ¿Quieres cambiar Drift a {{language}}?",
+		"switch": "Cambiar a {{language}}",
+		"keepDefault": "Mantener idioma actual"
+	},
+	"softwareEncoderFallback": {
+		"title": "Se cambió a codificación por software",
+		"description": "El codificador GPU predeterminado no pudo iniciarse, por lo que Drift pasó a la codificación H.264 por software. La grabación debería continuar con normalidad, pero el uso de CPU puede ser mayor.",
+		"dismiss": "Entendido",
+		"dontShowAgain": "No volver a mostrar"
+	},
+	"deviceSettings": {
+		"title": "Ajustes de dispositivos",
+		"done": "Listo",
+		"micLevel": "Nivel de entrada",
+		"micHint": "Habla para probar tu micrófono",
+		"noMicrophones": "No se encontró ningún micrófono",
+		"preview": "Vista previa",
+		"previewUnavailable": "Vista previa no disponible",
+		"about": "Acerca de",
+		"version": "Versión {{version}}",
+		"checkingForUpdates": "Buscando…"
+	}
+}

@@ -1,0 +1,1758 @@
+/* Drift Editor v4 shell — Media / Edit / Rec modes.
+ * Ported 1:1 from design/Drift Editor v4.dc.html. All colors read the
+ * global --* design tokens (src/styles/design-tokens.css); dark is the hero
+ * look, light is a full token swap handled by the token layer. */
+
+.app {
+	display: grid;
+	/* Single column pinned to the window width. Without an explicit column the
+	   implicit `auto` track is sized to its widest row's content, so any wide
+	   child (e.g. a long clip's timeline) would stretch the grid past the window
+	   and push the top bar's right-side buttons off-screen. minmax(0,1fr) caps it. */
+	grid-template-columns: minmax(0, 1fr);
+	height: 100vh;
+	width: 100%;
+	min-width: 0;
+	background: var(--bg);
+	color: var(--fg);
+	font-family: var(--font-display);
+	font-size: 13px;
+	line-height: 1.5;
+	overflow: hidden;
+	-webkit-font-smoothing: antialiased;
+}
+/* rows set inline per mode (topbar / body / timeline) */
+
+/* ─── TOP BAR ──────────────────────────────────────────────────────── */
+/* Every slot on the left half is width-STABLE by construction: the chat toggle
+   reserves its box even in the modes that don't have one, the project name and
+   the save state are fixed-size regardless of the string inside them. Without
+   that, hiding a button, renaming a project or simply typing (saved → unsaved)
+   re-flowed the whole bar and slid the mode switch sideways. */
+.topbar {
+	grid-row: 1;
+	display: flex;
+	align-items: center;
+	gap: var(--topbar-gap);
+	--topbar-gap: 14px;
+	--topbar-icon: 32px;
+	--topbar-project-w: 180px;
+	/* Widest of the short locale labels — "PT-BR", and the CJK "简中". */
+	--topbar-lang-label-w: 38px;
+	/* The topbar doubles as the window titlebar, so it keeps clear of the native
+	   window controls: the macOS traffic lights (--titlebar-inset-left, injected
+	   per-platform by the main process) on the left, and the Windows/Linux Window
+	   Controls Overlay on the right. `titlebar-area-width` is 100vw minus the
+	   overlay; without an overlay both terms fall back to a plain 18px gutter. */
+	padding-left: calc(18px + var(--titlebar-inset-left, 0px));
+	padding-right: calc(
+		18px + 100vw - env(titlebar-area-width, 100vw) - env(titlebar-area-x, 0px)
+	);
+	background: transparent;
+	border-bottom: 1px solid var(--border-soft);
+	min-width: 0;
+	-webkit-app-region: drag;
+	app-region: drag;
+}
+.topbar button,
+.topbar input,
+.topbar select {
+	-webkit-app-region: no-drag;
+	app-region: no-drag;
+}
+.sep {
+	width: 1px;
+	height: 18px;
+	background: var(--border);
+	flex-shrink: 0;
+}
+/* Reserved box for the chat toggle and its rule. The toggle only exists in Edit
+   mode (the left panel doesn't render in Media/Rec), so without a slot holding
+   the space every mode change shoved the rest of the bar sideways. Width =
+   button + gap + rule, i.e. exactly what it holds when it is there. */
+.topbarLead {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--topbar-gap);
+	width: calc(var(--topbar-icon) + var(--topbar-gap) + 1px);
+	flex-shrink: 0;
+}
+.brand {
+	display: inline-flex;
+	align-items: center;
+	gap: 9px;
+	flex-shrink: 0;
+}
+/* Transparent aperture mark: no plate behind it, so it needs a touch more box
+   than a filled tile would to hold the same optical weight next to the wordmark. */
+.brand img {
+	width: 24px;
+	height: 24px;
+	object-fit: contain;
+	display: block;
+	flex-shrink: 0;
+	user-select: none;
+}
+.brand .name {
+	font-size: 15px;
+	font-weight: 600;
+	letter-spacing: -0.015em;
+	color: var(--fg-emphasis);
+}
+/* The brand doubles as the app-menu trigger, so it has to read as a button on hover without
+   gaining any width: .modeSwitch is the only flex-shrink:1 element in the bar, so every pixel
+   a new control costs is paid out of the mode labels in the most verbose of 13 locales. The
+   negative margin lets the hover plate bleed past the logo without moving it. */
+.brandBtn {
+	border: 0;
+	background: transparent;
+	cursor: pointer;
+	padding: 4px 7px;
+	margin: 0 -7px;
+	border-radius: 9px;
+	transition: background var(--motion-fast) var(--ease);
+}
+.brandBtn:hover,
+.brandBtn[aria-expanded="true"] {
+	background: var(--surface-2);
+}
+/* Rotates to point up while the menu is open, the standard disclosure affordance. Hidden from
+   assistive tech: aria-expanded on the button already carries the state. */
+.brandChevron {
+	color: var(--muted);
+	transition: transform var(--motion-fast) var(--ease);
+}
+.brandBtn[aria-expanded="true"] .brandChevron {
+	transform: rotate(180deg);
+}
+/* Anchor for the menu. Not a portal: a portalled surface leaves the .topbar subtree and with
+   it the `.topbar button { app-region: no-drag }` rule that is the ONLY thing keeping controls
+   in this bar clickable — the OS would eat the click as a window drag. LangButton in this same
+   file anchors inline for exactly that reason. */
+.appMenuAnchor {
+	position: relative;
+	display: inline-flex;
+	flex-shrink: 0;
+}
+.appMenu {
+	position: absolute;
+	top: calc(100% + 6px);
+	left: 0;
+	min-width: 232px;
+	/* The trigger sits 13px from the top of a 58px bar, so the menu's first 7px overlap the
+	   titlebar's drag region. Only `.topbar button` is opted out of dragging, and that strip is
+	   the menu's padding, not a row — without this a mousedown on it drags the window out from
+	   under the open menu. Belt and braces: it also covers any future row that is not a button. */
+	-webkit-app-region: no-drag;
+	app-region: no-drag;
+	padding: 5px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--r-md);
+	box-shadow: var(--elev-pop);
+	z-index: 60;
+}
+.appMenuRow {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	padding: 7px 9px;
+	border: 0;
+	background: transparent;
+	color: var(--fg-2);
+	border-radius: var(--r-sm);
+	cursor: pointer;
+	text-align: left;
+	font: 500 12.5px var(--font-body);
+	transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
+}
+.appMenuRow:hover,
+.appMenuRow:focus-visible {
+	background: var(--surface-2);
+	color: var(--fg);
+}
+.appMenuRow svg {
+	color: var(--muted);
+	flex-shrink: 0;
+}
+.appMenuRow:hover svg,
+.appMenuRow:focus-visible svg {
+	color: var(--fg);
+}
+/* Pushes the version to the right edge of the row it shares with "About". */
+.appMenuVersion {
+	margin-left: auto;
+	color: var(--muted);
+	font-variant-numeric: tabular-nums;
+	font-size: 11.5px;
+}
+.appMenuSep {
+	height: 1px;
+	margin: 5px 7px;
+	background: var(--border);
+}
+.iconBtn {
+	width: 32px;
+	height: 32px;
+	display: grid;
+	place-items: center;
+	border-radius: 9px;
+	color: var(--muted);
+	background: transparent;
+	border: 0;
+	cursor: pointer;
+	flex-shrink: 0;
+	transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
+}
+.iconBtn:hover {
+	background: var(--surface-2);
+	color: var(--fg);
+}
+.iconBtn:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+.iconBtn.on {
+	background: var(--accent-soft);
+	color: var(--accent);
+}
+.ghostBtn {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	height: 30px;
+	padding: 0 8px 0 10px;
+	border-radius: 9px;
+	background: transparent;
+	border: 1px solid transparent;
+	color: var(--fg-2);
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+	flex-shrink: 0;
+	transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
+}
+.ghostBtn:hover:not(:disabled) {
+	background: var(--surface-1);
+	border-color: var(--border);
+}
+.ghostBtn:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+/* The project name keeps one width whatever it is called — and the read view and
+   the edit input keep the SAME width, so clicking to rename doesn't nudge the
+   bar either. A long title truncates rather than pushing its neighbours. */
+.projectNameBtn {
+	width: var(--topbar-project-w);
+	justify-content: flex-start;
+	box-sizing: border-box;
+}
+.projectNameLabel {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.projectNameInput {
+	height: 30px;
+	width: var(--topbar-project-w);
+	box-sizing: border-box;
+	padding: 0 10px;
+	border-radius: 9px;
+	border: 1px solid var(--accent);
+	background: var(--surface);
+	color: var(--fg);
+	font: 500 13px var(--font-display);
+	outline: none;
+}
+/* Both states are rendered into the SAME grid cell, so the slot is as wide as
+   the longer of the two and never resizes when the document goes dirty — which
+   happens on every keystroke. Sizing to the longer string beats guessing a width:
+   "Saved"/"Unsaved" differ by 2 characters in English and by 4 in French, and a
+   hard-coded width would clip somewhere among the 13 locales. */
+.saved {
+	display: inline-grid;
+	grid-template-areas: "state";
+	align-items: center;
+	justify-items: start;
+	font-family: var(--font-mono);
+	font-size: 11px;
+	color: var(--muted);
+	flex-shrink: 0;
+}
+.savedState {
+	grid-area: state;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	white-space: nowrap;
+}
+/* visibility (not display) so the hidden state still contributes its width —
+   and stays out of the accessibility tree. */
+.savedState[data-on="false"] {
+	visibility: hidden;
+}
+.saved .dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--accent);
+	box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* One box for every short locale label — see --topbar-lang-label-w. Without it
+   the language button resized between "EN", "PT-BR" and the CJK "简中", moving
+   everything to its right. */
+.langShort {
+	width: var(--topbar-lang-label-w);
+	text-align: center;
+	font-family: var(--font-mono);
+	font-size: 11px;
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+/* mode switch (Media / Edit / Rec) */
+/* Three EQUAL columns, not three content-sized buttons. `1fr` tracks in an
+   intrinsically-sized grid all take the width of the widest one, so the trio
+   stays symmetrical in every locale — English "Rec" next to "Media", French
+   "Enregistrement" next to "Médias" — and the hover/selected plate is the same
+   box on all three. */
+.modeSwitch {
+	margin: 0 auto;
+	display: inline-grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	align-items: center;
+	gap: 2px;
+	padding: 3px;
+	background: var(--surface-1);
+	border: 1px solid var(--border);
+	border-radius: 11px;
+	/* The only shrinkable item in the bar (everything else is flex-shrink: 0), so
+	   a verbose locale — fr "Enregistrement" is nearly twice "Médias" — narrows
+	   this control instead of shoving Export off the edge of a 1200px window. The
+	   columns stay equal to each other while it happens; only the labels clip. */
+	flex-shrink: 1;
+	min-width: 0;
+}
+.modeSwitch button {
+	padding: 5px 14px;
+	white-space: nowrap;
+	border: 0;
+	border-radius: 7px;
+	background: transparent;
+	color: var(--muted);
+	font-size: 11.5px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
+	/* Label and a hidden BOLD copy of it share one cell. Selecting a tab switches
+	   the label to 600, which is wider than the 500 it was — enough to resize the
+	   widest column and shift the whole control. Reserving the bold width up front
+	   makes each button the same size selected, hovered or idle. */
+	display: grid;
+	grid-template-areas: "label";
+	/* minmax(0,…) so the cell can be narrower than the text: without it the inner
+	   column sizes to the label and the button just clips it mid-glyph, instead of
+	   letting the label ellipsise. */
+	grid-template-columns: minmax(0, 1fr);
+	place-items: center;
+	min-width: 0;
+	overflow: hidden;
+}
+.modeSwitch button::before {
+	content: attr(data-label);
+	grid-area: label;
+	font-weight: 600;
+	visibility: hidden;
+}
+.modeLabel {
+	grid-area: label;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.modeSwitch button[aria-selected="true"] {
+	background: var(--surface-3);
+	color: var(--fg-emphasis);
+	font-weight: 600;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.exportBtn {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	height: 32px;
+	padding: 0 14px;
+	border-radius: 9px;
+	background: var(--accent);
+	color: var(--accent-on);
+	border: 1px solid var(--accent);
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	flex-shrink: 0;
+	box-shadow: 0 2px 10px -3px var(--accent-soft);
+	transition: background var(--motion-fast) var(--ease);
+}
+.exportBtn:hover {
+	background: var(--brand-lo);
+}
+.exportBtn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* ─── BODY ─────────────────────────────────────────────────────────── */
+.body {
+	position: relative;
+	grid-row: 2;
+	display: grid;
+	min-height: 0;
+	min-width: 0;
+}
+/* ─── RESIZE HANDLES (chat panel width, timeline height) ───────────── */
+.chatResizeHandle {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 8px;
+	margin-left: -4px;
+	cursor: col-resize;
+	z-index: 30;
+	background: transparent;
+	touch-action: none;
+}
+.chatResizeHandle:hover {
+	background: var(--accent-soft);
+}
+.timelineResizeHandle {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 8px;
+	margin-top: -4px;
+	cursor: row-resize;
+	z-index: 30;
+	background: transparent;
+	touch-action: none;
+}
+.timelineResizeHandle:hover {
+	background: var(--accent-soft);
+}
+.agent {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	min-width: 0;
+	background: var(--surface);
+	border-right: 1px solid var(--border);
+	overflow: hidden;
+}
+.stage {
+	position: relative;
+	min-width: 0;
+	min-height: 0;
+	overflow: hidden;
+	background: radial-gradient(ellipse 68% 54% at 52% 32%, var(--surface-1) 0%, var(--bg) 66%);
+}
+
+/* ─── FLOATING INSPECTOR + FACET RAIL ──────────────────────────────── */
+/* Playback transport lives in the timeline header now (TransportBar, via
+   V4Timeline), not over the stage, so every facet gets the same tight
+   margin down to just above the timeline. */
+.inspectorWrap {
+	position: absolute;
+	top: 20px;
+	right: 20px;
+	bottom: 20px;
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	z-index: 20;
+	pointer-events: none;
+}
+.inspector {
+	pointer-events: auto;
+	width: 300px;
+	max-height: 100%;
+	display: flex;
+	flex-direction: column;
+	background: var(--surface-1);
+	border: 1px solid var(--border);
+	border-radius: 16px;
+	box-shadow: var(--elev-pop);
+	overflow: hidden;
+	backdrop-filter: blur(18px);
+	-webkit-backdrop-filter: blur(18px);
+}
+.inspector :global(.pane) {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+.facetRail {
+	pointer-events: auto;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	padding: 6px;
+	background: var(--surface-1);
+	border: 1px solid var(--border);
+	border-radius: 14px;
+	box-shadow: var(--elev-pop);
+	backdrop-filter: blur(18px);
+	-webkit-backdrop-filter: blur(18px);
+}
+.facetRail button {
+	width: 38px;
+	height: 38px;
+	display: grid;
+	place-items: center;
+	border-radius: 10px;
+	color: var(--muted);
+	background: transparent;
+	border: 0;
+	cursor: pointer;
+	transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
+}
+.facetRail button:hover {
+	background: var(--surface-3);
+	color: var(--fg);
+}
+.facetRail button[aria-pressed="true"] {
+	color: var(--accent);
+	background: var(--accent-soft);
+}
+
+/* ─── TIMELINE FOOTER ──────────────────────────────────────────────── */
+.timeline {
+	grid-row: 3;
+	position: relative;
+	background: var(--surface);
+	border-top: 1px solid var(--border);
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+/* ─── MEDIA STAGE ──────────────────────────────────────────────────── */
+.mediaStage {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	padding: 32px 48px;
+	overflow: hidden;
+}
+.mediaInner {
+	width: 100%;
+	margin: 0 auto;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	flex: 1;
+}
+.mediaSearchRow {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 16px;
+}
+.mediaSearchRow input {
+	flex: 1;
+	min-width: 0;
+	padding: 10px 14px;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	background: var(--surface-1);
+	outline: none;
+	font-size: 13px;
+	color: var(--fg-2);
+	font-family: var(--font-display);
+}
+.mediaCols {
+	display: flex;
+	gap: 24px;
+	min-height: 0;
+	flex: 1;
+	overflow: hidden;
+}
+.mediaListCol {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+.mediaGrid {
+	overflow-y: auto;
+	min-height: 0;
+	display: grid;
+	gap: 14px;
+	padding-bottom: 14px;
+	scrollbar-width: thin;
+	scrollbar-color: var(--border-hi) transparent;
+}
+.mediaCard {
+	display: flex;
+	flex-direction: column;
+	padding: 0;
+	border: 1.5px solid var(--border);
+	border-radius: 12px;
+	background: var(--surface);
+	overflow: hidden;
+	cursor: grab;
+	text-align: left;
+	transition: border-color var(--motion-fast) var(--ease);
+}
+.mediaCard:hover {
+	border-color: var(--border-hi);
+}
+.mediaCard.selected {
+	border-color: var(--accent);
+}
+.mediaThumb {
+	position: relative;
+	height: 84px;
+	display: grid;
+	place-items: center;
+	color: rgba(255, 255, 255, 0.9);
+}
+.mediaCardMeta {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	padding: 10px 12px;
+}
+.mediaCardMeta .body {
+	min-width: 0;
+	flex: 1;
+}
+.mediaCardName {
+	font-size: 12.5px;
+	font-weight: 600;
+	color: var(--fg);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.mediaCardStats {
+	display: flex;
+	justify-content: space-between;
+	gap: 8px;
+}
+.mediaCardStats .dur {
+	font-family: var(--font-mono);
+	font-size: 10.5px;
+	color: var(--muted);
+}
+.mediaCardStats .size {
+	font-family: var(--font-mono);
+	font-size: 10.5px;
+	color: var(--muted);
+}
+.mediaHint {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 7px;
+	padding: 7px 0 3px;
+	color: var(--meta);
+	font-size: 11.5px;
+}
+.importBtn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	margin-top: 8px;
+	padding: 13px;
+	border: 1px dashed var(--border-hi);
+	border-radius: 12px;
+	background: transparent;
+	color: var(--muted);
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: border-color var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+}
+.importBtn:hover {
+	border-color: var(--accent);
+	color: var(--accent);
+	background: var(--accent-wash);
+}
+.mediaDetail {
+	width: 400px;
+	flex-shrink: 0;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	padding: 20px 22px;
+	background: var(--surface-1);
+	border: 1px solid var(--border);
+	border-radius: 16px;
+	overflow-y: auto;
+	scrollbar-width: thin;
+	scrollbar-color: var(--border-hi) transparent;
+}
+
+/* ─── REC STAGE ────────────────────────────────────────────────────── */
+/* A settings panel sized for the editor's real estate — not a copy of the
+   floating HUD's small draggable pill toolbar (no drag handle, orientation
+   toggle, or collapse affordance; those only make sense on a cramped OS
+   overlay). Source/mic/camera state is read from the same cross-window
+   prefs bridge the HUD hook seeds itself from, so the two stay in sync. */
+.recStage {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	padding: 24px 28px;
+	gap: 14px;
+}
+.recCols {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: row;
+	align-items: stretch;
+	gap: 20px;
+}
+.recPreviewCol {
+	flex: 1;
+	min-width: 0;
+	min-height: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.recPreviewFrame {
+	position: relative;
+	width: 100%;
+	max-width: 720px;
+	aspect-ratio: 16 / 9;
+	margin: 0;
+	background: linear-gradient(135deg, #1a1c22, #0e0f14);
+	border-radius: 16px;
+	box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.75), 0 12px 28px -12px rgba(0, 0, 0, 0.5),
+		inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+	overflow: hidden;
+	display: grid;
+	place-items: center;
+}
+.recCameraVideo {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	transform: scaleX(-1);
+}
+.recPreviewPlaceholder {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	color: rgba(255, 255, 255, 0.45);
+	font-size: 13px;
+	font-weight: 500;
+}
+.recPreviewHint {
+	color: rgba(255, 255, 255, 0.3);
+	font-size: 11.5px;
+	font-weight: 400;
+}
+.recBadge {
+	position: absolute;
+	top: 16px;
+	left: 16px;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 12px 6px 8px;
+	border-radius: 9999px;
+	background: rgba(8, 10, 13, 0.5);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	color: #fff;
+	font-family: var(--font-mono);
+	font-size: 11px;
+}
+.recDot {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: var(--danger);
+}
+.recPanel {
+	width: 360px;
+	flex-shrink: 0;
+	min-height: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	background: var(--surface-1);
+	border: 1px solid var(--border);
+	border-radius: 16px;
+	overflow-y: auto;
+	scrollbar-width: thin;
+	scrollbar-color: var(--border-hi) transparent;
+}
+@media (max-width: 760px) {
+	.recCols {
+		flex-direction: column;
+		overflow-y: auto;
+	}
+	.recPreviewCol {
+		flex: 0 0 auto;
+	}
+	.recPanel {
+		width: 100%;
+	}
+}
+.recRow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 13px 16px;
+	border-bottom: 1px solid var(--border-soft);
+}
+.recRow:last-child {
+	border-bottom: 0;
+}
+.recRowLabel {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	color: var(--fg-2);
+	font-size: 13px;
+	font-weight: 500;
+}
+.recRowControl {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.recRowMuted {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--muted);
+	font-size: 12px;
+}
+.recRowSourceBtn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 32px;
+	padding: 0 12px;
+	border-radius: 9px;
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--fg);
+	font-size: 12.5px;
+	font-weight: 500;
+	cursor: pointer;
+	max-width: 220px;
+}
+.recRowSourceBtn > span,
+.recRowSourceBtn {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.recRowSourceBtn:hover {
+	border-color: var(--border-hi);
+	background: var(--surface-2);
+}
+.recSelect {
+	height: 32px;
+	max-width: 200px;
+	padding: 0 8px;
+	border-radius: 9px;
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--fg);
+	font-size: 12.5px;
+	cursor: pointer;
+}
+.recLevelMeter {
+	width: 56px;
+	height: 18px;
+}
+.recToggleBtn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 44px;
+	height: 28px;
+	padding: 0 10px;
+	border-radius: 8px;
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--muted);
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease),
+		border-color var(--motion-fast) var(--ease);
+}
+.recToggleBtn:hover {
+	border-color: var(--border-hi);
+}
+.recToggleBtn.on {
+	background: var(--accent-soft);
+	border-color: var(--accent-border);
+	color: var(--accent);
+}
+.recActions {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 10px;
+}
+.recActionsHint {
+	flex-shrink: 0;
+	text-align: center;
+	color: var(--muted);
+	font-size: 11.5px;
+	margin: -6px 0 0;
+}
+.recCancelBtn {
+	height: 44px;
+	padding: 0 18px;
+	border-radius: 12px;
+	border: 1px solid var(--border);
+	background: transparent;
+	color: var(--fg-2);
+	font-size: 13.5px;
+	font-weight: 500;
+	cursor: pointer;
+}
+.recCancelBtn:hover {
+	background: var(--surface-2);
+}
+.recMenu {
+	position: absolute;
+	bottom: 46px;
+	min-width: 210px;
+	background: var(--surface-1);
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	box-shadow: var(--elev-pop);
+	padding: 6px;
+	z-index: 30;
+}
+.recMenuRow {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 8px 10px;
+	border-radius: 8px;
+	border: 0;
+	background: transparent;
+	color: var(--fg-2);
+	font-size: 12.5px;
+	font-weight: 500;
+	cursor: pointer;
+	text-align: left;
+}
+.recMenuRow:hover:not(:disabled) {
+	background: var(--surface-2);
+}
+/* A gated row (e.g. Smart cuts before its transcript exists) still shows its
+   reason line, so it must not also light up as if it were clickable. */
+.recMenuRow:disabled {
+	cursor: not-allowed;
+}
+.recMenuRow.active {
+	background: var(--accent-soft);
+	color: var(--accent);
+}
+
+/* ─── REC-MODE SOURCE PICKER MODAL ──────────────────────────────────── */
+.sourceModalOverlay {
+	position: fixed;
+	inset: 0;
+	z-index: 100;
+	background: rgba(4, 5, 7, 0.6);
+	backdrop-filter: blur(3px);
+	-webkit-backdrop-filter: blur(3px);
+	display: grid;
+	place-items: center;
+	padding: 24px;
+}
+.sourceModalCard {
+	width: 660px;
+	max-width: 100%;
+	max-height: 86vh;
+	display: flex;
+	flex-direction: column;
+	background: var(--surface-1);
+	border: 1px solid var(--border-hi);
+	border-radius: 20px;
+	box-shadow: 0 40px 90px -20px rgba(0, 0, 0, 0.7), 0 8px 24px rgba(0, 0, 0, 0.5);
+	overflow: hidden;
+}
+.sourceModalTabs {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 14px;
+	border-bottom: 1px solid var(--border-soft);
+	flex-shrink: 0;
+}
+.sourceModalTab {
+	flex: 1;
+	height: 40px;
+	border-radius: 11px;
+	background: transparent;
+	border: 1px solid transparent;
+	color: var(--muted);
+	font-size: 13.5px;
+	font-weight: 500;
+	cursor: pointer;
+}
+.sourceModalTab.active {
+	background: var(--surface-3);
+	border-color: var(--border-hi);
+	color: var(--fg-emphasis);
+	font-weight: 600;
+}
+.sourceGrid {
+	overflow-y: auto;
+	padding: 18px 18px 6px;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 14px;
+	scrollbar-width: thin;
+	scrollbar-color: var(--border-hi) transparent;
+}
+.sourceModalEmpty {
+	grid-column: 1 / -1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 10px;
+	padding: 40px 16px;
+	color: var(--muted);
+	font-size: 12.5px;
+}
+.sourceCard {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	text-align: left;
+	background: var(--surface);
+	border: 1.5px solid var(--border);
+	border-radius: 14px;
+	overflow: hidden;
+	cursor: pointer;
+	padding: 0;
+	transition: border-color var(--motion-fast) var(--ease), box-shadow var(--motion-fast) var(--ease),
+		transform var(--motion-fast) var(--ease);
+}
+.sourceCard:hover {
+	border-color: var(--border-hi);
+	transform: translateY(-2px);
+}
+.sourceCard.active {
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.sourceCardThumb {
+	position: relative;
+	aspect-ratio: 16 / 10.5;
+	display: grid;
+	place-items: center;
+	background: #0a0c10;
+	color: var(--muted);
+	overflow: hidden;
+}
+.sourceCardThumb img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+.sourceCardName {
+	display: block;
+	padding: 9px 11px;
+	font-size: 12.5px;
+	font-weight: 600;
+	color: var(--fg-2);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.sourceModalFooter {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 10px;
+	padding: 16px 18px;
+	border-top: 1px solid var(--border-soft);
+	flex-shrink: 0;
+}
+.sourceModalCancelBtn {
+	height: 36px;
+	padding: 0 16px;
+	border-radius: 9px;
+	background: transparent;
+	border: 1px solid var(--border-hi);
+	color: var(--fg-2);
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+}
+.sourceModalCancelBtn:hover {
+	background: var(--surface-2);
+}
+
+.bigRecBtn {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	height: 52px;
+	padding: 0 26px;
+	border-radius: 16px;
+	border: 1px solid var(--accent);
+	color: var(--accent-on);
+	background: var(--accent);
+	font-size: 14px;
+	font-weight: 600;
+	cursor: pointer;
+	box-shadow: 0 4px 16px -4px var(--accent-soft);
+	transition: background var(--motion-fast) var(--ease);
+}
+.bigRecBtn:hover {
+	background: var(--brand-lo);
+}
+.bigRecBtn.recording {
+	border-color: var(--danger);
+	background: var(--danger);
+	color: #fff;
+}
+.bigRecDot {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background: #fff;
+}
+
+/* ─── V4Timeline — from-design timeline (footer of the v4 .dc.html) ─── */
+.tl {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	height: 100%;
+	overflow: hidden;
+	/* The playhead's head sits ENTIRELY above the ruler, its tip landing on the
+	   line's top edge — that's what keeps it clear of the tick labels below. It
+	   deliberately overshoots the timeline body by --playhead-head-overshoot, so
+	   it breaks past the toolbar's bottom rule and reads as floating OVER the
+	   timeline rather than as a shape cut off by it. What's left of its height is
+	   the gap the ruler needs below the body's top edge (--playhead-head-clear),
+	   which .tlRulerRow pads by; .tlPlayheadLayer pads by the full height and is
+	   pulled up by the overshoot, so both content boxes still start on the same
+	   line. Derive, don't hand-tune: only -w/-h/-overshoot should ever change. */
+	--playhead-head-w: 16px;
+	--playhead-head-h: 18px;
+	--playhead-head-overshoot: 4px;
+	--playhead-head-clear: calc(var(--playhead-head-h) - var(--playhead-head-overshoot));
+	/* The pan/zoom bar's band, kept here (not just on .tlNav) because the playhead
+	   layer stretches by exactly this much to run behind it, down to the panel's
+	   bottom edge. */
+	--tl-nav-h: 20px;
+	--tl-nav-gap-top: 8px;
+	--tl-nav-gap-bottom: 12px;
+	--tl-nav-band: calc(var(--tl-nav-h) + var(--tl-nav-gap-top) + var(--tl-nav-gap-bottom));
+}
+.tlToolbar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 0 16px;
+	height: 40px;
+	flex-shrink: 0;
+	border-bottom: 1px solid var(--border-soft);
+}
+.tlTools {
+	display: flex;
+	align-items: center;
+	gap: 1px;
+}
+.tlToolBtn {
+	width: 28px;
+	height: 28px;
+	display: grid;
+	place-items: center;
+	border: 0;
+	background: transparent;
+	color: var(--muted);
+	border-radius: 6px;
+	cursor: pointer;
+	transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
+}
+.tlToolBtn:hover {
+	background: var(--surface-3);
+	color: var(--fg);
+}
+/* Toggle tools (Auto-Focus) read their lit state off aria-pressed, so the styling can't
+   drift from what assistive tech announces. */
+.tlToolBtn[aria-pressed="true"] {
+	background: var(--accent-soft, var(--surface-3));
+	color: var(--accent, var(--fg));
+}
+.tlHints {
+	margin-left: auto;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.tlHint {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	height: 26px;
+	padding: 0 10px;
+	background: var(--surface-1);
+	border: 1px solid var(--border);
+	border-radius: 7px;
+	font-size: 11px;
+	font-weight: 500;
+	color: var(--muted);
+}
+.tlKbd {
+	font-family: var(--font-mono);
+	font-size: 10.5px;
+	font-weight: 600;
+	color: var(--fg-2);
+}
+/* Ruler + tracks live in one relative wrapper (between the toolbar and the zoom
+   bar) so a single playhead overlay can span both. */
+.tlBody {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+/* Fixed ruler header — the ruler ticks sit here, pinned right under the toolbar
+   so they move with the header (not with the scrolling tracks) when the panel is
+   resized. overflow:hidden clips the zoom-transformed canvas horizontally. Its
+   canvas is exactly as wide as .tlTracks' because the tracks scrollbar is hidden
+   (takes no width), so ticks stay aligned with the clips + playhead.
+   The top padding is the playhead head's clearance, not decoration: the head
+   hangs off the top of the line, so this gap is what the ruler content needs to
+   start below it. .tlPlayheadLayer is offset to match, so both content boxes
+   begin on the same line and the tick labels land under the head. */
+.tlRulerRow {
+	position: relative;
+	flex-shrink: 0;
+	padding: var(--playhead-head-clear) 20px 0;
+	overflow: hidden;
+	cursor: text;
+}
+.tlTracks {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+	/* Top padding lives on .tlRulerRow now; keep the sides + bottom gap here. */
+	padding: 0 20px 8px;
+	/* Horizontal zoom/pan is done by transforming .tlCanvas, so x stays clipped;
+	   y scrolls when the panel is too short to show every lane + the main track. */
+	overflow-x: hidden;
+	overflow-y: auto;
+	/* Hide the scrollbar so it NEVER consumes layout width. A space-taking
+	   scrollbar narrowed the content box only while visible, shifting the clips
+	   (and ruler/playhead) horizontally when it appeared and desyncing clicks from
+	   times. With it hidden, all three canvases stay full width and identical;
+	   scrolling still works via the wheel (see the wheel handler). */
+	scrollbar-width: none;
+	/* Bottom-anchor via column-reverse (the single child is .tlCanvas, so its
+	   internal lane→clip order is untouched): the main clip track sits at the
+	   bottom edge and stays visible as the panel shrinks, while the edit lanes
+	   above overflow the top and REMAIN reachable by scrolling up. `flex-end`
+	   would bottom-anchor too, but content it pushes past the top edge isn't
+	   scrollable — which is why the lanes couldn't be reached before. */
+	display: flex;
+	flex-direction: column-reverse;
+	cursor: text;
+}
+.tlTracks::-webkit-scrollbar {
+	display: none;
+}
+.tlCanvas {
+	position: relative;
+	min-width: 100%;
+	/* Keep natural height so .tlTracks (not the canvas) is what scrolls; without
+	   this the flex column would shrink the canvas and clip its own content. */
+	flex-shrink: 0;
+	will-change: transform, width;
+}
+/* Playhead overlay: absolutely covers the ruler + tracks, fixed vertically (a
+   cursor, so it doesn't scroll with the lanes). Same horizontal padding as the
+   canvases (and the tracks scrollbar is hidden, so equal width) → its transformed
+   line/head aligns exactly with ticks/clips. pointer-events pass through (except
+   the head) so scrubbing still works.
+   It is deliberately LARGER than .tlBody at both ends. Up top by the head's
+   overshoot, so the head isn't clipped where it breaks past the toolbar rule.
+   Down below by the whole pan/zoom band, so the line reaches the panel's bottom
+   edge instead of stopping at the tracks — it runs BEHIND the pan/zoom bar, which
+   lifts itself over the line with a higher z-index. No bottom padding, for the
+   same reason: any inset there leaves the line short of the clips as soon as the
+   lanes are scrolled up. */
+.tlPlayheadLayer {
+	position: absolute;
+	top: calc(-1 * var(--playhead-head-overshoot));
+	right: 0;
+	bottom: calc(-1 * var(--tl-nav-band));
+	left: 0;
+	padding: var(--playhead-head-h) 20px 0;
+	overflow: hidden;
+	pointer-events: none;
+	z-index: 6;
+}
+.tlPlayheadLayer .tlCanvas {
+	height: 100%;
+}
+/* One continuous line from the ruler down through the clips and on behind the
+   zoom/nav bar to the panel's bottom edge, with the draggable head at the top
+   (hanging above the ruler). */
+.tlPlayhead {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 2px;
+	background: var(--playhead);
+	border-radius: 1px;
+	/* Wide, soft halo: the line is only 2px, and this is what keeps it findable
+	   as it crosses dark lanes and pale clip cards alike. */
+	box-shadow: 0 0 18px var(--playhead-glow);
+	pointer-events: none;
+}
+/* Map-pin head: a rounded rectangle that tapers to a point at the bottom, the
+   point landing exactly on the top of the line (translate -100%). It therefore
+   sits wholly ABOVE the ruler and can't cover the tick labels.
+   The shape is border-radius ∩ clip-path: the polygon cuts the bottom into a
+   point while the radius keeps the two TOP corners round — a polygon alone
+   would give four hard corners, a radius alone no point. */
+.tlPlayheadHead {
+	position: absolute;
+	top: 0;
+	left: 50%;
+	transform: translate(-50%, -100%);
+	width: var(--playhead-head-w);
+	height: var(--playhead-head-h);
+	box-sizing: border-box;
+	background: var(--playhead);
+	border-radius: 4px;
+	/* 67% keeps the point ~6px tall whatever --playhead-head-h is; the extra
+	   height all goes to the rectangular top. */
+	clip-path: polygon(0% 0%, 100% 0%, 100% 67%, 50% 100%, 0% 67%);
+	filter: drop-shadow(0 1px 3px var(--playhead-shadow));
+}
+/* Ruler ticks are positioned absolutely at their real time, not spread evenly
+   by a flex row — that's what keeps a label under the frame it names once the
+   canvas is zoomed. Tick density is picked per zoom level in
+   V4Timeline#rulerTicks. */
+.tlRuler {
+	position: relative;
+	height: 28px;
+	margin-bottom: 6px;
+	border-bottom: 1px solid var(--border-soft);
+}
+/* Ticks hang from the TOP of the band and the label sits under them, so the
+   numbers are below the playhead head rather than behind it. */
+.tlTick {
+	position: absolute;
+	top: 0;
+	width: 1px;
+	height: 5px;
+	background: var(--border);
+}
+.tlTickMajor {
+	height: 9px;
+	background: var(--border-hi);
+}
+.tlTickLabel {
+	position: absolute;
+	top: 12px;
+	left: 50%;
+	transform: translateX(-50%);
+	font-family: var(--font-mono);
+	font-size: 10px;
+	color: var(--meta);
+	white-space: nowrap;
+	pointer-events: none;
+}
+.tlLane {
+	position: relative;
+	height: 24px;
+	margin-bottom: 5px;
+	border-radius: 6px;
+	background: var(--surface-1);
+}
+.laneEmpty {
+	position: absolute;
+	/* left/width come from V4Timeline (the visible window, not the whole zoomed
+	   canvas) — see renderPills. */
+	top: 0;
+	bottom: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 11px;
+	font-weight: 500;
+	/* Deliberately quieter than lane content: it's a standing hint on every empty
+	   lane, so at --muted five of them shout over the clips. */
+	color: var(--meta);
+	pointer-events: none;
+	user-select: none;
+}
+.lanePill {
+	position: absolute;
+	top: 1px;
+	height: 22px;
+	/* The ONLY floor on a pill's width, and it is in px so it is the same hairline
+	   at every zoom: the box's width is the effect's duration, full stop. A `%`
+	   minimum is a duration in disguise (the old 1.5% drew everything shorter than
+	   27 s as 27 s on a 30-minute timeline). */
+	min-width: 1px;
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 0 8px 0 7px;
+	border-radius: 6px;
+	border: 1.5px solid var(--accent);
+	background: var(--accent-soft);
+	color: var(--fg);
+	font-size: 11px;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	box-sizing: border-box;
+	cursor: grab;
+	z-index: 2;
+}
+.lanePill:active {
+	cursor: grabbing;
+}
+.lanePillSel {
+	box-shadow: 0 0 0 3px var(--accent-ring);
+}
+/* Narrower than its own chrome (PILL_HANDLES_MIN_PX): the handles mount OUTSIDE
+   the box instead of inside it, so overflow must not clip them away — there is
+   no content to clip at this width anyway (see pillAffordance/roomForLabel).
+   ::after widens the move target to reach the handles (PILL_MOVE_GAP_PX on each
+   side), which is what keeps a 1px pill grabbable without inflating the bar the
+   user is reading a duration off. */
+.lanePillCompact {
+	overflow: visible;
+	padding: 0;
+}
+.lanePillCompact::after {
+	content: "";
+	position: absolute;
+	inset: 0 -4px;
+}
+/* An outside handle sits on bare lane background, where a transparent grab strip
+   is undiscoverable — on hover it shows itself as a bar flanking the pill. */
+.lanePillCompact:hover .lanePillHandle {
+	background: color-mix(in oklch, currentColor 35%, transparent);
+	border-radius: 2px;
+}
+.lanePillLabel {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.laneAnnotation {
+	border-color: var(--annotation);
+	background: var(--annotation-wash);
+}
+.laneSpeed {
+	border-color: var(--speed);
+	background: var(--speed-wash);
+}
+.laneTrim {
+	border-color: var(--danger);
+	background: var(--danger-soft);
+}
+.laneZoom {
+	border-color: var(--accent);
+	background: var(--accent-soft);
+}
+.laneCameraFullscreen {
+	border-color: #a855f7;
+	background: rgba(168, 85, 247, 0.14);
+}
+.tlClips {
+	position: relative;
+	/* NOT a flex row. Clips are absolutely positioned by percentage of the
+	   timeline, like the pills, the ruler and the playhead above them.
+	   A flex row's `gap` is a fixed pixel amount inserted into a proportional
+	   layout: each junction pushed what followed 6px right while every clip
+	   shrank proportionally to pay for the gaps, so a clip's left edge landed off
+	   its true start time — measured at +2px and +6px for clips 2 and 3 of a
+	   three-clip timeline, which is 5 s and 15 s of a 30-minute recording when
+	   zoomed out, and a fraction of a second when zoomed in. See .tlClip. */
+	height: 66px;
+	width: 100%;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	text-align: left;
+	cursor: default;
+}
+.tlClipsDrag::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border: 2px dashed var(--accent);
+	border-radius: 11px;
+	background: var(--accent-wash);
+	pointer-events: none;
+}
+.tlClip {
+	/* left/width come from V4Timeline, in percent of the timeline. The 6px gutter
+	   that used to be a flex `gap` is now taken off each clip's own width, so it
+	   separates the cards without ever moving the next one: a clip's LEFT edge is
+	   its true start time at every zoom and every clip count.
+	   ponytail: the right edge therefore reads 6px short. Constant, non-cumulative
+	   and below the width of the border it sits next to; draw the separator inside
+	   the box (inset shadow, square-butted cards) if that ever needs to be exact. */
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	/* px, like .lanePill's: the gutter is subtracted from the clip's width, so a
+	   clip narrower than 6px would otherwise compute to nothing. */
+	min-width: 1px;
+	border-radius: 11px;
+	border: 1.5px solid var(--border);
+	background: var(--surface-1);
+	overflow: hidden;
+	cursor: grab;
+	box-sizing: border-box;
+	box-shadow: inset 0 1px 8px rgba(255, 255, 255, 0.06);
+	/* pointer-driven reorder: suppress native touch scroll + text selection */
+	touch-action: none;
+	user-select: none;
+	transition: box-shadow var(--motion-fast) var(--ease), opacity var(--motion-fast) var(--ease),
+		transform 150ms var(--ease);
+}
+.tlClipSel {
+	border-color: var(--accent);
+}
+/* The clip being carried during a reorder drag — follows the pointer 1:1
+   (no transition lag) while its siblings slide out of the way with the
+   base .tlClip transform transition above. */
+.tlClipDragging {
+	cursor: grabbing;
+	opacity: 0.9;
+	z-index: 5;
+	border-color: var(--accent);
+	box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5), inset 0 1px 8px rgba(255, 255, 255, 0.06);
+	transition: box-shadow var(--motion-fast) var(--ease), opacity var(--motion-fast) var(--ease);
+}
+.tlWave {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1px;
+	padding: 0 2px;
+	pointer-events: none;
+}
+.tlWave span {
+	flex: 1 1 0;
+	align-self: center;
+	min-height: 2px;
+	max-width: 2px;
+	border-radius: 2px;
+	background: var(--accent);
+}
+.tlClipLabel {
+	position: absolute;
+	left: 10px;
+	top: 8px;
+	z-index: 2;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	max-width: calc(100% - 50px);
+	padding: 3px 9px 3px 6px;
+	border-radius: 8px;
+	background: color-mix(in srgb, #080a0d 55%, transparent);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	backdrop-filter: blur(8px);
+	-webkit-backdrop-filter: blur(8px);
+}
+.tlClipIcon {
+	width: 16px;
+	height: 16px;
+	display: grid;
+	place-items: center;
+	border-radius: 5px;
+	background: var(--surface);
+	color: var(--fg);
+	flex-shrink: 0;
+}
+.tlClipName {
+	font-size: 11px;
+	font-weight: 500;
+	color: #fff;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.tlClipDelete {
+	position: absolute;
+	right: 8px;
+	top: 8px;
+	z-index: 2;
+	width: 26px;
+	height: 26px;
+	display: grid;
+	place-items: center;
+	border-radius: 7px;
+	/* The chip itself is a fixed dark frosted-glass overlay regardless of
+	   theme (it sits on top of an arbitrary video thumbnail), so its icon
+	   needs the "light text on a dark overlay" token, not --muted — which
+	   is tuned for the app's own light/dark surfaces and reads as
+	   near-invisible against this chip in light theme. */
+	color: var(--overlay-text);
+	background: color-mix(in srgb, #080a0d 55%, transparent);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	backdrop-filter: blur(8px);
+	-webkit-backdrop-filter: blur(8px);
+	cursor: pointer;
+	transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
+}
+.tlClipDelete:hover {
+	background: var(--danger-soft);
+	color: var(--danger);
+}
+.tlDropHint {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	border: 2px dashed var(--accent);
+	border-radius: 11px;
+	background: var(--accent-wash);
+	color: var(--accent);
+	font-size: 12.5px;
+	font-weight: 600;
+	pointer-events: none;
+}
+.tlNav {
+	position: relative;
+	height: var(--tl-nav-h);
+	margin: var(--tl-nav-gap-top) 20px var(--tl-nav-gap-bottom);
+	flex-shrink: 0;
+	/* Above .tlPlayheadLayer's z-index: the playhead line now runs the full height
+	   of the panel, and this bar is meant to sit ON TOP of it, not be crossed. */
+	z-index: 7;
+}
+.tlNavTrack {
+	position: absolute;
+	top: 7px;
+	left: 0;
+	right: 0;
+	height: 6px;
+	border-radius: 3px;
+	background: var(--surface-3);
+}
+.tlNavWindow {
+	position: absolute;
+	top: 5px;
+	height: 10px;
+	border-radius: 5px;
+	background: var(--surface-hi);
+	border: 1px solid var(--border-hi);
+	box-sizing: border-box;
+	cursor: grab;
+}
+.tlNavWindow:active {
+	cursor: grabbing;
+}
+.tlNavHandle {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 12px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: ew-resize;
+	z-index: 3;
+}
+.tlNavHandle span {
+	width: 4px;
+	height: 14px;
+	border-radius: 2px;
+	background: var(--fg-2);
+	box-shadow: 0 0 0 2px var(--surface);
+}
+
+/* V4Timeline — region resize handles, toolbar aspect control */
+.lanePillHandle {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 6px;
+	cursor: ew-resize;
+	z-index: 3;
+}
+.tlToolSep {
+	width: 1px;
+	height: 20px;
+	background: var(--border);
+	margin: 0 4px;
+}
+.tlAspect {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 28px;
+	padding: 0 9px;
+	border: 0;
+	background: transparent;
+	color: var(--fg-2);
+	font-size: 11.5px;
+	font-weight: 500;
+	border-radius: 7px;
+	cursor: pointer;
+	transition: background var(--motion-fast) var(--ease);
+}
+.tlAspect:hover {
+	background: var(--surface-3);
+}
+.tlAspect svg {
+	color: var(--muted);
+}
+
+/* V4Timeline — snap guide during region drag/resize */
+.tlSnapGuide {
+	position: absolute;
+	top: 0;
+	bottom: 66px;
+	width: 2px;
+	background: var(--danger);
+	box-shadow: 0 0 6px color-mix(in oklch, var(--danger) 60%, transparent);
+	pointer-events: none;
+	z-index: 14;
+}

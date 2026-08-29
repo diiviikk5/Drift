@@ -88,7 +88,7 @@ import { reindexRecordingOnDisk } from "../recording/webm-seek-index";
 import { registerNativeBridgeHandlers } from "./nativeBridge";
 import { RecordingStreamRegistry, registerRecordingStreamHandlers } from "./recordingStream";
 
-const PROJECT_FILE_EXTENSION = "openscreen";
+const PROJECT_FILE_EXTENSION = "drift";
 export const SHORTCUTS_FILE = path.join(app.getPath("userData"), "shortcuts.json");
 const RECORDING_FILE_PREFIX = "recording-";
 const RECORDING_SESSION_SUFFIX = ".session.json";
@@ -109,7 +109,7 @@ const nativeMacCaptureEvents = new EventEmitter();
 // Enumeration walks every display and window and grabs a thumbnail of each, so it
 // is allowed to be slow on a loaded machine. It is not allowed to be unbounded.
 // Deliberately above the CLI runner's own 20s bound, so the more specific message
-// there still wins for `openscreen sources`; this is the backstop for everything
+// there still wins for `drift sources`; this is the backstop for everything
 // else that calls get-sources.
 const GET_SOURCES_TIMEOUT_MS = 30_000;
 
@@ -422,7 +422,7 @@ async function getApprovedProjectSession(
 
 	// Packed/portable projects: when the stored absolute path no longer exists
 	// (project moved to another machine or directory), fall back to a file with
-	// the same basename next to the project file (see `openscreen pack`).
+	// the same basename next to the project file (see `drift pack`).
 	const resolveWithSiblingFallback = async (mediaPath: string): Promise<string> => {
 		if (!projectFilePath) return mediaPath;
 		const exists = await fs
@@ -511,7 +511,7 @@ export interface RecordingPrefs {
 	 * getUserMedia permission round-trip first, and an auto-started recording
 	 * beat it. The request then went out with no name at all, and the helper
 	 * answers that by recording the Windows default endpoint instead of the
-	 * microphone the user picked (getopenscreen/openscreen#404).
+	 * microphone the user picked (getdrift/drift#404).
 	 */
 	micDeviceName: string | null;
 	camEnabled: boolean;
@@ -914,7 +914,7 @@ function resolvePackagedResourcePath(...segments: string[]) {
 }
 
 function getNativeWindowsCaptureHelperCandidates() {
-	const envPath = process.env.OPENSCREEN_WGC_CAPTURE_EXE?.trim();
+	const envPath = process.env.DRIFT_WGC_CAPTURE_EXE?.trim();
 	const archTag = process.arch === "arm64" ? "win32-arm64" : "win32-x64";
 	return [
 		envPath,
@@ -950,9 +950,9 @@ async function findNativeWindowsCaptureHelperPath() {
 }
 
 function getNativeMacCaptureHelperCandidates() {
-	const envPath = process.env.OPENSCREEN_SCK_CAPTURE_EXE?.trim();
+	const envPath = process.env.DRIFT_SCK_CAPTURE_EXE?.trim();
 	const archTag = process.arch === "arm64" ? "darwin-arm64" : "darwin-x64";
-	const helperName = "openscreen-screencapturekit-helper";
+	const helperName = "drift-screencapturekit-helper";
 	return [
 		envPath,
 		resolveUnpackedAppPath("electron", "native", "screencapturekit", "build", helperName),
@@ -1680,7 +1680,7 @@ export async function exportDiagnosticFile(payload: {
 }) {
 	const { filePath, canceled } = await dialog.showSaveDialog({
 		title: "Save Diagnostic File",
-		defaultPath: `openscreen-diagnostic-${Date.now()}.json`,
+		defaultPath: `drift-diagnostic-${Date.now()}.json`,
 		filters: [{ name: "JSON", extensions: ["json"] }],
 	});
 
@@ -1748,7 +1748,7 @@ export function registerIpcHandlers(
 			}
 
 			// Screen recording has no askForMediaAccess equivalent, so trigger the
-			// TCC prompt without opening OpenScreen's source selector above it.
+			// TCC prompt without opening Drift's source selector above it.
 			if (status === "not-determined") {
 				const mainWin = getMainWindow();
 				if (mainWin && !mainWin.isDestroyed()) {
@@ -1784,7 +1784,7 @@ export function registerIpcHandlers(
 		// indefinite spinner into the pickers' existing error branch.
 		// How long it actually took, under the existing diagnostic flag. The bound
 		// above turned an indefinite hang into a named failure, which is where the
-		// open question starts rather than ends: on a headless runner `openscreen
+		// open question starts rather than ends: on a headless runner `drift
 		// sources` gets an answer within 20s four times in five while `record` --
 		// the same call with the same options -- exceeds 30s every time. A duration
 		// on both paths is what tells those apart; a threshold alone cannot.
@@ -1920,7 +1920,7 @@ export function registerIpcHandlers(
 			const detail =
 				access.status === "missing-helper"
 					? "The cursor helper couldn't be found in this build, so the editable cursor can't be enabled. Rebuild the native helper (npm run build:native:mac) or switch the HUD cursor mode to system."
-					: "Allow OpenScreen under System Settings → Privacy & Security → Accessibility, then press record again to start the countdown.";
+					: "Allow Drift under System Settings → Privacy & Security → Accessibility, then press record again to start the countdown.";
 			const messageOptions = {
 				type: "warning",
 				buttons: ["Open Accessibility Settings", "Cancel"],
@@ -1968,7 +1968,7 @@ export function registerIpcHandlers(
 					cancelId: 1,
 					message: "Screen Recording permission is required",
 					detail:
-						"Allow OpenScreen in macOS System Settings, then come back and choose a screen or window.",
+						"Allow Drift in macOS System Settings, then come back and choose a screen or window.",
 				} satisfies Electron.MessageBoxOptions;
 				const result =
 					mainWin && !mainWin.isDestroyed()
@@ -2421,7 +2421,7 @@ export function registerIpcHandlers(
 						: getSelectedDisplay();
 				const bounds = sourceDisplay?.bounds ?? getSelectedSourceBounds();
 				// `bounds` is DIPs; the helper matches it against physical monitor rects
-				// (getopenscreen/openscreen#346). Converted here, at the wire, and not in
+				// (getdrift/drift#346). Converted here, at the wire, and not in
 				// `getSelectedSourceBounds` — the cursor session shares that getter and
 				// converts on its own side.
 				const helperBounds = toHelperRect(bounds);
@@ -2434,7 +2434,7 @@ export function registerIpcHandlers(
 					: null;
 				const cursorCaptureMode =
 					normalizeCursorCaptureMode(request.cursor?.mode) ?? "editable-overlay";
-				const envPreferSoftwareEncoder = (process.env.OPENSCREEN_WGC_PREFER_SOFTWARE_ENCODER ?? "")
+				const envPreferSoftwareEncoder = (process.env.DRIFT_WGC_PREFER_SOFTWARE_ENCODER ?? "")
 					.trim()
 					.toLowerCase();
 				const preferSoftwareEncoder =
@@ -2500,7 +2500,7 @@ export function registerIpcHandlers(
 					cursor: { mode: cursorCaptureMode },
 					// Both spaces, deliberately: the helper's own errors quote the physical
 					// rect, and a report that only carried the DIP one would be read against
-					// numbers it never saw (getopenscreen/openscreen#346).
+					// numbers it never saw (getdrift/drift#346).
 					bounds: { dip: bounds, helper: helperBounds },
 					sourceId: selectedSource?.id ?? null,
 					usedDisplayMatch: Boolean(sourceDisplay),
@@ -2998,7 +2998,7 @@ export function registerIpcHandlers(
 					// read, and the preview compositor answers an unreadable camera by
 					// drawing the SCREEN recording inside the little camera rectangle —
 					// which is how a webcam that never recorded showed up as the desktop
-					// duplicated into its own corner (getopenscreen/openscreen#387).
+					// duplicated into its own corner (getdrift/drift#387).
 					const webcamStat = await fs.stat(preferredWebcamPath);
 					webcamVideoPath = webcamStat.size > 0 ? preferredWebcamPath : undefined;
 					if (!webcamVideoPath) {
@@ -3826,7 +3826,7 @@ export function registerIpcHandlers(
 					defaultPath: path.join(RECORDINGS_DIR, defaultName),
 					filters: [
 						{
-							name: mainT("dialogs", "fileDialogs.openscreenProject"),
+							name: mainT("dialogs", "fileDialogs.driftProject"),
 							extensions: [PROJECT_FILE_EXTENSION],
 						},
 						{ name: "JSON", extensions: ["json"] },
@@ -3870,7 +3870,7 @@ export function registerIpcHandlers(
 	async function loadProjectFile(projectFolder?: string): Promise<ProjectFileResult> {
 		try {
 			// Default to the projects directory, where the editor actually stores
-			// openable project files (one `.openscreen` per project). Prefer the user's
+			// openable project files (one `.drift` per project). Prefer the user's
 			// last opened-project folder if given and still valid; only fall back to
 			// RECORDINGS_DIR if the projects dir doesn't exist yet (fresh install).
 			// Validate here because the renderer can't stat the filesystem.
@@ -3903,8 +3903,8 @@ export function registerIpcHandlers(
 					defaultPath: defaultDir,
 					filters: [
 						{
-							name: mainT("dialogs", "fileDialogs.openscreenProject"),
-							// All projects are `.openscreen`; `.axcut` is kept only so files
+							name: mainT("dialogs", "fileDialogs.driftProject"),
+							// All projects are `.drift`; `.axcut` is kept only so files
 							// written by older builds (pre-migration) still show up.
 							extensions: [PROJECT_FILE_EXTENSION, "axcut"],
 						},

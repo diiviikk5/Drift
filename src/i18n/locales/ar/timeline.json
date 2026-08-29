@@ -1,0 +1,90 @@
+{
+	"buttons": {
+		"addZoom": "إضافة تكبير (Z)",
+		"suggestZooms": "اقتراح تكبير من المؤشر",
+		"autoZoomOn": "اقتراحات التكبير التلقائي مفعّلة — انقر لإزالة التكبيرات المقترحة",
+		"autoZoomOff": "اقتراحات التكبير التلقائي معطّلة — انقر لاقتراح تكبيرات من المؤشر",
+		"autoFocusAllOn": "التركيز التلقائي مفعّل لجميع التكبيرات — انقر للتبديل إلى يدوي للجميع",
+		"autoFocusAllOff": "تفعيل التركيز التلقائي لجميع التكبيرات (الكاميرا تتبع المؤشر)",
+		"addTrim": "إضافة قص (T)",
+		"addAnnotation": "إضافة شرح (A)",
+		"addSpeed": "إضافة سرعة (S)",
+		"addCameraFullscreen": "إضافة كاميرا كاملة الشاشة (C)"
+	},
+	"hints": {
+		"pressZoom": "اضغط Z لإضافة تكبير",
+		"pressTrim": "اضغط T لإضافة قص",
+		"pressAnnotation": "اضغط A لإضافة شرح",
+		"pressSpeed": "اضغط S لإضافة سرعة",
+		"pressCameraFullscreen": "اضغط C لإضافة مقطع كاميرا كاملة الشاشة"
+	},
+	"labels": {
+		"pan": "تحريك",
+		"zoom": "تكبير",
+		"trim": "قص",
+		"speed": "سرعة",
+		"zoomItem": "تكبير {{index}}",
+		"trimItem": "قص {{index}}",
+		"speedItem": "سرعة {{index}}",
+		"annotationItem": "شرح",
+		"imageItem": "صورة",
+		"emptyText": "نص فارغ",
+		"cameraFullscreen": "كاميرا كاملة الشاشة",
+		"cameraFullscreenItem": "كاميرا كاملة الشاشة {{index}}"
+	},
+	"emptyState": {
+		"noVideo": "لم يتم تحميل أي فيديو",
+		"dragAndDrop": "اسحب وأفلت مقطع فيديو لبدء التعديل"
+	},
+	"errors": {
+		"cannotPlaceZoom": "لا يمكن وضع التكبير هنا",
+		"zoomExistsAtLocation": "يوجد تكبير بالفعل في هذا الموقع أو لا توجد مساحة كافية متاحة.",
+		"zoomSuggestionUnavailable": "معالج اقتراح التكبير غير متوفر",
+		"noCursorTelemetry": "لا تتوفر بيانات قياس المؤشر",
+		"noCursorTelemetryDescription": "قم بتسجيل الشاشة أولاً لإنشاء اقتراحات بناءً على المؤشر.",
+		"noUsableTelemetry": "لا توجد بيانات قياس مؤشر قابلة للاستخدام",
+		"noUsableTelemetryDescription": "التسجيل لا يتضمن بيانات حركة مؤشر كافية.",
+		"noDwellMoments": "لم يتم العثور على لحظات توقف واضحة للمؤشر",
+		"noDwellMomentsDescription": "جرب تسجيلاً مع توقفات مؤشر أبطأ عند الإجراءات المهمة.",
+		"noAutoZoomSlots": "لا تتوفر خانات تكبير تلقائي",
+		"noAutoZoomSlotsDescription": "نقاط التوقف المكتشفة تتداخل مع مناطق التكبير الحالية.",
+		"cannotPlaceTrim": "لا يمكن وضع القص هنا",
+		"trimExistsAtLocation": "يوجد قص بالفعل في هذا الموقع أو لا توجد مساحة كافية متاحة.",
+		"cannotPlaceSpeed": "لا يمكن وضع السرعة هنا",
+		"speedExistsAtLocation": "توجد منطقة سرعة بالفعل في هذا الموقع أو لا توجد مساحة كافية متاحة.",
+		"cannotPlaceCameraFullscreen": "لا يمكن وضع الكاميرا الكاملة هنا",
+		"cameraFullscreenExistsAtLocation": "يوجد بالفعل مقطع كاميرا كاملة الشاشة في هذا الموقع أو لا توجد مساحة كافية متاحة."
+	},
+	"success": {
+		"addedZoomSuggestions": "تمت إضافة {{count}} اقتراح تكبير بناءً على المؤشر",
+		"addedZoomSuggestionsPlural": "تمت إضافة {{count}} اقتراحات تكبير بناءً على المؤشر"
+	},
+	"toolbar": {
+		"autoEnhance": "تحسين تلقائي",
+		"automaticZooms": "تكبيرات تلقائية",
+		"automaticZoomsHint": "من حركة المؤشر المسجلة",
+		"smartZoomsAndCuts": "قصات ذكية",
+		"smartZoomsAndCutsHint": "باستخدام الذكاء الاصطناعي",
+		"comment": "تعليق",
+		"timelineTools": "أدوات المخطط الزمني",
+		"arrangeClips": "ترتيب المقاطع",
+		"arrangeClipsHint": "اسحب المقاطع أدناه لإعادة ترتيبها أو إسقاط مقاطع جديدة",
+		"newAnnotation": "شرح",
+		"dragToReorderHint": "اسحب لإعادة الترتيب · انقر نقرًا مزدوجًا لتعديل نقطتي البداية والنهاية",
+		"editInOutPoints": "تعديل نقطتي البداية والنهاية",
+		"deleteClip": "حذف المقطع",
+		"dropToAdd": "أفلت للإضافة إلى المخطط الزمني",
+		"importRecordingFirst": "استورد تسجيلاً أولاً",
+		"noAutoZoomMoments": "لم يتم العثور على لحظات تكبير تلقائي",
+		"noAutoZoomMomentsDescription": "لا يحتوي هذا التسجيل على بيانات حركة مؤشر، أو أن التكبيرات الحالية تغطي بالفعل اللحظات المزدحمة.",
+		"addedAutoZoom": "تمت إضافة {{count}} تكبير تلقائي",
+		"addedAutoZoomPlural": "تمت إضافة {{count}} تكبيرات تلقائية",
+		"autoZoomFailed": "فشل التكبير التلقائي",
+		"aiEnhanceRequested": "طُلب من وكيل الذكاء الاصطناعي قص الأوقات الميتة",
+		"smartCutsWaiting": "جارٍ النسخ… سيكون جاهزًا بعد قليل",
+		"smartCutsNeedsTranscript": "يتطلب نصًا منسوخًا",
+		"smartCutsNoAudio": "لا يحتوي هذا الملف على صوت",
+		"smartCutsNoSpeech": "لم يتم اكتشاف كلام",
+		"smartCutsFailed": "فشل النسخ — أعد المحاولة من قسم الوسائط"
+	}
+}

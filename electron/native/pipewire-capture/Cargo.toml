@@ -1,4 +1,4 @@
-# OpenScreen Linux capture helper (PipeWire + xdg-desktop-portal).
+# Drift Linux capture helper (PipeWire + xdg-desktop-portal).
 #
 # WHY IT LIVES HERE AND NOT IN crates/.
 #
@@ -23,7 +23,7 @@
 # so that a future root Cargo.toml cannot silently adopt it.
 
 [package]
-name = "openscreen-pipewire-helper"
+name = "drift-pipewire-helper"
 version = "0.0.0"
 edition = "2021"
 publish = false
@@ -32,7 +32,7 @@ license = "MIT"
 [workspace]
 
 [[bin]]
-name = "openscreen-pipewire-helper"
+name = "drift-pipewire-helper"
 path = "src/main.rs"
 
 [dependencies]

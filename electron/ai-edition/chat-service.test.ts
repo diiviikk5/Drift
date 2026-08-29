@@ -160,7 +160,7 @@ describe("runTimelineOperation", () => {
 	// the media-links directory is ever read and no directory is created.
 	class StubDocumentService extends DocumentService {
 		constructor(readonly file: { stored: AxcutDocument | undefined }) {
-			const unused = path.join(tmpdir(), "openscreen-chat-service-test-unused");
+			const unused = path.join(tmpdir(), "drift-chat-service-test-unused");
 			super(unused, unused);
 		}
 

@@ -1,0 +1,41 @@
+{
+	"title": "Klavye Kısayolları",
+	"customize": "Özelleştir",
+	"configurable": "Yapılandırılabilir",
+	"fixed": "Sabit",
+	"pressKey": "Bir tuşa basın…",
+	"clickToChange": "Değiştirmek için tıklayın",
+	"pressEscToCancel": "İptal etmek için Esc tuşuna basın",
+	"helpText": "Bir kısayola tıklayın, ardından yeni tuş kombinasyonuna basın. İptal etmek için Esc tuşuna basın.",
+	"resetToDefaults": "Varsayılanlara sıfırla",
+	"alreadyUsedBy": "\"{{action}}\" tarafından zaten kullanılıyor",
+	"swap": "Değiştir",
+	"reservedShortcut": "Bu kısayol \"{{label}}\" için ayrılmıştır ve yeniden atanamaz.",
+	"savedToast": "Klavye kısayolları kaydedildi",
+	"resetToast": "Varsayılan kısayollara sıfırlandı — uygulamak için Kaydet'e tıklayın",
+	"registrationFailed": "Kısayol kaydedilemedi. Başka bir uygulama tarafından kullanılıyor olabilir. Farklı bir tuş deneyin.",
+	"actions": {
+		"openApp": "Uygulamayı Aç",
+		"addZoom": "Yakınlaştırma Ekle",
+		"addTrim": "Kırpma Ekle",
+		"addSpeed": "Hız Ekle",
+		"addAnnotation": "Açıklama Ekle",
+		"addKeyframe": "Anahtar Kare Ekle",
+		"addCameraFullscreen": "Tam Ekran Kamera Ekle",
+		"deleteSelected": "Seçileni Sil",
+		"playPause": "Oynat / Duraklat",
+		"copySelected": "Seçileni Kopyala",
+		"paste": "Yapıştır"
+	},
+	"fixedActions": {
+		"undo": "Geri Al",
+		"redo": "Yinele",
+		"cycleAnnotationsForward": "Açıklamalar Arasında İleri Geç",
+		"cycleAnnotationsBackward": "Açıklamalar Arasında Geri Geç",
+		"deleteSelectedAlt": "Seçileni Sil (alternatif)",
+		"panTimeline": "Zaman Çizelgesini Kaydır",
+		"zoomTimeline": "Zaman Çizelgesini Yakınlaştır",
+		"frameBack": "Önceki Kare",
+		"frameForward": "Sonraki Kare"
+	}
+}

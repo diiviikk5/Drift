@@ -47,11 +47,11 @@ type MacCursorEvent =
 			leftButtonReleased?: boolean;
 	  };
 
-const HELPER_NAME = "openscreen-macos-cursor-helper";
+const HELPER_NAME = "drift-macos-cursor-helper";
 const READY_TIMEOUT_MS = 5_000;
 
 function helperCandidates() {
-	const envPath = process.env.OPENSCREEN_MAC_CURSOR_HELPER_EXE?.trim();
+	const envPath = process.env.DRIFT_MAC_CURSOR_HELPER_EXE?.trim();
 	const appRoot = process.env.APP_ROOT ? path.resolve(process.env.APP_ROOT) : process.cwd();
 	const archTag = process.arch === "arm64" ? "darwin-arm64" : "darwin-x64";
 	const resourceRoot =

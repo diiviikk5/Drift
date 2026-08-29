@@ -13,7 +13,7 @@ function probe(overrides: Partial<InstallProbe> = {}): InstallProbe {
 	return {
 		platform: "linux",
 		isPackaged: true,
-		execPath: "/opt/Openscreen/openscreen",
+		execPath: "/opt/Openscreen/drift",
 		windowsStore: false,
 		env: {},
 		hasFlatpakInfo: false,
@@ -42,14 +42,14 @@ describe("classifyInstall", () => {
 
 	it("classifies the channels a package manager owns", () => {
 		expect(classifyInstall(probe({ platform: "win32", windowsStore: true }))).toBe("store");
-		expect(classifyInstall(probe({ env: { FLATPAK_ID: "com.getopenscreen.OpenScreen" } }))).toBe(
+		expect(classifyInstall(probe({ env: { FLATPAK_ID: "com.getdrift.Drift" } }))).toBe(
 			"flatpak",
 		);
 		expect(classifyInstall(probe({ hasFlatpakInfo: true }))).toBe("flatpak");
 		expect(
-			classifyInstall(probe({ env: { SNAP: "/snap/openscreen/42", SNAP_REVISION: "42" } })),
+			classifyInstall(probe({ env: { SNAP: "/snap/drift/42", SNAP_REVISION: "42" } })),
 		).toBe("snap");
-		expect(classifyInstall(probe({ execPath: "/nix/store/abc-openscreen/bin/openscreen" }))).toBe(
+		expect(classifyInstall(probe({ execPath: "/nix/store/abc-drift/bin/drift" }))).toBe(
 			"nix",
 		);
 	});
@@ -65,7 +65,7 @@ describe("classifyInstall", () => {
 		).toBe("snap");
 		expect(
 			classifyInstall(
-				probe({ execPath: "/nix/store/x/bin/openscreen", env: { APPIMAGE: "/x.AppImage" } }),
+				probe({ execPath: "/nix/store/x/bin/drift", env: { APPIMAGE: "/x.AppImage" } }),
 			),
 		).toBe("nix");
 		// The Microsoft Store build is still a win32 packaged app; without the check it is "nsis".

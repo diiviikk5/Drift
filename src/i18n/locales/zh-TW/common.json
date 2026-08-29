@@ -1,0 +1,69 @@
+{
+	"actions": {
+		"cancel": "取消",
+		"save": "儲存",
+		"delete": "刪除",
+		"close": "關閉",
+		"share": "分享",
+		"done": "完成",
+		"open": "開啟",
+		"checkForUpdates": "檢查更新",
+		"viewRelease": "檢視版本",
+		"downloadUpdate": "下載更新",
+		"restartNow": "立即重新啟動",
+		"upload": "上傳",
+		"export": "匯出",
+		"showInFolder": "在資料夾中顯示",
+		"file": "檔案",
+		"edit": "編輯",
+		"view": "檢視",
+		"window": "視窗",
+		"help": "說明",
+		"quit": "退出",
+		"stopRecording": "停止錄製",
+		"undo": "復原",
+		"redo": "重做",
+		"cut": "剪下",
+		"copy": "複製",
+		"paste": "貼上",
+		"selectAll": "全選",
+		"minimize": "最小化",
+		"reload": "重新載入",
+		"forceReload": "強制重新載入",
+		"toggleDevTools": "切換開發者工具",
+		"actualSize": "實際大小",
+		"zoomIn": "放大",
+		"zoomOut": "縮小",
+		"toggleFullScreen": "切換全螢幕",
+		"recordingStatus": "錄製中：{{source}}",
+		"about": "關於 Drift",
+		"services": "服務",
+		"hide": "隱藏 Drift",
+		"hideOthers": "隱藏其他",
+		"unhide": "全部顯示",
+		"saveDiagnostics": "儲存診斷資料"
+	},
+	"updates": {
+		"available": "Drift {{latestVersion}} 已推出。目前版本為 {{currentVersion}}。",
+		"current": "Drift 已是最新版本（{{currentVersion}}）。",
+		"readyToInstall": "Drift {{latestVersion}} 已下載完成。請重新啟動以完成安裝。",
+		"blockedRecording": "請先結束錄影，再安裝更新。",
+		"blockedLocation": "更新前請將 Drift 移至「應用程式」資料夾。",
+		"failed": "無法檢查更新。",
+		"downloadFailed": "無法下載更新。"
+	},
+	"units": {
+		"pixelsPerSecond": "{{value}} 像素/秒",
+		"pixels": "{{value}} 像素"
+	},
+	"locale": {
+		"name": "繁體中文",
+		"short": "繁中"
+	},
+	"recordingSource": {
+		"window": "視窗",
+		"screen": "螢幕",
+		"virtual": "虛擬顯示器",
+		"unknown": "螢幕錄製"
+	}
+}

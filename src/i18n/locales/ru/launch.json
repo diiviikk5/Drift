@@ -1,0 +1,99 @@
+{
+	"tooltips": {
+		"hideHUD": "Скрыть HUD",
+		"closeApp": "Закрыть приложение",
+		"restartRecording": "Перезапустить запись",
+		"cancelRecording": "Отменить запись",
+		"pauseRecording": "Приостановить запись",
+		"resumeRecording": "Возобновить запись",
+		"useVerticalTray": "Использовать вертикальную панель",
+		"useHorizontalTray": "Использовать горизонтальную панель",
+		"openStudio": "Открыть студию",
+		"openNotes": "Открыть заметки",
+		"openNotesPlaceholder": "Пишите заметки здесь...",
+		"notesToolbar": {
+			"bold": "Жирный",
+			"italic": "Курсив",
+			"strikethrough": "Зачеркнутый",
+			"bulletList": "Маркированный список",
+			"numberedList": "Нумерованный список",
+			"blockquote": "Цитата",
+			"codeBlock": "Блок кода",
+			"play": "Запустить автопрокрутку",
+			"pause": "Приостановить автопрокрутку",
+			"speed": "Скорость прокрутки",
+			"decreaseSpeed": "Уменьшить скорость прокрутки",
+			"increaseSpeed": "Увеличить скорость прокрутки",
+			"fontSize": "Размер шрифта",
+			"decreaseFontSize": "Уменьшить размер шрифта",
+			"increaseFontSize": "Увеличить размер шрифта",
+			"mirror": "Отразить по горизонтали"
+		}
+	},
+	"audio": {
+		"enableSystemAudio": "Включить системное аудио",
+		"disableSystemAudio": "Отключить системное аудио",
+		"enableMicrophone": "Включить микрофон",
+		"disableMicrophone": "Отключить микрофон",
+		"defaultMicrophone": "Микрофон по умолчанию",
+		"systemAudio": "Системный звук",
+		"microphone": "Микрофон",
+		"on": "Вкл",
+		"off": "Выкл",
+		"inputDevice": "Устройство ввода"
+	},
+	"webcam": {
+		"enableWebcam": "Включить веб-камеру",
+		"disableWebcam": "Отключить веб-камеру",
+		"defaultCamera": "Камера по умолчанию",
+		"searching": "Поиск...",
+		"noneFound": "Камера не найдена",
+		"unavailable": "Камера недоступна",
+		"camera": "Камера",
+		"cameraDevice": "Устройство камеры"
+	},
+	"sourceSelector": {
+		"loading": "Загрузка источников...",
+		"screens": "Экраны ({{count}})",
+		"windows": "Окна ({{count}})",
+		"emptyTitle": "Экраны или окна не найдены",
+		"emptyDescription": "Если вы только что предоставили разрешение на запись экрана, перезагрузите этот выбор источника. На macOS может потребоваться заново открыть Drift.",
+		"loadFailedDescription": "Drift не удалось загрузить источники захвата. Перезагрузите этот выбор источника и попробуйте снова.",
+		"defaultSourceName": "Экран"
+	},
+	"recording": {
+		"selectSource": "Пожалуйста, выберите источник для записи",
+		"systemPicker": "Система спросит, чем поделиться",
+		"inProgress": "Идёт запись",
+		"saving": "Сохранение..."
+	},
+	"language": "Язык",
+	"systemLanguagePrompt": {
+		"title": "Использовать системный язык?",
+		"description": "Мы обнаружили {{language}} как системный язык. Хотите переключить Drift на {{language}}?",
+		"switch": "Переключить на {{language}}",
+		"keepDefault": "Оставить текущий язык"
+	},
+	"cursor": {
+		"useEditableCursor": "Использовать редактируемый курсор",
+		"useSystemCursor": "Использовать системный курсор"
+	},
+	"softwareEncoderFallback": {
+		"title": "Выполнен переход на программное кодирование",
+		"description": "Стандартный GPU-кодировщик не запустился, поэтому Drift перешёл на программное кодирование H.264. Запись продолжится как обычно, но нагрузка на процессор может быть выше.",
+		"dismiss": "Понятно",
+		"dontShowAgain": "Больше не показывать"
+	},
+	"deviceSettings": {
+		"title": "Настройки устройств",
+		"done": "Готово",
+		"micLevel": "Уровень входа",
+		"micHint": "Скажите что-нибудь, чтобы проверить микрофон",
+		"noMicrophones": "Микрофон не найден",
+		"preview": "Предпросмотр",
+		"previewUnavailable": "Предпросмотр недоступен",
+		"about": "О программе",
+		"version": "Версия {{version}}",
+		"checkingForUpdates": "Проверка…"
+	}
+}

@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	ANTHROPIC_API_MAX_OUTPUT_TOKENS,
-	createOpenScreenChatModel,
+	createDriftChatModel,
 	messageContentToText,
 	messageContentToThinking,
 } from "./chat-model";
@@ -18,9 +18,9 @@ function clientConfig(model: unknown): Record<string, unknown> {
 	return (model as { clientConfig?: Record<string, unknown> }).clientConfig ?? {};
 }
 
-describe("createOpenScreenChatModel — provider aliases", () => {
+describe("createDriftChatModel — provider aliases", () => {
 	it("routes the `claude` alias to the Anthropic SDK, not the OpenAI fallback", async () => {
-		const model = await createOpenScreenChatModel({
+		const model = await createDriftChatModel({
 			provider: "claude",
 			model: "claude-sonnet-4-5",
 			apiKey: "sk-ant-test",
@@ -29,7 +29,7 @@ describe("createOpenScreenChatModel — provider aliases", () => {
 	});
 
 	it("routes the `gemini` alias to the Google OpenAI-compat base URL", async () => {
-		const model = await createOpenScreenChatModel({
+		const model = await createDriftChatModel({
 			provider: "gemini",
 			model: "gemini-2.5-pro",
 			apiKey: "test-key",
@@ -40,7 +40,7 @@ describe("createOpenScreenChatModel — provider aliases", () => {
 	});
 });
 
-describe("createOpenScreenChatModel — Anthropic-wire output budget", () => {
+describe("createDriftChatModel — Anthropic-wire output budget", () => {
 	// Regression for #181: ChatAnthropic's default maxTokens table only knows
 	// Claude slugs (16k); anything else — MiniMax-M3 included — falls back to
 	// 4096. With adaptive thinking on, a cold-start turn can spend that whole
@@ -52,7 +52,7 @@ describe("createOpenScreenChatModel — Anthropic-wire output budget", () => {
 
 	for (const provider of ["minimax", "minimax-token-plan"]) {
 		it(`sets an explicit maxTokens on the ${provider} ChatAnthropic`, async () => {
-			const model = await createOpenScreenChatModel({
+			const model = await createDriftChatModel({
 				provider,
 				model: "MiniMax-M3",
 				apiKey: "test-key",
@@ -63,7 +63,7 @@ describe("createOpenScreenChatModel — Anthropic-wire output budget", () => {
 	}
 
 	it("floors maxTokens for non-Claude models on the anthropic provider", async () => {
-		const model = await createOpenScreenChatModel({
+		const model = await createDriftChatModel({
 			provider: "anthropic",
 			model: "some-self-hosted-model",
 			apiKey: "sk-ant-test",
@@ -75,14 +75,14 @@ describe("createOpenScreenChatModel — Anthropic-wire output budget", () => {
 	it("keeps LangChain's per-model default for known Claude slugs", async () => {
 		// claude-3-haiku's hard output limit is 4096 — overriding it with 16k
 		// would make the API reject every request for this model.
-		const legacy = await createOpenScreenChatModel({
+		const legacy = await createDriftChatModel({
 			provider: "anthropic",
 			model: "claude-3-haiku-20240307",
 			apiKey: "sk-ant-test",
 		});
 		expect(maxTokens(legacy)).toBe(4096);
 
-		const current = await createOpenScreenChatModel({
+		const current = await createDriftChatModel({
 			provider: "anthropic",
 			model: "claude-haiku-4-5",
 			apiKey: "sk-ant-test",

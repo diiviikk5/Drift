@@ -1,0 +1,90 @@
+{
+	"buttons": {
+		"addZoom": "添加缩放 (Z)",
+		"suggestZooms": "根据光标建议缩放",
+		"autoZoomOn": "自动缩放建议已开启 — 点击可移除建议的缩放",
+		"autoZoomOff": "自动缩放建议已关闭 — 点击可根据光标建议缩放",
+		"autoFocusAllOn": "所有缩放的自动对焦已开启 — 点击可将全部切换为手动",
+		"autoFocusAllOff": "为所有缩放开启自动对焦（摄像头跟随光标）",
+		"addTrim": "添加剪辑 (T)",
+		"addAnnotation": "添加标注 (A)",
+		"addSpeed": "添加速度 (S)",
+		"addCameraFullscreen": "添加全屏摄像头 (C)"
+	},
+	"hints": {
+		"pressZoom": "按 Z 添加缩放",
+		"pressTrim": "按 T 添加剪辑",
+		"pressAnnotation": "按 A 添加标注",
+		"pressSpeed": "按 S 添加速度",
+		"pressCameraFullscreen": "按 C 添加一个全屏摄像头片段"
+	},
+	"labels": {
+		"pan": "平移",
+		"zoom": "缩放",
+		"trim": "剪辑",
+		"speed": "速度",
+		"zoomItem": "缩放 {{index}}",
+		"trimItem": "剪辑 {{index}}",
+		"speedItem": "速度 {{index}}",
+		"annotationItem": "标注",
+		"imageItem": "图片",
+		"emptyText": "空文本",
+		"cameraFullscreen": "全屏摄像头",
+		"cameraFullscreenItem": "全屏摄像头 {{index}}"
+	},
+	"emptyState": {
+		"noVideo": "未加载视频",
+		"dragAndDrop": "拖放视频以开始编辑"
+	},
+	"errors": {
+		"cannotPlaceZoom": "无法在此处放置缩放",
+		"zoomExistsAtLocation": "此位置已存在缩放或没有足够的空间。",
+		"zoomSuggestionUnavailable": "缩放建议处理器不可用",
+		"noCursorTelemetry": "无可用的光标遥测数据",
+		"noCursorTelemetryDescription": "请先录制一段屏幕录像以生成基于光标的建议。",
+		"noUsableTelemetry": "无可用的光标遥测数据",
+		"noUsableTelemetryDescription": "录制内容没有包含足够的光标移动数据。",
+		"noDwellMoments": "未找到明确的光标停留时刻",
+		"noDwellMomentsDescription": "请尝试在重要操作上进行较慢光标停留的录制。",
+		"noAutoZoomSlots": "无可用的自动缩放位置",
+		"noAutoZoomSlotsDescription": "检测到的停留点与现有缩放区域重叠。",
+		"cannotPlaceTrim": "无法在此处放置剪辑",
+		"trimExistsAtLocation": "此位置已存在剪辑或没有足够的空间。",
+		"cannotPlaceSpeed": "无法在此处放置速度",
+		"speedExistsAtLocation": "此位置已存在速度区域或没有足够的空间。",
+		"cannotPlaceCameraFullscreen": "无法在此处放置全屏摄像头",
+		"cameraFullscreenExistsAtLocation": "此位置已存在全屏摄像头片段或没有足够的空间。"
+	},
+	"success": {
+		"addedZoomSuggestions": "已添加 {{count}} 个基于光标的缩放建议",
+		"addedZoomSuggestionsPlural": "已添加 {{count}} 个基于光标的缩放建议"
+	},
+	"toolbar": {
+		"autoEnhance": "自动增强",
+		"automaticZooms": "自动缩放",
+		"automaticZoomsHint": "基于录制的光标移动",
+		"smartZoomsAndCuts": "智能剪切",
+		"smartZoomsAndCutsHint": "使用 AI",
+		"comment": "评论",
+		"timelineTools": "时间轴工具",
+		"arrangeClips": "排列片段",
+		"arrangeClipsHint": "拖动下方片段以重新排序，或拖入新片段",
+		"newAnnotation": "标注",
+		"dragToReorderHint": "拖动以重新排序 · 双击以编辑入点/出点",
+		"editInOutPoints": "编辑入点/出点",
+		"deleteClip": "删除片段",
+		"dropToAdd": "拖放以添加到时间轴",
+		"importRecordingFirst": "请先导入录制内容",
+		"noAutoZoomMoments": "未找到自动缩放时刻",
+		"noAutoZoomMomentsDescription": "此录制没有光标移动数据，或现有缩放已覆盖繁忙时刻。",
+		"addedAutoZoom": "已添加 {{count}} 个自动缩放",
+		"addedAutoZoomPlural": "已添加 {{count}} 个自动缩放",
+		"autoZoomFailed": "自动缩放失败",
+		"aiEnhanceRequested": "已请求 AI 代理剪除空白片段",
+		"smartCutsWaiting": "正在转录…稍后可用",
+		"smartCutsNeedsTranscript": "需要转录文本",
+		"smartCutsNoAudio": "此媒体没有音频",
+		"smartCutsNoSpeech": "未检测到语音",
+		"smartCutsFailed": "转录失败 — 请在“媒体”中重试"
+	}
+}

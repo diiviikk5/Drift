@@ -395,9 +395,9 @@ export async function runChat(
 		error: (message: string) => emit.error(message),
 	};
 
-	const { invokeOpenScreenAgent } = await import("./deep-agent/service");
+	const { invokeDriftAgent } = await import("./deep-agent/service");
 
-	const result = await invokeOpenScreenAgent({
+	const result = await invokeDriftAgent({
 		document: workingDocument ?? emptyDocumentForTextOnly(projectId),
 		model: {
 			provider: config.provider,
@@ -761,10 +761,10 @@ async function tryCompactSession(opts: {
 	const prompt = buildCompactionPrompt(oldMessages);
 	let summary = "";
 	try {
-		const { createOpenScreenChatModel, messageContentToText } = await import(
+		const { createDriftChatModel, messageContentToText } = await import(
 			"./deep-agent/chat-model"
 		);
-		const chatModel = await createOpenScreenChatModel({
+		const chatModel = await createDriftChatModel({
 			provider,
 			model,
 			apiKey,

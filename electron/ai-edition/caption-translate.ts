@@ -12,7 +12,7 @@
 // and shows the original text, which is the honest fallback for a partial run.
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { createOpenScreenChatModel, messageContentToText } from "./deep-agent/chat-model";
+import { createDriftChatModel, messageContentToText } from "./deep-agent/chat-model";
 
 /** One transcript segment to translate. */
 export interface CaptionTranslateSegment {
@@ -129,9 +129,9 @@ export async function translateCaptionSegments(
 
 	// Built once, not per batch: a long transcript is a lot of batches and the
 	// model object is reusable across all of them.
-	let model: Awaited<ReturnType<typeof createOpenScreenChatModel>>;
+	let model: Awaited<ReturnType<typeof createDriftChatModel>>;
 	try {
-		model = await createOpenScreenChatModel({
+		model = await createDriftChatModel({
 			provider: options.provider,
 			model: options.model,
 			apiKey: options.apiKey,

@@ -45,7 +45,7 @@ describe("WindowsNativeRecordingSession bounds handling", () => {
 	beforeEach(() => {
 		setPlatform("win32");
 		// First candidate in the lookup, so nothing has to exist on disk but this.
-		process.env.OPENSCREEN_CURSOR_SAMPLER_EXE = __filename;
+		process.env.DRIFT_CURSOR_SAMPLER_EXE = __filename;
 		dipToScreenRect.mockReturnValue(PHYSICAL_BOUNDS);
 		vi.spyOn(console, "error").mockImplementation(() => undefined);
 		vi.spyOn(console, "info").mockImplementation(() => undefined);
@@ -53,7 +53,7 @@ describe("WindowsNativeRecordingSession bounds handling", () => {
 
 	afterEach(() => {
 		setPlatform(REAL_PLATFORM);
-		process.env.OPENSCREEN_CURSOR_SAMPLER_EXE = undefined;
+		process.env.DRIFT_CURSOR_SAMPLER_EXE = undefined;
 		spawn.mockReset();
 		dipToScreenRect.mockReset();
 		vi.restoreAllMocks();

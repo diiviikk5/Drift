@@ -8,7 +8,7 @@ import { registerMediaLinks } from "../media/mediaLinksRegistry";
 import { DocumentNotFoundError, DocumentService, ProjectFileError } from "./document-service";
 
 async function makeTempDir(): Promise<string> {
-	const base = await fs.mkdtemp(path.join(os.tmpdir(), "openscreen-ai-edition-"));
+	const base = await fs.mkdtemp(path.join(os.tmpdir(), "drift-ai-edition-"));
 	return base;
 }
 
@@ -36,7 +36,7 @@ describe("DocumentService", () => {
 			expect(doc.project.id).toMatch(/^proj_/);
 			expect(doc.assets).toEqual([]);
 
-			const filePath = path.join(tempDir, `${doc.project.id}.openscreen`);
+			const filePath = path.join(tempDir, `${doc.project.id}.drift`);
 			const raw = await fs.readFile(filePath, "utf8");
 			expect(JSON.parse(raw)).toMatchObject({
 				schemaVersion: axcutSchemaVersion,
@@ -220,17 +220,17 @@ describe("DocumentService", () => {
 
 		it("skips files that fail to parse rather than throwing", async () => {
 			const a = await service.createProject("OK");
-			await fs.writeFile(path.join(tempDir, "garbage.openscreen"), "not json", "utf8");
+			await fs.writeFile(path.join(tempDir, "garbage.drift"), "not json", "utf8");
 			const summaries = await service.listProjects();
 			expect(summaries.map((s) => s.id)).toEqual([a.project.id]);
 		});
 
-		it("migrates a legacy .axcut project to .openscreen on access", async () => {
+		it("migrates a legacy .axcut project to .drift on access", async () => {
 			// A project written by an older build: same document bytes, `.axcut` name.
 			const created = await service.createProject("Legacy");
-			const openscreenPath = path.join(tempDir, `${created.project.id}.openscreen`);
+			const driftPath = path.join(tempDir, `${created.project.id}.drift`);
 			const axcutPath = path.join(tempDir, `${created.project.id}.axcut`);
-			await fs.rename(openscreenPath, axcutPath);
+			await fs.rename(driftPath, axcutPath);
 
 			// A fresh service (new process) must still surface and load it, renaming
 			// the file across in the process.
@@ -241,7 +241,7 @@ describe("DocumentService", () => {
 				project: { id: created.project.id, title: "Legacy" },
 			});
 			await expect(fs.access(axcutPath)).rejects.toBeTruthy();
-			await expect(fs.access(openscreenPath)).resolves.toBeUndefined();
+			await expect(fs.access(driftPath)).resolves.toBeUndefined();
 		});
 	});
 
@@ -505,7 +505,7 @@ describe("DocumentService", () => {
 		it("leaves valid JSON when a long and a short save race", async () => {
 			for (let round = 0; round < 12; round++) {
 				const doc = await service.createProject(`Race ${round}`);
-				const file = path.join(tempDir, `${doc.project.id}.openscreen`);
+				const file = path.join(tempDir, `${doc.project.id}.drift`);
 
 				// Unawaited on purpose: this is the exact shape of the real failure —
 				// two saves of one project in flight at once.

@@ -1,0 +1,69 @@
+{
+	"actions": {
+		"cancel": "Отмена",
+		"save": "Сохранить",
+		"delete": "Удалить",
+		"close": "Закрыть",
+		"share": "Поделиться",
+		"done": "Готово",
+		"open": "Открыть",
+		"checkForUpdates": "Проверить обновления",
+		"viewRelease": "Открыть выпуск",
+		"downloadUpdate": "Загрузить обновление",
+		"restartNow": "Перезапустить",
+		"upload": "Загрузить",
+		"export": "Экспорт",
+		"showInFolder": "Показать в папке",
+		"file": "Файл",
+		"edit": "Редактировать",
+		"view": "Вид",
+		"window": "Окно",
+		"help": "Справка",
+		"quit": "Выход",
+		"stopRecording": "Остановить запись",
+		"undo": "Отменить",
+		"redo": "Повторить",
+		"cut": "Вырезать",
+		"copy": "Копировать",
+		"paste": "Вставить",
+		"selectAll": "Выделить всё",
+		"minimize": "Свернуть",
+		"reload": "Перезагрузить",
+		"forceReload": "Принудительная перезагрузка",
+		"toggleDevTools": "Переключить инструменты разработчика",
+		"actualSize": "Реальный размер",
+		"zoomIn": "Увеличить",
+		"zoomOut": "Уменьшить",
+		"toggleFullScreen": "Полноэкранный режим",
+		"recordingStatus": "Запись: {{source}}",
+		"about": "О Drift",
+		"services": "Сервисы",
+		"hide": "Скрыть Drift",
+		"hideOthers": "Скрыть остальные",
+		"unhide": "Показать все",
+		"saveDiagnostics": "Сохранить диагностику"
+	},
+	"updates": {
+		"available": "Доступен Drift {{latestVersion}}. Установлена версия {{currentVersion}}.",
+		"current": "Установлена последняя версия Drift ({{currentVersion}}).",
+		"readyToInstall": "Drift {{latestVersion}} загружен. Перезапустите, чтобы завершить установку.",
+		"blockedRecording": "Завершите запись перед установкой обновления.",
+		"blockedLocation": "Переместите Drift в папку «Программы» перед обновлением.",
+		"failed": "Не удалось проверить наличие обновлений.",
+		"downloadFailed": "Не удалось загрузить обновление."
+	},
+	"units": {
+		"pixelsPerSecond": "{{value}} пикс/с",
+		"pixels": "{{value}} пикс"
+	},
+	"locale": {
+		"name": "Русский",
+		"short": "RU"
+	},
+	"recordingSource": {
+		"window": "Окно",
+		"screen": "Экран",
+		"virtual": "Виртуальный экран",
+		"unknown": "Запись экрана"
+	}
+}

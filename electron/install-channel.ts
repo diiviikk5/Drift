@@ -1,4 +1,4 @@
-// How this copy of OpenScreen was installed, and therefore WHO is allowed to update it.
+// How this copy of Drift was installed, and therefore WHO is allowed to update it.
 //
 // On the Microsoft Store, Flathub, Snap and Nix the package manager already updates the app.
 // A second updater there is not merely redundant: inside an MSIX container the install
@@ -159,7 +159,7 @@ function readPackageType(): string | null {
 	}
 }
 
-// ponytail: a distro that REPACKAGES our .pacman (the AUR `openscreen` package does exactly
+// ponytail: a distro that REPACKAGES our .pacman (the AUR `drift` package does exactly
 // this) inherits our `package-type` marker, so we would classify it as a pacman install we own
 // and try to `pacman -U` a file the AUR helper knows nothing about. Distinguishing them needs
 // `pacman -Qoq $(readlink -f /proc/self/exe)` and a package-name comparison — a subprocess on

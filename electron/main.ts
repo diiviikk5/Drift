@@ -59,7 +59,7 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// CLI mode: `openscreen export|record|info|help ...` runs headless without
+// CLI mode: `drift export|record|info|help ...` runs headless without
 // HUD/tray/menu. Parsed before any GUI side effects; see electron/cli/.
 const cliCommand = parseCliArgs(process.argv, app.isPackaged ? 1 : 2);
 
@@ -132,7 +132,7 @@ const isMac = process.platform === "darwin";
 const trayIconSize = isMac ? 16 : 24;
 
 // Tray Icons
-const defaultTrayIcon = getTrayIcon("openscreen.png", trayIconSize);
+const defaultTrayIcon = getTrayIcon("drift.png", trayIconSize);
 const recordingTrayIcon = getTrayIcon("rec-button.png", trayIconSize);
 
 function createWindow() {
@@ -156,7 +156,7 @@ function showMainWindow() {
 	createWindow();
 }
 
-// CLI runs skip the single-instance lock so `openscreen export/record` works
+// CLI runs skip the single-instance lock so `drift export/record` works
 // while the GUI app is open (they share nothing but the recordings directory).
 const hasSingleInstanceLock = cliCommand ? false : app.requestSingleInstanceLock();
 
@@ -213,7 +213,7 @@ function setupApplicationMenu() {
 			submenu: [
 				{
 					role: "about",
-					label: mainT("common", "actions.about") || "About OpenScreen",
+					label: mainT("common", "actions.about") || "About Drift",
 				},
 				{ type: "separator" as const },
 				{
@@ -239,7 +239,7 @@ function setupApplicationMenu() {
 				{ type: "separator" },
 				{
 					role: "hide",
-					label: mainT("common", "actions.hide") || "Hide OpenScreen",
+					label: mainT("common", "actions.hide") || "Hide Drift",
 				},
 				{
 					role: "hideOthers",
@@ -375,7 +375,7 @@ function setupApplicationMenu() {
 						]
 					: []),
 				{
-					label: mainT("common", "actions.about") || "About OpenScreen",
+					label: mainT("common", "actions.about") || "About Drift",
 					click: runAboutDialog,
 				},
 				{ type: "separator" as const },
@@ -504,7 +504,7 @@ async function presentAboutDialog() {
 	const heading = `${PRODUCT_NAME} ${facts.version}`;
 	const choice = await showMessageBox({
 		type: "info",
-		title: mainT("common", "actions.about") || "About OpenScreen",
+		title: mainT("common", "actions.about") || "About Drift",
 		message: heading,
 		detail,
 		buttons: [
@@ -536,7 +536,7 @@ function runUpdateCheck() {
 /**
  * Menu and tray entry point for exporting a diagnostic bundle. The backend
  * (`exportDiagnosticFile`) and its "Save Diagnostics" label already existed —
- * nothing in the app ever called it (getopenscreen/openscreen#460). Reveals
+ * nothing in the app ever called it (getdrift/drift#460). Reveals
  * the written file on success, the same confirmation the export flow's "Show
  * in folder" gives, so there is no need for a second dialog on top of the
  * native Save dialog the user already went through.
@@ -779,16 +779,16 @@ function updateTrayMenu(recording: boolean = false) {
 				isMac
 					? {
 							role: "about" as const,
-							label: mainT("common", "actions.about") || "About OpenScreen",
+							label: mainT("common", "actions.about") || "About Drift",
 						}
 					: {
-							label: mainT("common", "actions.about") || "About OpenScreen",
+							label: mainT("common", "actions.about") || "About Drift",
 							click: runAboutDialog,
 						},
 				// Right next to About, and reachable without opening any window: this is the
 				// one place in the app most likely to still be usable right after a recording
 				// failed to stop, which is exactly when the [stop-timing]/encoder-selection
-				// lines this exports are worth the most (getopenscreen/openscreen#460).
+				// lines this exports are worth the most (getdrift/drift#460).
 				{
 					label: mainT("common", "actions.saveDiagnostics") || "Save Diagnostics",
 					click: runSaveDiagnostics,
@@ -947,7 +947,7 @@ let sttShutdownFinished = false;
 // enough to terminate the long-lived Whisper helper, then re-enter app.quit()
 // with a guard so the second before-quit event can proceed normally. Without
 // this, a normal Cmd+Q orphaned the helper under launchd with the model and GPU
-// resources still resident after every OpenScreen window had gone away.
+// resources still resident after every Drift window had gone away.
 app.on("before-quit", (event) => {
 	// A check started seconds ago must not settle after the app is gone and try to open a
 	// dialog on a quitting app. Aborting on the FIRST quit is deliberate even though that
@@ -976,7 +976,7 @@ const appReady = !cliCommand && hasSingleInstanceLock ? app.whenReady() : null;
 appReady?.then(async () => {
 	if (isDiagnosticModeEnabled()) {
 		mainLogBuffer.install();
-		console.info("[diagnostic] OPENSCREEN_DIAGNOSTIC=1, capturing console.* into ring buffer");
+		console.info("[diagnostic] DRIFT_DIAGNOSTIC=1, capturing console.* into ring buffer");
 	}
 
 	// Force "regular" activation policy so the Dock icon appears. The HUD overlay

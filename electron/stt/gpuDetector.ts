@@ -63,7 +63,7 @@ export function binaryNameForBackend(_backend: SttBackend): string {
 
 /**
  * Where to look for the binary, in priority order:
- *   1. `OPENSCREEN_WHISPER_SERVER_EXE` env override (debug builds)
+ *   1. `DRIFT_WHISPER_SERVER_EXE` env override (debug builds)
  *   2. `<appPath>/electron/native/bin/<os>-<arch>/<binaryName>` (dev `npm run
  *      dev` and `electron-builder --dir` unpacked staging)
  *   3. `<resourcesPath>/electron/native/bin/<os>-<arch>/<binaryName>`
@@ -79,7 +79,7 @@ export function binaryNameForBackend(_backend: SttBackend): string {
 export function candidateBinaryPaths(here: string = process.cwd()): string[] {
 	const tag = `${process.platform}-${process.arch}`;
 	const name = binaryNameForBackend("whispercpp-cpu");
-	const envPath = process.env.OPENSCREEN_WHISPER_SERVER_EXE?.trim();
+	const envPath = process.env.DRIFT_WHISPER_SERVER_EXE?.trim();
 	const appPath = readAppPath();
 	const resourcePath = readResourcesPath();
 	const names = name.endsWith(".exe") ? [name, name.replace(/\.exe$/, "")] : [name];

@@ -11,11 +11,11 @@ macOS native recording will use a ScreenCaptureKit helper with the same process 
 
 Helper locations:
 
-1. `OPENSCREEN_SCK_CAPTURE_EXE`, for local development and diagnostics.
-2. `electron/native/screencapturekit/build/openscreen-screencapturekit-helper`, for locally built Swift output.
-3. `electron/native/bin/darwin-arm64/openscreen-screencapturekit-helper` or `electron/native/bin/darwin-x64/openscreen-screencapturekit-helper`, for packaged prebuilt helpers.
+1. `DRIFT_SCK_CAPTURE_EXE`, for local development and diagnostics.
+2. `electron/native/screencapturekit/build/drift-screencapturekit-helper`, for locally built Swift output.
+3. `electron/native/bin/darwin-arm64/drift-screencapturekit-helper` or `electron/native/bin/darwin-x64/drift-screencapturekit-helper`, for packaged prebuilt helpers.
 
-The macOS cursor-shape helper is resolved from `OPENSCREEN_MAC_CURSOR_HELPER_EXE` first, then the matching `openscreen-macos-cursor-helper` binary in the same local build and packaged `electron/native/bin/darwin-${arch}` directories.
+The macOS cursor-shape helper is resolved from `DRIFT_MAC_CURSOR_HELPER_EXE` first, then the matching `drift-macos-cursor-helper` binary in the same local build and packaged `electron/native/bin/darwin-${arch}` directories.
 
 Build the macOS helper with:
 
@@ -35,7 +35,7 @@ See `technical-documentation/architecture/recording.md` for the contract, rollou
 
 Windows native recording is resolved from one of these locations:
 
-1. `OPENSCREEN_WGC_CAPTURE_EXE`, for local development and diagnostics.
+1. `DRIFT_WGC_CAPTURE_EXE`, for local development and diagnostics.
 2. `electron/native/wgc-capture/build/wgc-capture.exe`, for a locally built Ninja helper.
 3. `electron/native/wgc-capture/build/Release/wgc-capture.exe`, for a locally built multi-config helper.
 4. `electron/native/bin/win32-x64/wgc-capture.exe` or `electron/native/bin/win32-arm64/wgc-capture.exe`, for packaged prebuilt helpers.
@@ -85,9 +85,9 @@ The current helper implementation supports display/window video capture, system 
 
 Container: recordings are written as fragmented MP4 (`MFCreateFMPEG4MediaSink` + `MFCreateSinkWriterFromMediaSink`, `MF_MPEG4SINK_MIN_FRAGMENT_DURATION` = 1s) rather than plain MP4. A plain MP4 has no index until `IMFSinkWriter::Finalize()` writes `moov` at the very end, so when the shutdown watchdog force-exits a wedged helper the file on disk holds every frame and no way to read them — that is why issues #252 / #292 / #327 cost the whole recording rather than the frozen tail of it. A fragmented MP4 writes its index up front and its samples in self-describing `moof`+`mdat` pairs, so the same kill leaves a file that plays up to the last complete fragment. This does not fix the freeze; it removes the data loss the freeze causes. Because the fragmented sink needs both output media types at construction, the sink writer is built from a media sink instead of from a URL, and the helper reads the video/audio stream positions back off the sink rather than assuming them. If any of that is unavailable on a machine, the helper retries with the plain container and says so — `container` in the `encoder-selection` event is `fragmented-mp4` or `mp4`, and it reports what was used, not what was asked for.
 
-Encoder selection: by default the helper keeps the existing sink-writer path first. If that path fails while setting up H.264, it retries with the Microsoft software H.264 encoder (`mfh264enc.dll`). The key of this retry is registering that encoder locally in the helper process via `MFTRegisterLocalByCLSID`, which makes a software H.264 encoder available even when the machine's hardware encoders are missing or broken; hardware transforms are disabled for the retry only as a secondary guard so the sink writer prefers the locally registered software encoder, not as the fallback mechanism itself. Set `preferSoftwareEncoder: true` in the helper JSON, or set `OPENSCREEN_WGC_PREFER_SOFTWARE_ENCODER=true` before launching Electron, to force the software path from the first attempt.
+Encoder selection: by default the helper keeps the existing sink-writer path first. If that path fails while setting up H.264, it retries with the Microsoft software H.264 encoder (`mfh264enc.dll`). The key of this retry is registering that encoder locally in the helper process via `MFTRegisterLocalByCLSID`, which makes a software H.264 encoder available even when the machine's hardware encoders are missing or broken; hardware transforms are disabled for the retry only as a secondary guard so the sink writer prefers the locally registered software encoder, not as the fallback mechanism itself. Set `preferSoftwareEncoder: true` in the helper JSON, or set `DRIFT_WGC_PREFER_SOFTWARE_ENCODER=true` before launching Electron, to force the software path from the first attempt.
 
-Frame input path: the helper feeds the encoder from the GPU when it can. On that path it copies the WGC frame across a keyed-mutex bridge to a second D3D11 device, converts BGRA to NV12 with the D3D11 video processor, and submits an allocator-owned DXGI sample to the hardware H.264 encoder, so no frame ever passes through system memory. The alternative is the original path: a staging texture, `Map(D3D11_MAP_READ)`, and a row-by-row copy into an `IMFMediaBuffer` — which is where a driver stall costs a recording (issue #252). The GPU path is a preference, never a requirement: it is skipped outright for `preferSoftwareEncoder` and for inline webcam PiP (both need the frame in system memory), and it degrades to the CPU path on its own if the encoding device, the NV12 video processor, the shared bridge texture, the DXGI sample allocator, or the hardware sink writer is unavailable. The GPU path is OFF by default: it fixed #252 on the machine that reproduces it and broke recording outright in #336, and its fallbacks only cover failures during `initialize()`, not one that appears once frames are flowing. Set `OPENSCREEN_WGC_ENABLE_DXGI_INPUT=1` to turn it on. Because the two paths land on different encoders and hardware MFTs default to constant bitrate, the GPU path asks for VBR through `ICodecAPI`; without it a static screen spends the full configured budget (measured 16.9 Mbps against 1.95 for the same desktop).
+Frame input path: the helper feeds the encoder from the GPU when it can. On that path it copies the WGC frame across a keyed-mutex bridge to a second D3D11 device, converts BGRA to NV12 with the D3D11 video processor, and submits an allocator-owned DXGI sample to the hardware H.264 encoder, so no frame ever passes through system memory. The alternative is the original path: a staging texture, `Map(D3D11_MAP_READ)`, and a row-by-row copy into an `IMFMediaBuffer` — which is where a driver stall costs a recording (issue #252). The GPU path is a preference, never a requirement: it is skipped outright for `preferSoftwareEncoder` and for inline webcam PiP (both need the frame in system memory), and it degrades to the CPU path on its own if the encoding device, the NV12 video processor, the shared bridge texture, the DXGI sample allocator, or the hardware sink writer is unavailable. The GPU path is OFF by default: it fixed #252 on the machine that reproduces it and broke recording outright in #336, and its fallbacks only cover failures during `initialize()`, not one that appears once frames are flowing. Set `DRIFT_WGC_ENABLE_DXGI_INPUT=1` to turn it on. Because the two paths land on different encoders and hardware MFTs default to constant bitrate, the GPU path asks for VBR through `ICodecAPI`; without it a static screen spends the full configured budget (measured 16.9 Mbps against 1.95 for the same desktop).
 
 The helper reports the outcome through the `encoder-selection` stdout event (`video` is `default`, `software-preferred`, or `software-fallback`; `videoInput` is `dxgi-nv12` or `cpu-rgb32`; `container` is `fragmented-mp4` or `mp4`; all three report what the encoder settled on rather than what was asked for). On the GPU path the helper also prints one `[frame-drops] gpu_bridge_contended=<n>` line to stderr at stop: a frame the bridge was too busy to take is skipped rather than failing the recording, and a large count there is the first thing to look at in a report about missing frames. When the app sees `software-fallback` — the default encoder failed and the helper switched on its own — it shows a small dismissible notice in the recording HUD with a "Don't show again" option, because software encoding can raise CPU usage. An explicit `software-preferred` selection shows no notice, and the event stays available for diagnostics either way.
 
@@ -109,22 +109,22 @@ npm run test:wgc-webcam:win
 To validate a specific native webcam manually:
 
 ```powershell
-$env:OPENSCREEN_WGC_TEST_WEBCAM_DEVICE_NAME = "NVIDIA Broadcast"
+$env:DRIFT_WGC_TEST_WEBCAM_DEVICE_NAME = "NVIDIA Broadcast"
 npm run test:wgc-webcam:win
-Remove-Item Env:OPENSCREEN_WGC_TEST_WEBCAM_DEVICE_NAME
+Remove-Item Env:DRIFT_WGC_TEST_WEBCAM_DEVICE_NAME
 ```
 
 To validate a specific native microphone manually:
 
 ```powershell
-$env:OPENSCREEN_WGC_TEST_MICROPHONE_DEVICE_NAME = "Microphone (NVIDIA Broadcast)"
+$env:DRIFT_WGC_TEST_MICROPHONE_DEVICE_NAME = "Microphone (NVIDIA Broadcast)"
 npm run test:wgc-mic:win
-Remove-Item Env:OPENSCREEN_WGC_TEST_MICROPHONE_DEVICE_NAME
+Remove-Item Env:DRIFT_WGC_TEST_MICROPHONE_DEVICE_NAME
 ```
 
 ## Linux
 
-Linux cursor recording is handled by `openscreen-pipewire-helper`
+Linux cursor recording is handled by `drift-pipewire-helper`
 (`electron/native/pipewire-capture`). Stage 1 emits **cursor samples only** — no
 video capture, no encoding.
 
@@ -137,9 +137,9 @@ each frame as `SPA_META_Cursor` instead.
 
 Helper locations, in resolution order:
 
-1. `OPENSCREEN_LINUX_CURSOR_HELPER_EXE`, for local development and diagnostics.
-2. `electron/native/pipewire-capture/build/openscreen-pipewire-helper`, for a locally built binary.
-3. `electron/native/bin/linux-x64/openscreen-pipewire-helper` (or `linux-arm64`), for packaged prebuilt helpers.
+1. `DRIFT_LINUX_CURSOR_HELPER_EXE`, for local development and diagnostics.
+2. `electron/native/pipewire-capture/build/drift-pipewire-helper`, for a locally built binary.
+3. `electron/native/bin/linux-x64/drift-pipewire-helper` (or `linux-arm64`), for packaged prebuilt helpers.
 
 Build it with:
 
@@ -165,13 +165,13 @@ marks the point where samples begin.
 **This raises the GNOME/portal source picker and streams until you stop it.**
 
 ```bash
-OPENSCREEN_PIPEWIRE_DEBUG=1 electron/native/bin/linux-x64/openscreen-pipewire-helper '{"sampleIntervalMs":100}'
+DRIFT_PIPEWIRE_DEBUG=1 electron/native/bin/linux-x64/drift-pipewire-helper '{"sampleIntervalMs":100}'
 ```
 
 Pick a monitor in the dialog, move the mouse, and `cursor-sample` lines with real
 coordinates should stream out. Type `stop` and press Enter, or Ctrl-D, to end it.
 
-`OPENSCREEN_PIPEWIRE_DEBUG=1` additionally reports stream state transitions, the
+`DRIFT_PIPEWIRE_DEBUG=1` additionally reports stream state transitions, the
 negotiated SPA buffer data type, the full list of metadata blocks that survived
 negotiation, and whether `SPA_META_Cursor` carries a sprite bitmap. Every line
 carries `timestampMs`, so a log shows how long the stream actually lived.
@@ -204,7 +204,7 @@ cursor-mode check — run the non-interactive probe. This is also what
 `npm run build:native:linux` runs after a successful build:
 
 ```bash
-electron/native/bin/linux-x64/openscreen-pipewire-helper '{"probeOnly":true}'
+electron/native/bin/linux-x64/drift-pipewire-helper '{"probeOnly":true}'
 ```
 
 ### Known gaps
@@ -216,7 +216,7 @@ electron/native/bin/linux-x64/openscreen-pipewire-helper '{"probeOnly":true}'
   stays `"move"` — the same as before. When a device is readable, the coinciding
   sample is tagged `"click"`. Scope is deliberately narrow: `BTN_LEFT` only,
   never keystrokes (see `pipewire-capture/src/input.rs`), and
-  `OPENSCREEN_DISABLE_CLICK_CAPTURE=1` turns it off entirely.
+  `DRIFT_DISABLE_CLICK_CAPTURE=1` turns it off entirely.
 - **The user picks a source twice.** Electron's `desktopCapturer` raises its own
   portal dialog for the video, and this helper raises a second one for the cursor.
   Collapsing them requires one portal session serving both, which is why the

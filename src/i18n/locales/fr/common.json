@@ -1,0 +1,69 @@
+{
+	"actions": {
+		"cancel": "Annuler",
+		"save": "Enregistrer",
+		"delete": "Supprimer",
+		"close": "Fermer",
+		"share": "Partager",
+		"done": "Terminer",
+		"open": "Ouvrir",
+		"checkForUpdates": "Rechercher des mises à jour",
+		"viewRelease": "Voir la version",
+		"downloadUpdate": "Télécharger la mise à jour",
+		"restartNow": "Redémarrer maintenant",
+		"upload": "Téléverser",
+		"export": "Exporter",
+		"showInFolder": "Afficher dans le dossier",
+		"file": "Fichier",
+		"edit": "Éditer",
+		"view": "Affichage",
+		"window": "Fenêtre",
+		"help": "Aide",
+		"quit": "Quitter",
+		"stopRecording": "Arrêter l'enregistrement",
+		"undo": "Annuler",
+		"redo": "Rétablir",
+		"cut": "Couper",
+		"copy": "Copier",
+		"paste": "Coller",
+		"selectAll": "Tout sélectionner",
+		"minimize": "Réduire",
+		"reload": "Recharger",
+		"forceReload": "Forcer le rechargement",
+		"toggleDevTools": "Afficher/masquer les outils de développement",
+		"actualSize": "Taille réelle",
+		"zoomIn": "Zoom avant",
+		"zoomOut": "Zoom arrière",
+		"toggleFullScreen": "Basculer en plein écran",
+		"recordingStatus": "Enregistrement : {{source}}",
+		"about": "À propos d’Drift",
+		"services": "Services",
+		"hide": "Masquer Drift",
+		"hideOthers": "Masquer les autres",
+		"unhide": "Tout afficher",
+		"saveDiagnostics": "Enregistrer les diagnostics"
+	},
+	"updates": {
+		"available": "Drift {{latestVersion}} est disponible. Vous utilisez la version {{currentVersion}}.",
+		"current": "Drift est à jour ({{currentVersion}}).",
+		"readyToInstall": "Drift {{latestVersion}} a été téléchargé. Redémarrez pour terminer l'installation.",
+		"blockedRecording": "Terminez votre enregistrement avant d'installer la mise à jour.",
+		"blockedLocation": "Déplacez Drift dans le dossier Applications avant de le mettre à jour.",
+		"failed": "Impossible de rechercher les mises à jour.",
+		"downloadFailed": "Impossible de télécharger la mise à jour."
+	},
+	"units": {
+		"pixelsPerSecond": "{{value}} pixels/s",
+		"pixels": "{{value}} pixels"
+	},
+	"locale": {
+		"name": "Français",
+		"short": "FR"
+	},
+	"recordingSource": {
+		"window": "Fenêtre",
+		"screen": "Écran",
+		"virtual": "Écran virtuel",
+		"unknown": "Enregistrement d'écran"
+	}
+}

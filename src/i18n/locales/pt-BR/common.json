@@ -1,0 +1,69 @@
+{
+	"actions": {
+		"cancel": "Cancelar",
+		"save": "Salvar",
+		"delete": "Deletar",
+		"close": "Fechar",
+		"share": "Compartilhar",
+		"done": "Concluir",
+		"open": "Abrir",
+		"checkForUpdates": "Verificar atualizações",
+		"viewRelease": "Ver versão",
+		"downloadUpdate": "Baixar atualização",
+		"restartNow": "Reiniciar agora",
+		"upload": "Upload",
+		"export": "Exportar",
+		"showInFolder": "Mostrar na Pasta",
+		"file": "Arquivo",
+		"edit": "Editar",
+		"view": "Visualizar",
+		"window": "Janela",
+		"help": "Ajuda",
+		"quit": "Sair",
+		"stopRecording": "Parar Gravação",
+		"undo": "Desfazer",
+		"redo": "Refazer",
+		"cut": "Recortar",
+		"copy": "Copiar",
+		"paste": "Colar",
+		"selectAll": "Selecionar Tudo",
+		"minimize": "Minimizar",
+		"reload": "Recarregar",
+		"forceReload": "Forçar Recarregar",
+		"toggleDevTools": "Alternar ferramentas de desenvolvedor",
+		"actualSize": "Tamanho Original",
+		"zoomIn": "Aumentar Zoom",
+		"zoomOut": "Diminuir Zoom",
+		"toggleFullScreen": "Tela Cheia",
+		"recordingStatus": "Gravando: {{source}}",
+		"about": "Sobre o Drift",
+		"services": "Serviços",
+		"hide": "Ocultar Drift",
+		"hideOthers": "Ocultar Outros",
+		"unhide": "Mostrar Todos",
+		"saveDiagnostics": "Salvar Diagnósticos"
+	},
+	"updates": {
+		"available": "O Drift {{latestVersion}} está disponível. Você está usando a versão {{currentVersion}}.",
+		"current": "O Drift está atualizado ({{currentVersion}}).",
+		"readyToInstall": "O Drift {{latestVersion}} foi baixado. Reinicie para concluir a instalação.",
+		"blockedRecording": "Conclua a gravação antes de instalar a atualização.",
+		"blockedLocation": "Mova o Drift para a pasta Aplicativos antes de atualizar.",
+		"failed": "Não foi possível verificar atualizações.",
+		"downloadFailed": "Não foi possível baixar a atualização."
+	},
+	"units": {
+		"pixelsPerSecond": "{{value}} pixels/s",
+		"pixels": "{{value}} pixels"
+	},
+	"locale": {
+		"name": "Português Brasileiro",
+		"short": "PT-BR"
+	},
+	"recordingSource": {
+		"window": "Janela",
+		"screen": "Tela",
+		"virtual": "Tela virtual",
+		"unknown": "Gravação de tela"
+	}
+}

@@ -1,0 +1,41 @@
+{
+	"title": "Keyboard Shortcuts",
+	"customize": "Customize",
+	"configurable": "Configurable",
+	"fixed": "Fixed",
+	"pressKey": "Press a key…",
+	"clickToChange": "Click to change",
+	"pressEscToCancel": "Press Esc to cancel",
+	"helpText": "Click a shortcut then press the new key combination. Press Esc to cancel.",
+	"resetToDefaults": "Reset to defaults",
+	"alreadyUsedBy": "Already used by {{action}}",
+	"swap": "Swap",
+	"reservedShortcut": "This shortcut is reserved for \"{{label}}\" and cannot be reassigned.",
+	"savedToast": "Keyboard shortcuts saved",
+	"resetToast": "Reset to default shortcuts — click Save to apply",
+	"registrationFailed": "Failed to register shortcut. It may be in use by another app. Try a different key.",
+	"actions": {
+		"openApp": "Open App",
+		"addZoom": "Add Zoom",
+		"addTrim": "Add Trim",
+		"addSpeed": "Add Speed",
+		"addAnnotation": "Add Annotation",
+		"addKeyframe": "Add Keyframe",
+		"addCameraFullscreen": "Add Full Camera",
+		"deleteSelected": "Delete Selected",
+		"playPause": "Play / Pause",
+		"copySelected": "Copy Selected",
+		"paste": "Paste"
+	},
+	"fixedActions": {
+		"undo": "Undo",
+		"redo": "Redo",
+		"cycleAnnotationsForward": "Cycle Annotations Forward",
+		"cycleAnnotationsBackward": "Cycle Annotations Backward",
+		"deleteSelectedAlt": "Delete Selected (alt)",
+		"panTimeline": "Pan Timeline",
+		"zoomTimeline": "Zoom Timeline",
+		"frameBack": "Frame Back",
+		"frameForward": "Frame Forward"
+	}
+}

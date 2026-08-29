@@ -42,11 +42,11 @@ describe("ffmpeg resolution", () => {
 	});
 
 	it("honours the env override first", () => {
-		process.env.OPENSCREEN_FFMPEG_PATH = "/custom/ffmpeg";
+		process.env.DRIFT_FFMPEG_PATH = "/custom/ffmpeg";
 		try {
 			expect(ffmpegCandidates(ROOT)[0]).toBe("/custom/ffmpeg");
 		} finally {
-			process.env.OPENSCREEN_FFMPEG_PATH = undefined;
+			process.env.DRIFT_FFMPEG_PATH = undefined;
 		}
 	});
 
@@ -67,7 +67,7 @@ describe("ffmpeg resolution", () => {
 	 * either.
 	 */
 	it("skips a candidate that is a directory rather than the binary", () => {
-		const here = mkdtempSync(path.join(tmpdir(), "openscreen-ffmpeg-"));
+		const here = mkdtempSync(path.join(tmpdir(), "drift-ffmpeg-"));
 		const tag = `${process.platform}-${process.arch}`;
 		const name = process.platform === "win32" ? "ffmpeg-shared.exe" : "ffmpeg";
 		const staged = path.join(here, "electron", "native", "bin", tag, name);
@@ -83,7 +83,7 @@ describe("ffmpeg resolution", () => {
 	});
 
 	it("accepts a candidate that is an executable file", () => {
-		const here = mkdtempSync(path.join(tmpdir(), "openscreen-ffmpeg-"));
+		const here = mkdtempSync(path.join(tmpdir(), "drift-ffmpeg-"));
 		const tag = `${process.platform}-${process.arch}`;
 		const name = process.platform === "win32" ? "ffmpeg-shared.exe" : "ffmpeg";
 		const staged = path.join(here, "electron", "native", "bin", tag, name);
@@ -102,7 +102,7 @@ describe("ffmpeg resolution", () => {
 	it.runIf(process.platform !== "win32")(
 		"skips a candidate that is a file but not executable",
 		() => {
-			const here = mkdtempSync(path.join(tmpdir(), "openscreen-ffmpeg-"));
+			const here = mkdtempSync(path.join(tmpdir(), "drift-ffmpeg-"));
 			const staged = path.join(
 				here,
 				"electron",
@@ -129,7 +129,7 @@ describe("ffmpeg resolution", () => {
 	 * first — with a single candidate staged, `null` is equally consistent with
 	 * "skipped it" and "gave up on the whole list".
 	 *
-	 * `OPENSCREEN_FFMPEG_PATH` is the vehicle because `ffmpegCandidates` puts it
+	 * `DRIFT_FFMPEG_PATH` is the vehicle because `ffmpegCandidates` puts it
 	 * FIRST, so a bad value there is the one case that could shadow every real
 	 * candidate behind it.
 	 */
@@ -138,7 +138,7 @@ describe("ffmpeg resolution", () => {
 		let staged: string;
 
 		beforeEach(() => {
-			here = mkdtempSync(path.join(tmpdir(), "openscreen-ffmpeg-"));
+			here = mkdtempSync(path.join(tmpdir(), "drift-ffmpeg-"));
 			staged = path.join(
 				here,
 				"electron",
@@ -152,12 +152,12 @@ describe("ffmpeg resolution", () => {
 		});
 
 		afterEach(() => {
-			delete process.env.OPENSCREEN_FFMPEG_PATH;
+			delete process.env.DRIFT_FFMPEG_PATH;
 			rmSync(here, { recursive: true, force: true });
 		});
 
 		it("passes over a leading candidate that does not exist", () => {
-			process.env.OPENSCREEN_FFMPEG_PATH = path.join(here, "nowhere", "ffmpeg");
+			process.env.DRIFT_FFMPEG_PATH = path.join(here, "nowhere", "ffmpeg");
 
 			expect(resolveFfmpeg(here)).toBe(staged);
 		});
@@ -166,7 +166,7 @@ describe("ffmpeg resolution", () => {
 			const decoy = path.join(here, "decoy-ffmpeg");
 			mkdirSync(decoy, { recursive: true });
 			writeFileSync(path.join(decoy, "libavcodec.so.62"), "");
-			process.env.OPENSCREEN_FFMPEG_PATH = decoy;
+			process.env.DRIFT_FFMPEG_PATH = decoy;
 
 			expect(resolveFfmpeg(here)).toBe(staged);
 		});
@@ -176,7 +176,7 @@ describe("ffmpeg resolution", () => {
 			() => {
 				const decoy = path.join(here, "decoy-ffmpeg");
 				writeFileSync(decoy, "", { mode: 0o644 });
-				process.env.OPENSCREEN_FFMPEG_PATH = decoy;
+				process.env.DRIFT_FFMPEG_PATH = decoy;
 
 				expect(resolveFfmpeg(here)).toBe(staged);
 			},
@@ -190,7 +190,7 @@ describe("ffmpeg resolution", () => {
 			() => {
 				const executableOnly = path.join(here, "exec-only-ffmpeg");
 				writeFileSync(executableOnly, "", { mode: 0o111 });
-				process.env.OPENSCREEN_FFMPEG_PATH = executableOnly;
+				process.env.DRIFT_FFMPEG_PATH = executableOnly;
 
 				expect(resolveFfmpeg(here)).toBe(executableOnly);
 			},

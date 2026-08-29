@@ -391,7 +391,7 @@ export default function RecorderPage() {
                 }
             }
 
-            // 3-second OpenScreen countdown overlay
+            // 3-second Drift countdown overlay
             setCountdown(3);
             let count = 3;
             const countInterval = setInterval(() => {
@@ -1286,7 +1286,7 @@ export default function RecorderPage() {
             </div>
 
             
-            {/* ═══ 3-2-1 OPENSCREEN COUNTDOWN OVERLAY ═══ */}
+            {/* ═══ 3-2-1 DRIFT COUNTDOWN OVERLAY ═══ */}
             {countdown > 0 && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md animate-in fade-in duration-200">
                     <div className="flex flex-col items-center">

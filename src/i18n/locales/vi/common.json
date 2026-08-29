@@ -1,0 +1,69 @@
+{
+	"actions": {
+		"cancel": "Hủy",
+		"save": "Lưu",
+		"delete": "Xóa",
+		"close": "Đóng",
+		"share": "Chia sẻ",
+		"done": "Hoàn tất",
+		"open": "Mở",
+		"checkForUpdates": "Kiểm tra bản cập nhật",
+		"viewRelease": "Xem bản phát hành",
+		"downloadUpdate": "Tải bản cập nhật",
+		"restartNow": "Khởi động lại ngay",
+		"upload": "Tải lên",
+		"export": "Xuất",
+		"showInFolder": "Hiển thị trong thư mục",
+		"file": "Tệp",
+		"edit": "Chỉnh sửa",
+		"view": "Xem",
+		"window": "Cửa sổ",
+		"help": "Trợ giúp",
+		"quit": "Thoát",
+		"stopRecording": "Dừng ghi hình",
+		"undo": "Hoàn tác",
+		"redo": "Làm lại",
+		"cut": "Cắt",
+		"copy": "Sao chép",
+		"paste": "Dán",
+		"selectAll": "Chọn tất cả",
+		"minimize": "Thu nhỏ",
+		"reload": "Tải lại",
+		"forceReload": "Buộc tải lại",
+		"toggleDevTools": "Bật/tắt công cụ nhà phát triển",
+		"actualSize": "Kích thước thực",
+		"zoomIn": "Phóng to",
+		"zoomOut": "Thu nhỏ",
+		"toggleFullScreen": "Bật/tắt toàn màn hình",
+		"recordingStatus": "Đang ghi: {{source}}",
+		"about": "Giới thiệu Drift",
+		"services": "Dịch vụ",
+		"hide": "Ẩn Drift",
+		"hideOthers": "Ẩn ứng dụng khác",
+		"unhide": "Hiển thị tất cả",
+		"saveDiagnostics": "Lưu thông tin chẩn đoán"
+	},
+	"updates": {
+		"available": "Đã có Drift {{latestVersion}}. Bạn đang dùng phiên bản {{currentVersion}}.",
+		"current": "Drift đang ở phiên bản mới nhất ({{currentVersion}}).",
+		"readyToInstall": "Đã tải xuống Drift {{latestVersion}}. Khởi động lại để hoàn tất cài đặt.",
+		"blockedRecording": "Hãy kết thúc bản ghi trước khi cài đặt bản cập nhật.",
+		"blockedLocation": "Hãy chuyển Drift vào thư mục Applications trước khi cập nhật.",
+		"failed": "Không thể kiểm tra bản cập nhật.",
+		"downloadFailed": "Không thể tải xuống bản cập nhật."
+	},
+	"units": {
+		"pixelsPerSecond": "{{value}} px/giây",
+		"pixels": "{{value}} px"
+	},
+	"locale": {
+		"name": "Tiếng Việt",
+		"short": "VI"
+	},
+	"recordingSource": {
+		"window": "Cửa sổ",
+		"screen": "Màn hình",
+		"virtual": "Màn hình ảo",
+		"unknown": "Ghi màn hình"
+	}
+}

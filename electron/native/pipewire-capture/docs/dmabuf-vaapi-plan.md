@@ -142,7 +142,7 @@ Key architecture calls:
   on shm. shm remains in the offer as the negotiation fallback, so a compositor
   that cannot produce dmabuf — or a GPU where the importer will not build — keeps
   today's path with no regression. Confirmed: full-monitor scroll records 39.8
-  distinct fps with `convertMs 0.0` and no force flag. `OPENSCREEN_PIPEWIRE_FORCE_DMABUF`
+  distinct fps with `convertMs 0.0` and no force flag. `DRIFT_PIPEWIRE_FORCE_DMABUF`
   still forces the swap for testing.
 - [x] **Window crop via VPP** (validated). The importer now takes a source size
   (the full stream) and an output size (the committed crop); `scale_vaapi` outputs

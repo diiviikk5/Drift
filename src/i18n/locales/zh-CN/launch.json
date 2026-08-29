@@ -1,0 +1,99 @@
+{
+	"tooltips": {
+		"hideHUD": "隐藏控制面板",
+		"closeApp": "关闭应用",
+		"restartRecording": "重新开始录制",
+		"cancelRecording": "取消录制",
+		"pauseRecording": "暂停录制",
+		"resumeRecording": "继续录制",
+		"useVerticalTray": "使用竖向托盘",
+		"useHorizontalTray": "使用横向托盘",
+		"openStudio": "打开工作室",
+		"openNotes": "打开笔记",
+		"openNotesPlaceholder": "在此输入笔记...",
+		"notesToolbar": {
+			"bold": "加粗",
+			"italic": "斜体",
+			"strikethrough": "删除线",
+			"bulletList": "无序列表",
+			"numberedList": "有序列表",
+			"blockquote": "引用",
+			"codeBlock": "代码块",
+			"play": "开始自动滚动",
+			"pause": "暂停自动滚动",
+			"speed": "滚动速度",
+			"decreaseSpeed": "降低滚动速度",
+			"increaseSpeed": "提高滚动速度",
+			"fontSize": "字体大小",
+			"decreaseFontSize": "减小字体",
+			"increaseFontSize": "增大字体",
+			"mirror": "水平镜像"
+		}
+	},
+	"audio": {
+		"enableSystemAudio": "启用系统音频",
+		"disableSystemAudio": "禁用系统音频",
+		"enableMicrophone": "启用麦克风",
+		"disableMicrophone": "禁用麦克风",
+		"defaultMicrophone": "默认麦克风",
+		"systemAudio": "系统音频",
+		"microphone": "麦克风",
+		"on": "开",
+		"off": "关",
+		"inputDevice": "输入设备"
+	},
+	"webcam": {
+		"enableWebcam": "启用摄像头",
+		"disableWebcam": "禁用摄像头",
+		"defaultCamera": "默认摄像头",
+		"searching": "正在搜索...",
+		"noneFound": "未找到摄像头",
+		"unavailable": "摄像头不可用",
+		"camera": "摄像头",
+		"cameraDevice": "摄像头设备"
+	},
+	"cursor": {
+		"useEditableCursor": "使用可编辑光标",
+		"useSystemCursor": "使用系统光标"
+	},
+	"sourceSelector": {
+		"loading": "正在加载源...",
+		"screens": "屏幕 ({{count}})",
+		"windows": "窗口 ({{count}})",
+		"emptyTitle": "未找到屏幕或窗口",
+		"emptyDescription": "如果您刚刚授予了屏幕录制权限，请重新加载此选择器。在 macOS 上，您可能需要重新打开 Drift。",
+		"loadFailedDescription": "Drift 无法加载采集源。请重新加载此选择器并重试。",
+		"defaultSourceName": "屏幕"
+	},
+	"recording": {
+		"selectSource": "请选择要录制的源",
+		"systemPicker": "系统将询问要共享的内容",
+		"inProgress": "正在录制",
+		"saving": "正在保存..."
+	},
+	"language": "语言",
+	"systemLanguagePrompt": {
+		"title": "使用系统语言吗？",
+		"description": "我们检测到你的系统语言是{{language}}。是否将 Drift 切换为{{language}}？",
+		"switch": "切换到{{language}}",
+		"keepDefault": "保持当前语言"
+	},
+	"softwareEncoderFallback": {
+		"title": "已切换到软件编码",
+		"description": "默认 GPU 编码器启动失败，Drift 已改用软件 H.264 编码。录制会正常继续，但 CPU 占用可能更高。",
+		"dismiss": "知道了",
+		"dontShowAgain": "不再提示"
+	},
+	"deviceSettings": {
+		"title": "设备设置",
+		"done": "完成",
+		"micLevel": "输入音量",
+		"micHint": "说话以测试麦克风",
+		"noMicrophones": "未找到麦克风",
+		"preview": "预览",
+		"previewUnavailable": "预览不可用",
+		"about": "关于",
+		"version": "版本 {{version}}",
+		"checkingForUpdates": "正在检查…"
+	}
+}

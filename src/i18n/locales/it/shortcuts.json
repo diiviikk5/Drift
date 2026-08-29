@@ -1,0 +1,41 @@
+{
+	"title": "Scorciatoie tastiera",
+	"customize": "Personalizza",
+	"configurable": "Configurabile",
+	"fixed": "Fisso",
+	"pressKey": "Premi un tasto…",
+	"clickToChange": "Clicca per cambiare",
+	"pressEscToCancel": "Premi Esc per annullare",
+	"helpText": "Clicca una scorciatoia e premi la nuova combinazione di tasti. Premi Esc per annullare.",
+	"resetToDefaults": "Ripristina predefiniti",
+	"alreadyUsedBy": "Già utilizzata da {{action}}",
+	"swap": "Scambia",
+	"reservedShortcut": "Questa scorciatoia è riservata a \"{{label}}\" e non può essere riassegnata.",
+	"savedToast": "Scorciatoie tastiera salvate",
+	"resetToast": "Ripristino alle scorciatoie predefinite — clicca Salva per applicare",
+	"registrationFailed": "Impossibile registrare la scorciatoia. Potrebbe essere in uso da un'altra applicazione. Prova un altro tasto.",
+	"actions": {
+		"openApp": "Apri applicazione",
+		"addZoom": "Aggiungi zoom",
+		"addTrim": "Aggiungi taglio",
+		"addSpeed": "Aggiungi velocità",
+		"addAnnotation": "Aggiungi annotazione",
+		"addKeyframe": "Aggiungi fotogramma chiave",
+		"addCameraFullscreen": "Aggiungi Camera a schermo intero",
+		"deleteSelected": "Elimina selezionato",
+		"playPause": "Riproduci / Pausa",
+		"copySelected": "Copia selezione",
+		"paste": "Incolla"
+	},
+	"fixedActions": {
+		"undo": "Annulla",
+		"redo": "Ripeti",
+		"cycleAnnotationsForward": "Scorri annotazioni in avanti",
+		"cycleAnnotationsBackward": "Scorri annotazioni indietro",
+		"deleteSelectedAlt": "Elimina selezionato (alt)",
+		"panTimeline": "Panoramica timeline",
+		"zoomTimeline": "Zoom timeline",
+		"frameBack": "Fotogramma indietro",
+		"frameForward": "Fotogramma avanti"
+	}
+}

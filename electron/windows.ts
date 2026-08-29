@@ -17,11 +17,11 @@ const HEADLESS = process.env["HEADLESS"] === "true";
 // what opens the editor — which makes a whole slice of the app unreachable from automation. Hence
 // this escape hatch, for testing only. It warns on every window it skips, because a recording made
 // while it is set WILL contain the HUD.
-const CONTENT_PROTECTION_DISABLED = process.env["OPENSCREEN_DISABLE_CONTENT_PROTECTION"] === "1";
+const CONTENT_PROTECTION_DISABLED = process.env["DRIFT_DISABLE_CONTENT_PROTECTION"] === "1";
 
 // Forces protection back on where it is auto-disabled below, so the macOS
 // regression can be re-tested against a future Electron without editing code.
-const CONTENT_PROTECTION_FORCED = process.env["OPENSCREEN_FORCE_CONTENT_PROTECTION"] === "1";
+const CONTENT_PROTECTION_FORCED = process.env["DRIFT_FORCE_CONTENT_PROTECTION"] === "1";
 
 /**
  * macOS 26 (Darwin 25) never displays a window that has had
@@ -66,7 +66,7 @@ function applyContentProtection(win: BrowserWindow, label: string) {
 	if (CONTENT_PROTECTION_DISABLED) {
 		console.warn(
 			`[content-protection] OFF for the ${label} window ` +
-				"(OPENSCREEN_DISABLE_CONTENT_PROTECTION=1) — it will appear in screen captures, " +
+				"(DRIFT_DISABLE_CONTENT_PROTECTION=1) — it will appear in screen captures, " +
 				"including recordings. Unset it for anything but automated testing.",
 		);
 		return;
@@ -76,7 +76,7 @@ function applyContentProtection(win: BrowserWindow, label: string) {
 			`[content-protection] OFF for the ${label} window — macOS ` +
 				`${process.getSystemVersion()} never displays a content-protected window, so ` +
 				"enabling it would make this window permanently invisible. It may therefore appear " +
-				"in screen captures. Set OPENSCREEN_FORCE_CONTENT_PROTECTION=1 to re-test.",
+				"in screen captures. Set DRIFT_FORCE_CONTENT_PROTECTION=1 to re-test.",
 		);
 		return;
 	}
@@ -412,7 +412,7 @@ export function createEditorWindow(query: Record<string, string> = {}): BrowserW
 		resizable: true,
 		alwaysOnTop: false,
 		skipTaskbar: false,
-		title: "OpenScreen",
+		title: "Drift",
 		backgroundColor: "#09090b",
 		show: false, // shown via ready-to-show to avoid white flash on first load
 		webPreferences: {
@@ -574,7 +574,7 @@ export function createNotesWindow(): BrowserWindow {
 		minHeight: 400,
 		maxWidth: 640,
 		maxHeight: 720,
-		title: "OpenScreen - Notes",
+		title: "Drift - Notes",
 		backgroundColor: "#09090b",
 		resizable: true,
 		alwaysOnTop: true,

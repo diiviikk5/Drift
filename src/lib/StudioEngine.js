@@ -1,5 +1,5 @@
 // Studio Engine 2.0 - Production-Grade Post-Production Studio
-// Inspired by Screen Studio for Mac & OpenScreen:
+// Inspired by Screen Studio for Mac & Drift:
 // - 60fps/120fps analytical spring physics (CinemaZoomEngine & CinemaCursorEngine)
 // - Multi-aspect ratio framing (16:9, 9:16, 1:1, 4:3, 4:5, 21:9)
 // - 12+ Luxury background presets + Dynamic Video Blur Backdrop

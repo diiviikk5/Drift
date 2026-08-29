@@ -36,7 +36,7 @@ describe("checkLatestRelease", () => {
 		const fetchLatest = vi.fn().mockResolvedValue(
 			releaseResponse({
 				tag_name: "v1.10.0",
-				html_url: "https://github.com/getopenscreen/openscreen/releases/tag/v1.10.0",
+				html_url: "https://github.com/getdrift/drift/releases/tag/v1.10.0",
 				draft: false,
 				prerelease: false,
 			}),
@@ -46,10 +46,10 @@ describe("checkLatestRelease", () => {
 			kind: "available",
 			currentVersion: "1.9.0",
 			latestVersion: "1.10.0",
-			releaseUrl: "https://github.com/getopenscreen/openscreen/releases/tag/v1.10.0",
+			releaseUrl: "https://github.com/getdrift/drift/releases/tag/v1.10.0",
 		});
 		expect(fetchLatest).toHaveBeenCalledWith(
-			"https://api.github.com/repos/getopenscreen/openscreen/releases/latest",
+			"https://api.github.com/repos/getdrift/drift/releases/latest",
 			expect.objectContaining({
 				headers: expect.objectContaining({ Accept: "application/vnd.github+json" }),
 			}),
@@ -60,7 +60,7 @@ describe("checkLatestRelease", () => {
 		const fetchLatest = vi.fn().mockResolvedValue(
 			releaseResponse({
 				tag_name: "v1.9.0",
-				html_url: "https://github.com/getopenscreen/openscreen/releases/tag/v1.9.0",
+				html_url: "https://github.com/getdrift/drift/releases/tag/v1.9.0",
 				draft: false,
 				prerelease: false,
 			}),
@@ -82,7 +82,7 @@ describe("checkLatestRelease", () => {
 		const fetchLatest = vi.fn().mockResolvedValue(
 			releaseResponse({
 				tag_name: "v1.9.0",
-				html_url: "https://github.com/getopenscreen/openscreen/releases/tag/v1.9.0",
+				html_url: "https://github.com/getdrift/drift/releases/tag/v1.9.0",
 				draft: false,
 				prerelease: false,
 			}),
@@ -96,7 +96,7 @@ describe("checkLatestRelease", () => {
 		});
 
 		expect(fetchLatest).toHaveBeenCalledWith(
-			"https://api.github.com/repos/getopenscreen/openscreen/releases/latest",
+			"https://api.github.com/repos/getdrift/drift/releases/latest",
 			expect.objectContaining({ signal: controller.signal }),
 		);
 	});
@@ -108,7 +108,7 @@ describe("checkLatestRelease", () => {
 		const fetchLatest = vi.fn().mockResolvedValue(
 			releaseResponse({
 				tag_name: "v2.0.0",
-				html_url: "https://github.com/getopenscreen/openscreen/releases/tag/v2.0.0",
+				html_url: "https://github.com/getdrift/drift/releases/tag/v2.0.0",
 				draft,
 				prerelease,
 			}),
@@ -123,7 +123,7 @@ describe("checkLatestRelease", () => {
 		const fetchLatest = vi.fn().mockResolvedValue(
 			releaseResponse({
 				tag_name: "v9.9.9",
-				html_url: "https://example.com/openscreen-9.9.9.exe",
+				html_url: "https://example.com/drift-9.9.9.exe",
 				draft: false,
 				prerelease: false,
 			}),
@@ -135,10 +135,10 @@ describe("checkLatestRelease", () => {
 	});
 
 	it.each([
-		"https://github.com/getopenscreen/openscreen/releases/download/v9.9.9/app.zip",
-		"https://github.com/getopenscreen/openscreen/releases/tag/v9.9.8",
-		"https://github.com/getopenscreen/openscreen/releases/tag/v9.9.9?download=1",
-		"https://github.com/getopenscreen/openscreen/releases/tag/v9.9.9#notes",
+		"https://github.com/getdrift/drift/releases/download/v9.9.9/app.zip",
+		"https://github.com/getdrift/drift/releases/tag/v9.9.8",
+		"https://github.com/getdrift/drift/releases/tag/v9.9.9?download=1",
+		"https://github.com/getdrift/drift/releases/tag/v9.9.9#notes",
 	])("rejects an invalid official-repository URL: %s", async (htmlUrl) => {
 		const fetchLatest = vi.fn().mockResolvedValue(
 			releaseResponse({

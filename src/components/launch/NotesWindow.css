@@ -1,0 +1,136 @@
+/* Tiptap sets class="tiptap" on the ProseMirror root, so every selector here is global.
+ * Plain .css, NOT .module.css: this sheet is imported for its side effect only, and a
+ * binding-less CSS-module import is tree-shaken out of the production bundle. */
+.tiptap {
+	height: 100%;
+	width: 100%;
+	outline: none;
+	overflow-y: auto;
+	color: #111827;
+	caret-color: #111827;
+}
+
+.notes-teleprompter-content[data-mirrored="true"] {
+	transform: scaleX(-1);
+}
+
+.tiptap :first-child {
+	margin-top: 0;
+}
+
+/*
+ * Spacing is in `em` so it tracks the teleprompter font size the Notes window sets on the
+ * container. Every element below inherits that size, so `em` here equals the container size
+ * and the default 16px rendering is unchanged. Headings are the exception — see below.
+ */
+.tiptap p {
+	min-height: 1.5em;
+	line-height: 1.5;
+	margin-top: 0.75em;
+	margin-bottom: 0.75em;
+}
+
+.tiptap p:first-child {
+	margin-top: 0;
+}
+
+/* Tailwind preflight strips list markers — restore them for markdown-style input rules. */
+.tiptap ul,
+.tiptap ol {
+	padding-left: 1.5em;
+	margin: 1em 0;
+}
+
+.tiptap ul {
+	list-style-type: disc;
+}
+
+.tiptap ol {
+	list-style-type: decimal;
+}
+
+.tiptap li {
+	display: list-item;
+}
+
+.tiptap ul li p,
+.tiptap ol li p {
+	margin-top: 0.25em;
+	margin-bottom: 0.25em;
+}
+
+/*
+ * Heading margins stay in `rem`: `em` on a heading resolves against the heading's own
+ * enlarged font size, not the container's, so switching them would change the default
+ * rendering rather than just scale it.
+ */
+.tiptap h1,
+.tiptap h2,
+.tiptap h3,
+.tiptap h4,
+.tiptap h5,
+.tiptap h6 {
+	line-height: 1.1;
+	margin-top: 2.5rem;
+	text-wrap: pretty;
+}
+
+.tiptap h1,
+.tiptap h2 {
+	margin-top: 3.5rem;
+	margin-bottom: 1.5rem;
+}
+
+.tiptap h1 {
+	font-size: 1.4em;
+}
+
+.tiptap h2 {
+	font-size: 1.2em;
+}
+
+.tiptap h3 {
+	font-size: 1.1em;
+}
+
+.tiptap h4,
+.tiptap h5,
+.tiptap h6 {
+	font-size: 1em;
+}
+
+.tiptap code {
+	background-color: #ede9fe;
+	border-radius: 0.4rem;
+	color: #111827;
+	font-size: 0.85em;
+	padding: 0.25em 0.3em;
+}
+
+.tiptap pre {
+	background: #111827;
+	border-radius: 0.5rem;
+	color: #ffffff;
+	font-family: "JetBrainsMono", monospace;
+	margin: 1.5em 0;
+	padding: 0.75em 1em;
+}
+
+.tiptap pre code {
+	background: none;
+	color: inherit;
+	font-size: 0.8em;
+	padding: 0;
+}
+
+.tiptap blockquote {
+	border-left: 3px solid #d1d5db;
+	margin: 1.5em 0;
+	padding-left: 1em;
+}
+
+.tiptap hr {
+	border: none;
+	border-top: 1px solid #e5e7eb;
+	margin: 2em 0;
+}

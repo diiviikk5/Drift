@@ -63,7 +63,7 @@ const DECODE_TIMEOUT_MS = 60_000;
 export function ffmpegCandidates(here: string = process.cwd()): string[] {
 	const tag = `${process.platform}-${process.arch}`;
 	const exe = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
-	const env = process.env.OPENSCREEN_FFMPEG_PATH?.trim();
+	const env = process.env.DRIFT_FFMPEG_PATH?.trim();
 	const roots: string[] = [];
 	// `app` is absent when this module is imported by a test.
 	const appPath = (() => {

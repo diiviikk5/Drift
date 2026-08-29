@@ -32,7 +32,7 @@ interface CliOutput {
 	progress(p: CliProgressEvent): void;
 }
 
-// stdout/stderr may be a closed pipe (`openscreen export | head`); writes must
+// stdout/stderr may be a closed pipe (`drift export | head`); writes must
 // never take the process down — Electron would show a GUI error dialog.
 function safeWrite(stream: NodeJS.WriteStream, text: string): void {
 	try {
@@ -43,7 +43,7 @@ function safeWrite(stream: NodeJS.WriteStream, text: string): void {
 }
 
 // Timestamped startup milestones on stderr. A process that stops answering says
-// nothing about where it stopped, and `openscreen sources` has hung on roughly
+// nothing about where it stopped, and `drift sources` has hung on roughly
 // half of its headless CI runs while emitting no renderer output whatsoever --
 // which rules out everything after the renderer starts and leaves everything
 // before it. These narrow that down without guessing.
@@ -264,7 +264,7 @@ export function runCli(command: CliCommand): void {
 		};
 	}
 
-	// A consumer closing the pipe (`openscreen export | head`) must not crash the
+	// A consumer closing the pipe (`drift export | head`) must not crash the
 	// process, and main-process exceptions must never surface as Electron's GUI
 	// error dialog — report on stderr and exit non-zero instead.
 	const ignoreStreamError = () => {

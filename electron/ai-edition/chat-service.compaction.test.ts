@@ -1,16 +1,16 @@
 // Compaction as seen from chat-service: what the user keeps versus what the
-// model is handed. Both seams are mocked — `invokeOpenScreenAgent` for the
+// model is handed. Both seams are mocked — `invokeDriftAgent` for the
 // turn itself (so we can read the history it was given) and the chat model
 // behind the summarizer, so no test here needs a provider or a key.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./deep-agent/service", () => ({
-	invokeOpenScreenAgent: vi.fn(),
+	invokeDriftAgent: vi.fn(),
 }));
 
 vi.mock("./deep-agent/chat-model", () => ({
-	createOpenScreenChatModel: vi.fn(),
+	createDriftChatModel: vi.fn(),
 	messageContentToText: (content: unknown) => String(content),
 }));
 
@@ -21,12 +21,12 @@ import {
 	runChat,
 	selectSession,
 } from "./chat-service";
-import { createOpenScreenChatModel } from "./deep-agent/chat-model";
-import { invokeOpenScreenAgent } from "./deep-agent/service";
+import { createDriftChatModel } from "./deep-agent/chat-model";
+import { invokeDriftAgent } from "./deep-agent/service";
 import type { LlmConfigStore } from "./llm-config-store";
 
-const invokeMock = vi.mocked(invokeOpenScreenAgent);
-const chatModelMock = vi.mocked(createOpenScreenChatModel);
+const invokeMock = vi.mocked(invokeDriftAgent);
+const chatModelMock = vi.mocked(createDriftChatModel);
 
 type ModelHistory = Array<{ role: "user" | "assistant" | "system"; content: string }>;
 
@@ -44,7 +44,7 @@ function stubConfig(): LlmConfigStore {
 function stubSummarizer(reply: string) {
 	const invoke = vi.fn(async () => ({ content: reply }));
 	chatModelMock.mockImplementation(
-		async () => ({ invoke }) as unknown as Awaited<ReturnType<typeof createOpenScreenChatModel>>,
+		async () => ({ invoke }) as unknown as Awaited<ReturnType<typeof createDriftChatModel>>,
 	);
 	return invoke;
 }

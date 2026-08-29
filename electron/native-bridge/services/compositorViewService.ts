@@ -146,7 +146,7 @@ export function resolveSceneAssetPaths(sceneJson: string): string {
 export interface CompositorViewServiceOptions {
 	/**
 	 * Optional explicit override for the addon path. Has precedence over the
-	 * `OPENSCREEN_COMPOSITOR_VIEW_NODE` env var and the candidate path list.
+	 * `DRIFT_COMPOSITOR_VIEW_NODE` env var and the candidate path list.
 	 * Useful for poking at a locally-built `.node` without copying it into
 	 * the standard search root.
 	 */
@@ -377,7 +377,7 @@ export class CompositorViewService {
 		this.loadAttempted = true;
 
 		const envOverride =
-			this.options.envOverride ?? process.env.OPENSCREEN_COMPOSITOR_VIEW_NODE ?? null;
+			this.options.envOverride ?? process.env.DRIFT_COMPOSITOR_VIEW_NODE ?? null;
 		const appRoot = this.options.appRoot ?? defaultAppRoot();
 		const isPackaged = this.options.isPackaged ?? defaultIsPackaged();
 
@@ -539,7 +539,7 @@ export class CompositorViewService {
 		if (!addon) {
 			return null;
 		}
-		const target = outPath ?? path.join(app.getPath("temp"), "openscreen-native-export.mp4");
+		const target = outPath ?? path.join(app.getPath("temp"), "drift-native-export.mp4");
 		return addon.exportMulti(
 			clips,
 			target,
@@ -567,7 +567,7 @@ export class CompositorViewService {
 		if (!addon) {
 			return null;
 		}
-		const target = outPath ?? path.join(app.getPath("temp"), "openscreen-native-export.gif");
+		const target = outPath ?? path.join(app.getPath("temp"), "drift-native-export.gif");
 		return addon.exportGif(
 			clips,
 			target,

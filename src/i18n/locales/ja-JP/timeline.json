@@ -1,0 +1,90 @@
+{
+	"buttons": {
+		"addZoom": "ズームを追加 (Z)",
+		"suggestZooms": "カーソル位置からズームを提案",
+		"autoZoomOn": "自動ズーム提案がオン — クリックすると提案されたズームを削除します",
+		"autoZoomOff": "自動ズーム提案がオフ — クリックするとカーソル位置からズームを提案します",
+		"autoFocusAllOn": "すべてのズームでオートフォーカスがオン — クリックするとすべて手動に切り替わります",
+		"autoFocusAllOff": "すべてのズームでオートフォーカスをオンにする（カメラがカーソルに追従）",
+		"addTrim": "トリムを追加 (T)",
+		"addAnnotation": "注釈を追加 (A)",
+		"addSpeed": "再生速度を追加 (S)",
+		"addCameraFullscreen": "フルスクリーンカメラを追加 (C)"
+	},
+	"hints": {
+		"pressZoom": "Zキーを押してズームを追加",
+		"pressTrim": "Tキーを押してトリムを追加",
+		"pressAnnotation": "Aキーを押して注釈を追加",
+		"pressSpeed": "Sキーを押して再生速度を追加",
+		"pressCameraFullscreen": "Cキーを押してフルスクリーンカメラのセグメントを追加"
+	},
+	"labels": {
+		"pan": "移動",
+		"zoom": "ズーム",
+		"trim": "トリム",
+		"speed": "再生速度",
+		"zoomItem": "ズーム {{index}}",
+		"trimItem": "トリム {{index}}",
+		"speedItem": "再生速度 {{index}}",
+		"annotationItem": "注釈",
+		"imageItem": "画像",
+		"emptyText": "空のテキスト",
+		"cameraFullscreen": "フルスクリーンカメラ",
+		"cameraFullscreenItem": "フルスクリーンカメラ {{index}}"
+	},
+	"emptyState": {
+		"noVideo": "ビデオが読み込まれていません",
+		"dragAndDrop": "ビデオをドラッグアンドドロップして編集を開始してください"
+	},
+	"errors": {
+		"cannotPlaceZoom": "ここにズームを配置できません",
+		"zoomExistsAtLocation": "この場所にはすでにズームが存在するか、十分なスペースがありません。",
+		"zoomSuggestionUnavailable": "ズームの自動提案機能が利用できません",
+		"noCursorTelemetry": "カーソルの動きが記録されていません",
+		"noCursorTelemetryDescription": "まず画面録画を行い、カーソルに基づく提案を生成してください。",
+		"noUsableTelemetry": "使用可能なカーソルの動きデータがありません",
+		"noUsableTelemetryDescription": "録画には十分なカーソルの動きデータが含まれていません。",
+		"noDwellMoments": "カーソルが静止したポイントが見つかりません",
+		"noDwellMomentsDescription": "強調したい操作の際に、カーソルを一時停止させて録画してみてください。",
+		"noAutoZoomSlots": "自動ズームを適用できる箇所がありません",
+		"noAutoZoomSlotsDescription": "検出された滞留ポイントが既存のズーム領域と重なっています。",
+		"cannotPlaceTrim": "ここにトリムを配置できません",
+		"trimExistsAtLocation": "この場所にはすでにトリムが存在するか、十分なスペースがありません。",
+		"cannotPlaceSpeed": "ここに再生速度を配置できません",
+		"speedExistsAtLocation": "この場所にはすでに再生速度の範囲が存在するか、十分なスペースがありません。",
+		"cannotPlaceCameraFullscreen": "ここにフルスクリーンカメラを配置できません",
+		"cameraFullscreenExistsAtLocation": "この場所にはすでにフルスクリーンカメラのセグメントが存在するか、十分なスペースがありません。"
+	},
+	"success": {
+		"addedZoomSuggestions": "カーソルに基づくズーム提案を {{count}} 件追加しました",
+		"addedZoomSuggestionsPlural": "カーソルに基づくズーム提案を {{count}} 件追加しました"
+	},
+	"toolbar": {
+		"autoEnhance": "自動強化",
+		"automaticZooms": "自動ズーム",
+		"automaticZoomsHint": "記録されたカーソルの動きから",
+		"smartZoomsAndCuts": "スマートカット",
+		"smartZoomsAndCutsHint": "AIを使用",
+		"comment": "コメント",
+		"timelineTools": "タイムラインツール",
+		"arrangeClips": "クリップを配置",
+		"arrangeClipsHint": "下のクリップをドラッグして並べ替えるか、新しいクリップをドロップします",
+		"newAnnotation": "注釈",
+		"dragToReorderHint": "ドラッグして並べ替え・ダブルクリックでイン/アウトポイントを編集",
+		"editInOutPoints": "イン/アウトポイントを編集",
+		"deleteClip": "クリップを削除",
+		"dropToAdd": "ドロップしてタイムラインに追加",
+		"importRecordingFirst": "先に録画をインポートしてください",
+		"noAutoZoomMoments": "自動ズームの瞬間が見つかりません",
+		"noAutoZoomMomentsDescription": "この録画にはカーソルの動きのデータがないか、既存のズームがすでに重要な瞬間をカバーしています。",
+		"addedAutoZoom": "自動ズームを {{count}} 件追加しました",
+		"addedAutoZoomPlural": "自動ズームを {{count}} 件追加しました",
+		"autoZoomFailed": "自動ズームに失敗しました",
+		"aiEnhanceRequested": "AIエージェントに無音部分のカットを依頼しました",
+		"smartCutsWaiting": "文字起こし中… まもなく使えます",
+		"smartCutsNeedsTranscript": "文字起こしが必要です",
+		"smartCutsNoAudio": "このメディアには音声がありません",
+		"smartCutsNoSpeech": "音声が検出されませんでした",
+		"smartCutsFailed": "文字起こしに失敗しました — メディアから再試行してください"
+	}
+}

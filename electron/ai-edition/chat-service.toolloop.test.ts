@@ -1,7 +1,7 @@
 // Tool-loop behavior of runChat (P1.2–P1.5, P1.8, P2.5) with a mocked deep
 // agent. The deep-agent port routes the loop through LangGraph
 // (`createDeepAgent`); rather than mocking the LangChain chat model the
-// tests mock `invokeOpenScreenAgent` directly — that's the seam chat-service
+// tests mock `invokeDriftAgent` directly — that's the seam chat-service
 // crosses to drive the agentic turn.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,14 +12,14 @@ import {
 } from "../../src/lib/ai-edition/schema";
 
 vi.mock("./deep-agent/service", () => ({
-	invokeOpenScreenAgent: vi.fn(),
+	invokeDriftAgent: vi.fn(),
 }));
 
 import { createSession, rewindToMessage, runChat } from "./chat-service";
-import { invokeOpenScreenAgent } from "./deep-agent/service";
+import { invokeDriftAgent } from "./deep-agent/service";
 import type { LlmConfigStore } from "./llm-config-store";
 
-const invokeMock = vi.mocked(invokeOpenScreenAgent);
+const invokeMock = vi.mocked(invokeDriftAgent);
 
 function fixtureDocument(): AxcutDocument {
 	const base = createEmptyDocument({ title: "Test", projectId: "proj_loop" });
@@ -107,7 +107,7 @@ beforeEach(() => {
 // the next sink event (text delta / toolStart / toolEnd / error). The
 // generator yields `null` to end the loop.
 async function streamAgent(
-	args: Parameters<typeof invokeOpenScreenAgent>[0],
+	args: Parameters<typeof invokeDriftAgent>[0],
 	events: ReadonlyArray<{ kind: string; payload: unknown }>,
 ): Promise<{ text: string; document: AxcutDocument; mutated: boolean }> {
 	const sink = args.sink;

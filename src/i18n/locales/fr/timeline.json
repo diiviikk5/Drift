@@ -1,0 +1,90 @@
+{
+	"buttons": {
+		"addZoom": "Ajouter un zoom (Z)",
+		"suggestZooms": "Suggérer des zooms depuis le curseur",
+		"autoZoomOn": "Suggestions de zoom automatique activées — cliquez pour retirer les zooms suggérés",
+		"autoZoomOff": "Suggestions de zoom automatique désactivées — cliquez pour suggérer des zooms depuis le curseur",
+		"autoFocusAllOn": "Mise au point automatique activée pour tous les zooms — cliquez pour tout passer en manuel",
+		"autoFocusAllOff": "Activer la mise au point automatique pour tous les zooms (la caméra suit le curseur)",
+		"addTrim": "Ajouter une coupe (T)",
+		"addAnnotation": "Ajouter une annotation (A)",
+		"addSpeed": "Ajouter une vitesse (S)",
+		"addCameraFullscreen": "Ajouter Caméra plein écran (C)"
+	},
+	"hints": {
+		"pressZoom": "Appuyez sur Z pour ajouter un zoom",
+		"pressTrim": "Appuyez sur T pour ajouter une coupe",
+		"pressAnnotation": "Appuyez sur A pour ajouter une annotation",
+		"pressSpeed": "Appuyez sur S pour ajouter une vitesse",
+		"pressCameraFullscreen": "Appuyez sur C pour ajouter un segment Caméra plein écran"
+	},
+	"labels": {
+		"pan": "Panoramique",
+		"zoom": "Zoom",
+		"trim": "Couper",
+		"speed": "Vitesse",
+		"zoomItem": "Zoom {{index}}",
+		"trimItem": "Coupe {{index}}",
+		"speedItem": "Vitesse {{index}}",
+		"annotationItem": "Annotation",
+		"imageItem": "Image",
+		"emptyText": "Texte vide",
+		"cameraFullscreen": "Caméra plein écran",
+		"cameraFullscreenItem": "Caméra plein écran {{index}}"
+	},
+	"emptyState": {
+		"noVideo": "Aucune vidéo chargée",
+		"dragAndDrop": "Glissez-déposez une vidéo pour commencer à éditer"
+	},
+	"errors": {
+		"cannotPlaceZoom": "Impossible de placer le zoom ici",
+		"zoomExistsAtLocation": "Un zoom existe déjà à cet emplacement ou l'espace disponible est insuffisant.",
+		"zoomSuggestionUnavailable": "Gestionnaire de suggestions de zoom non disponible",
+		"noCursorTelemetry": "Aucune télémétrie de curseur disponible",
+		"noCursorTelemetryDescription": "Enregistrez d'abord un screencast pour générer des suggestions basées sur le curseur.",
+		"noUsableTelemetry": "Aucune télémétrie de curseur utilisable",
+		"noUsableTelemetryDescription": "L'enregistrement ne contient pas suffisamment de données de mouvement du curseur.",
+		"noDwellMoments": "Aucun moment de pause du curseur trouvé",
+		"noDwellMomentsDescription": "Essayez un enregistrement avec des pauses plus lentes du curseur sur les actions importantes.",
+		"noAutoZoomSlots": "Aucun emplacement de zoom automatique disponible",
+		"noAutoZoomSlotsDescription": "Les points de pause détectés chevauchent des régions de zoom existantes.",
+		"cannotPlaceTrim": "Impossible de placer la coupe ici",
+		"trimExistsAtLocation": "Une coupe existe déjà à cet emplacement ou l'espace disponible est insuffisant.",
+		"cannotPlaceSpeed": "Impossible de placer la vitesse ici",
+		"speedExistsAtLocation": "Une région de vitesse existe déjà à cet emplacement ou l'espace disponible est insuffisant.",
+		"cannotPlaceCameraFullscreen": "Impossible de placer la caméra plein écran ici",
+		"cameraFullscreenExistsAtLocation": "Un segment Caméra plein écran existe déjà à cet emplacement ou l'espace disponible est insuffisant."
+	},
+	"success": {
+		"addedZoomSuggestions": "{{count}} suggestion de zoom basée sur le curseur ajoutée",
+		"addedZoomSuggestionsPlural": "{{count}} suggestions de zoom basées sur le curseur ajoutées"
+	},
+	"toolbar": {
+		"autoEnhance": "Amélioration auto",
+		"automaticZooms": "Zooms automatiques",
+		"automaticZoomsHint": "Basé sur le mouvement du curseur enregistré",
+		"smartZoomsAndCuts": "Coupes intelligentes",
+		"smartZoomsAndCutsHint": "Avec l'IA",
+		"comment": "Commentaire",
+		"timelineTools": "Outils de la timeline",
+		"arrangeClips": "Organiser les clips",
+		"arrangeClipsHint": "Glissez les clips ci-dessous pour les réorganiser ou en déposer de nouveaux",
+		"newAnnotation": "Annotation",
+		"dragToReorderHint": "Glissez pour réorganiser · double-cliquez pour modifier les points d'entrée/sortie",
+		"editInOutPoints": "Modifier les points d'entrée/sortie",
+		"deleteClip": "Supprimer le clip",
+		"dropToAdd": "Déposez pour ajouter à la timeline",
+		"importRecordingFirst": "Importez d'abord un enregistrement",
+		"noAutoZoomMoments": "Aucun moment de zoom automatique trouvé",
+		"noAutoZoomMomentsDescription": "Cet enregistrement n'a pas de données de mouvement du curseur, ou les zooms existants couvrent déjà les moments importants.",
+		"addedAutoZoom": "{{count}} zoom automatique ajouté",
+		"addedAutoZoomPlural": "{{count}} zooms automatiques ajoutés",
+		"autoZoomFailed": "Échec du zoom automatique",
+		"aiEnhanceRequested": "Demandé à l'agent IA de couper les temps morts",
+		"smartCutsWaiting": "Transcription en cours… disponible dans un instant",
+		"smartCutsNeedsTranscript": "Nécessite une transcription",
+		"smartCutsNoAudio": "Ce média n'a pas d'audio",
+		"smartCutsNoSpeech": "Aucune parole détectée",
+		"smartCutsFailed": "Échec de la transcription — relancez-la depuis Médias"
+	}
+}

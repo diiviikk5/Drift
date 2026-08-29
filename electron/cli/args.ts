@@ -1,4 +1,4 @@
-// Pure argv parser for the OpenScreen CLI. No Electron imports so it can be
+// Pure argv parser for the Drift CLI. No Electron imports so it can be
 // unit-tested under plain vitest.
 
 import path from "node:path";
@@ -61,17 +61,17 @@ const SUBCOMMANDS = new Set([
 	"-h",
 ]);
 
-export const CLI_USAGE = `OpenScreen CLI
+export const CLI_USAGE = `Drift CLI
 
 Usage:
-  openscreen export <project.openscreen> [options]   Render a project to MP4/GIF
-  openscreen record [options]                        Record the screen headlessly
-  openscreen sources [--json] [-o <file>]            List displays, windows and microphones
-  openscreen pack <project.openscreen> --out <dir>   Copy project + media into one portable folder
-  openscreen captions <project.openscreen>           Add auto-captions (on-device Whisper) to a project
+  drift export <project.drift> [options]   Render a project to MP4/GIF
+  drift record [options]                        Record the screen headlessly
+  drift sources [--json] [-o <file>]            List displays, windows and microphones
+  drift pack <project.drift> --out <dir>   Copy project + media into one portable folder
+  drift captions <project.drift>           Add auto-captions (on-device Whisper) to a project
                      [--min-words <n>] [--max-words <n>]
-  openscreen info <project.openscreen> [--json]      Inspect a project file
-  openscreen help                                    Show this help
+  drift info <project.drift> [--json]      Inspect a project file
+  drift help                                    Show this help
 
 Export options:
   -o, --out <path>          Output file (.mp4 or .gif). Default: next to the project file
@@ -97,7 +97,7 @@ Record options (recording is saved into the app's recordings directory):
   --cursor <editable-overlay|system>
                             Cursor capture mode (default editable-overlay)
   --duration <seconds>      Stop automatically after this long
-  --project <out.openscreen>
+  --project <out.drift>
                             Write a ready-to-export project file when done
   --json                    NDJSON events on stdout
 
@@ -108,7 +108,7 @@ or pass --duration.
 function takeValue(argv: string[], i: number, flag: string): [string, number] {
 	const next = argv[i + 1];
 	// "" is rejected alongside a missing value: an unset variable in a wrapper
-	// (`openscreen sources -o "$OUT"`) reaches us as an empty argument, and every
+	// (`drift sources -o "$OUT"`) reaches us as an empty argument, and every
 	// caller here feeds the result to resolvePath, where path.resolve(cwd, "")
 	// returns cwd. That turns a typo into a directory path, which then fails much
 	// later as EISDIR from the write — after the work is done and discarded —
@@ -137,7 +137,7 @@ export function parseCliArgs(
 	const rawArgs = argv.slice(firstArgIndex).filter((a) => !a.startsWith("--inspect"));
 
 	// Skip *leading* Chromium/Electron switches (e.g. the AppImage's required
-	// `--no-sandbox`) so `Openscreen --no-sandbox export demo.openscreen` still
+	// `--no-sandbox`) so `Openscreen --no-sandbox export demo.drift` still
 	// enters CLI mode. Only leading dash-tokens are skipped — everything after
 	// the subcommand belongs to the subcommand parser. `--help`/`-h` are ours.
 	let subIndex = 0;
@@ -269,7 +269,7 @@ function parseExport(args: string[], cwd: string): CliCommand {
 		}
 	}
 
-	if (!request.projectPath) throw new Error("export requires a <project.openscreen> path");
+	if (!request.projectPath) throw new Error("export requires a <project.drift> path");
 	if (request.outPath) {
 		const ext = path.extname(request.outPath).toLowerCase();
 		if (ext !== ".mp4" && ext !== ".gif") {
@@ -354,8 +354,8 @@ function parseRecord(args: string[], cwd: string): CliCommand {
 			}
 			case "--project": {
 				const [value, next] = takeValue(args, i, arg);
-				if (!value.endsWith(".openscreen")) {
-					throw new Error(`--project must end in .openscreen, got "${value}"`);
+				if (!value.endsWith(".drift")) {
+					throw new Error(`--project must end in .drift, got "${value}"`);
 				}
 				request.projectOut = resolvePath(value, cwd);
 				i = next;
@@ -415,7 +415,7 @@ function parsePack(args: string[], cwd: string): CliCommand {
 			projectPath = resolvePath(arg, cwd);
 		}
 	}
-	if (!projectPath) throw new Error("pack requires a <project.openscreen> path");
+	if (!projectPath) throw new Error("pack requires a <project.drift> path");
 	if (!outDir) throw new Error("pack requires --out <directory>");
 	return { kind: "pack", projectPath, outDir, json };
 }
@@ -446,7 +446,7 @@ function parseCaptions(args: string[], cwd: string): CliCommand {
 			projectPath = resolvePath(arg, cwd);
 		}
 	}
-	if (!projectPath) throw new Error("captions requires a <project.openscreen> path");
+	if (!projectPath) throw new Error("captions requires a <project.drift> path");
 	if (minWordsPerCaption > maxWordsPerCaption) {
 		throw new Error("--min-words cannot exceed --max-words");
 	}
@@ -467,6 +467,6 @@ function parseInfo(args: string[], cwd: string): CliCommand {
 			projectPath = resolvePath(arg, cwd);
 		}
 	}
-	if (!projectPath) throw new Error("info requires a <project.openscreen> path");
+	if (!projectPath) throw new Error("info requires a <project.drift> path");
 	return { kind: "info", projectPath, json };
 }

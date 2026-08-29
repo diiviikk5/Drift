@@ -7,7 +7,7 @@
 // along with their providers — see the note in provider-registry.ts.
 //
 // ponytail: the per-provider reasoning-effort capability table (was
-// ./agent-provider-capabilities.ts) is only consumed by createOpenScreenChatModel,
+// ./agent-provider-capabilities.ts) is only consumed by createDriftChatModel,
 // so it lives here as a top section. The deep-agent runtime wrapper
 // (./service.ts) stays separate because it owns a different concern — the
 // LangGraph thread + tool graph, not the chat-model factory.
@@ -74,7 +74,7 @@ const OPENROUTER_REASONING_EFFORTS: readonly AgentReasoningEffort[] = [
 const GOOGLE_REASONING_EFFORTS: readonly AgentReasoningEffort[] = ["none", "low", "medium", "high"];
 
 // Every branch here compares against canonical registry ids —
-// createOpenScreenChatModel normalizes the provider before calling in.
+// createDriftChatModel normalizes the provider before calling in.
 export function getReasoningCapability(provider: string, model?: string): ReasoningCapability {
 	const def: ProviderDefinition | undefined = getProviderDefinition(provider);
 	const normalizedModel = normalizeModelName(model);
@@ -277,7 +277,7 @@ function normalizeModelName(model?: string): string {
 
 // --- chat-model factory ----------------------------------------------------
 
-export interface OpenScreenChatModelConfig {
+export interface DriftChatModelConfig {
 	provider: string;
 	model: string;
 	apiKey?: string;
@@ -287,7 +287,7 @@ export interface OpenScreenChatModelConfig {
 
 // ponytail: placeholder API key for self-hosted OpenAI-compatible endpoints
 // that don't actually authenticate (same as axcut's OPENAI_COMPATIBLE_NO_AUTH).
-export const OPENAI_COMPATIBLE_NO_AUTH_API_KEY = "openscreen-openai-compatible-no-auth";
+export const OPENAI_COMPATIBLE_NO_AUTH_API_KEY = "drift-openai-compatible-no-auth";
 
 // ponytail: explicit output budget for the Anthropic-wire providers
 // (`anthropic`, `minimax`, `minimax-token-plan`). ChatAnthropic picks its
@@ -363,13 +363,13 @@ export function messageContentToThinking(content: unknown): string {
 	return total;
 }
 
-export async function createOpenScreenChatModel(
-	input: OpenScreenChatModelConfig,
+export async function createDriftChatModel(
+	input: DriftChatModelConfig,
 ): Promise<BaseChatModel> {
 	// Canonicalise once, here: stored configs can still carry historical
 	// aliases (`claude`, `gemini`, `anthropic-proxy`), and every provider
 	// comparison below is an exact match against a registry id.
-	const config: OpenScreenChatModelConfig = {
+	const config: DriftChatModelConfig = {
 		...input,
 		provider: normalizeProviderId(input.provider) ?? input.provider,
 	};
@@ -433,7 +433,7 @@ export async function createOpenScreenChatModel(
 }
 
 async function createLocalProviderChatModel(
-	config: OpenScreenChatModelConfig,
+	config: DriftChatModelConfig,
 	reasoningOptions: ReturnType<typeof buildLangChainReasoningOptions>,
 ): Promise<BaseChatModel> {
 	switch (config.provider) {

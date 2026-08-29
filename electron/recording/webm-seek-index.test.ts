@@ -31,7 +31,7 @@ describe("recording re-index", () => {
 	 */
 	beforeEach(async () => {
 		setPlatform("linux");
-		dir = await mkdtemp(path.join(tmpdir(), "openscreen-reindex-"));
+		dir = await mkdtemp(path.join(tmpdir(), "drift-reindex-"));
 		vi.spyOn(console, "warn").mockImplementation(() => undefined);
 	});
 

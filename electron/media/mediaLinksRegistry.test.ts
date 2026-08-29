@@ -11,7 +11,7 @@ import {
 } from "./mediaLinksRegistry";
 
 async function makeTempDir(): Promise<string> {
-	return fs.mkdtemp(path.join(os.tmpdir(), "openscreen-media-links-"));
+	return fs.mkdtemp(path.join(os.tmpdir(), "drift-media-links-"));
 }
 
 /**

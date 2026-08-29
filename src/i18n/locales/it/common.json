@@ -1,0 +1,69 @@
+{
+	"actions": {
+		"cancel": "Annulla",
+		"save": "Salva",
+		"delete": "Elimina",
+		"close": "Chiudi",
+		"share": "Condividi",
+		"done": "Fatto",
+		"open": "Apri",
+		"checkForUpdates": "Controlla aggiornamenti",
+		"viewRelease": "Visualizza versione",
+		"downloadUpdate": "Scarica aggiornamento",
+		"restartNow": "Riavvia ora",
+		"upload": "Carica",
+		"export": "Esporta",
+		"showInFolder": "Mostra nella cartella",
+		"file": "File",
+		"edit": "Modifica",
+		"view": "Visualizza",
+		"window": "Finestra",
+		"help": "Aiuto",
+		"quit": "Esci",
+		"stopRecording": "Interrompi registrazione",
+		"undo": "Annulla",
+		"redo": "Ripeti",
+		"cut": "Taglia",
+		"copy": "Copia",
+		"paste": "Incolla",
+		"selectAll": "Seleziona tutto",
+		"minimize": "Riduci a icona",
+		"reload": "Ricarica",
+		"forceReload": "Forza ricarica",
+		"toggleDevTools": "Attiva/disattiva strumenti sviluppatore",
+		"actualSize": "Dimensione effettiva",
+		"zoomIn": "Ingrandisci",
+		"zoomOut": "Riduci",
+		"toggleFullScreen": "Attiva/disattiva schermo intero",
+		"recordingStatus": "Registrazione: {{source}}",
+		"about": "Info su Drift",
+		"services": "Servizi",
+		"hide": "Nascondi Drift",
+		"hideOthers": "Nascondi gli altri",
+		"unhide": "Mostra tutto",
+		"saveDiagnostics": "Salva dati diagnostici"
+	},
+	"updates": {
+		"available": "Drift {{latestVersion}} è disponibile. Stai usando la versione {{currentVersion}}.",
+		"current": "Drift è aggiornato ({{currentVersion}}).",
+		"readyToInstall": "Drift {{latestVersion}} è stato scaricato. Riavvia per completare l'installazione.",
+		"blockedRecording": "Termina la registrazione prima di installare l'aggiornamento.",
+		"blockedLocation": "Sposta Drift nella cartella Applicazioni prima di aggiornare.",
+		"failed": "Impossibile controllare gli aggiornamenti.",
+		"downloadFailed": "Impossibile scaricare l'aggiornamento."
+	},
+	"units": {
+		"pixelsPerSecond": "{{value}} pixel/s",
+		"pixels": "{{value}} pixel"
+	},
+	"locale": {
+		"name": "Italiano",
+		"short": "IT"
+	},
+	"recordingSource": {
+		"window": "Finestra",
+		"screen": "Schermo",
+		"virtual": "Schermo virtuale",
+		"unknown": "Registrazione schermo"
+	}
+}

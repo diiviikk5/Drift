@@ -3,7 +3,7 @@ import { binaryNameForBackend, candidateBinaryPaths, detectGpuBackend } from "./
 
 describe("gpuDetector", () => {
 	afterEach(() => {
-		delete process.env.OPENSCREEN_WHISPER_SERVER_EXE;
+		delete process.env.DRIFT_WHISPER_SERVER_EXE;
 	});
 
 	it("returns a whisper.cpp backend for the current platform", async () => {
@@ -52,15 +52,15 @@ describe("gpuDetector", () => {
 	});
 
 	it("candidateBinaryPaths prepends env override when set", () => {
-		process.env.OPENSCREEN_WHISPER_SERVER_EXE = "/custom/path/whisper-stt-server";
+		process.env.DRIFT_WHISPER_SERVER_EXE = "/custom/path/whisper-stt-server";
 		const here = "/fake/repo";
 		const paths = candidateBinaryPaths(here);
 		expect(paths[0]).toBe("/custom/path/whisper-stt-server");
-		delete process.env.OPENSCREEN_WHISPER_SERVER_EXE;
+		delete process.env.DRIFT_WHISPER_SERVER_EXE;
 	});
 
-	it("candidateBinaryPaths honours OPENSCREEN_WHISPER_SERVER_EXE when set", () => {
-		process.env.OPENSCREEN_WHISPER_SERVER_EXE = "/custom/path/whisper-stt-server";
+	it("candidateBinaryPaths honours DRIFT_WHISPER_SERVER_EXE when set", () => {
+		process.env.DRIFT_WHISPER_SERVER_EXE = "/custom/path/whisper-stt-server";
 		const paths = candidateBinaryPaths("/fake/repo");
 		expect(paths[0]).toBe("/custom/path/whisper-stt-server");
 	});

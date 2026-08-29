@@ -26,7 +26,7 @@ describe("webm-duration patching", () => {
 	const pathFor = (name: string) => path.join(dir, name);
 
 	beforeEach(async () => {
-		dir = await mkdtemp(path.join(tmpdir(), "openscreen-duration-"));
+		dir = await mkdtemp(path.join(tmpdir(), "drift-duration-"));
 	});
 
 	afterEach(async () => {

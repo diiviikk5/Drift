@@ -4,7 +4,7 @@
  * Captures the last `capacity` lines written via console.info / console.warn /
  * console.error / console.log into a single in-memory buffer. Disabled by
  * default — install only when verbose diagnostics are wanted, e.g. when
- * OPENSCREEN_DIAGNOSTIC=1 is set or when a developer wants a more complete
+ * DRIFT_DIAGNOSTIC=1 is set or when a developer wants a more complete
  * "Save Diagnostics" payload for an upstream bug report.
  *
  * Cost when enabled: one array.push + occasional shift per console call,
@@ -95,7 +95,7 @@ export class MainLogBuffer {
 export const mainLogBuffer = new MainLogBuffer();
 
 export function isDiagnosticModeEnabled(): boolean {
-	const raw = process.env.OPENSCREEN_DIAGNOSTIC;
+	const raw = process.env.DRIFT_DIAGNOSTIC;
 	if (!raw) return false;
 	const lowered = raw.trim().toLowerCase();
 	return lowered === "1" || lowered === "true" || lowered === "yes";

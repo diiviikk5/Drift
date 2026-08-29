@@ -1,8 +1,8 @@
 // DocumentService — main-process owner of v3 AxcutDocument projects.
-// Persists one .openscreen JSON per project under userData/projects/ (the file
+// Persists one .drift JSON per project under userData/projects/ (the file
 // carries its own `schemaVersion`, so migration keys off the content, not the
 // extension). Older builds wrote these same documents as `.axcut`; those are
-// renamed to `.openscreen` on first access. Slim port of
+// renamed to `.drift` on first access. Slim port of
 // axcut's apps/server/src/services/document-service.ts (no separate paths.ts —
 // uses app.getPath("userData") directly; no Python probe_media — assets carry
 // only path metadata, duration is filled in by the renderer).
@@ -23,7 +23,7 @@ import {
 } from "../../src/lib/ai-edition/schema";
 import { relinkProjectMedia } from "../media/projectMediaRelinker";
 
-const PROJECT_FILE_EXTENSION = ".openscreen";
+const PROJECT_FILE_EXTENSION = ".drift";
 // Older builds stored these same v3/v4 AxcutDocuments under `.axcut`. We read
 // them for back-compat and rename them to PROJECT_FILE_EXTENSION on access.
 const LEGACY_PROJECT_FILE_EXTENSION = ".axcut";
@@ -135,7 +135,7 @@ export class DocumentService {
 	}
 
 	// One-time-per-process pass renaming any legacy `.axcut` project files to
-	// `.openscreen`. The document bytes are identical (same schemaVersion), so
+	// `.drift`. The document bytes are identical (same schemaVersion), so
 	// this is a pure rename — no content migration involved.
 	private async migrateLegacyExtensions(): Promise<void> {
 		if (this.legacyMigrationDone) return;
@@ -154,7 +154,7 @@ export class DocumentService {
 					const base = name.slice(0, -LEGACY_PROJECT_FILE_EXTENSION.length);
 					const to = path.join(this.projectsRoot, `${base}${PROJECT_FILE_EXTENSION}`);
 					try {
-						// If a `.openscreen` already exists for this id it's authoritative;
+						// If a `.drift` already exists for this id it's authoritative;
 						// drop the stale `.axcut`. Otherwise rename the legacy file across.
 						await fs.access(to);
 						await fs.unlink(from);
@@ -207,7 +207,7 @@ export class DocumentService {
 	}
 
 	async getProject(projectId: string): Promise<AxcutDocument> {
-		// Prefer the canonical `.openscreen` file, falling back to a not-yet-migrated
+		// Prefer the canonical `.drift` file, falling back to a not-yet-migrated
 		// legacy `.axcut` so a project opened before its migration pass still loads.
 		let raw: string;
 		try {
@@ -231,7 +231,7 @@ export class DocumentService {
 				);
 			}
 		}
-		// Relink here rather than in the .openscreen import handlers, because this
+		// Relink here rather than in the .drift import handlers, because this
 		// is the one place every open funnels through — the project picker, the
 		// agent, and the auto-load-last-project effect on launch. A document whose
 		// media moved (or that was authored on another machine, issue #212) is
@@ -387,7 +387,7 @@ export class DocumentService {
 		await this.ensureProjectsDir();
 		const filePath = this.fileFor(doc.project.id);
 		// The suffix goes AFTER the extension on purpose: listProjects matches on a
-		// trailing `.openscreen`, so an interrupted write's leftover is invisible to
+		// trailing `.drift`, so an interrupted write's leftover is invisible to
 		// it rather than showing up as a corrupt project. Unique per write, so two
 		// queues (or two processes) never share a temp path.
 		const tempPath = `${filePath}.tmp-${process.pid}-${createId("w")}`;

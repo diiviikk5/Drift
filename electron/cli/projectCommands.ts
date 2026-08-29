@@ -1,5 +1,5 @@
 // The two CLI commands that only touch the project file and its media:
-// `openscreen pack` and `openscreen info`. They live outside cliMain.ts so they
+// `drift pack` and `drift info`. They live outside cliMain.ts so they
 // carry no `electron` import and stay unit-testable — the caller passes the
 // writer, so nothing here knows about process.stdout either.
 
@@ -45,7 +45,7 @@ export async function runPackCommand(
 	const resolveSource = async (mediaPath: string): Promise<string> => {
 		if (await isFile(mediaPath)) return mediaPath;
 		// Moved project: the stored absolute path is stale but the media travelled
-		// with the .openscreen file. Same rule as the loader's sibling fallback.
+		// with the .drift file. Same rule as the loader's sibling fallback.
 		const sibling = path.join(projectDir, path.basename(mediaPath));
 		if (await isFile(sibling)) return sibling;
 		throw new Error(`Referenced media not found: ${mediaPath}`);

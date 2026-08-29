@@ -1,7 +1,7 @@
 import { type Rectangle, screen } from "electron";
 
 /**
- * Converts a rect from Electron's coordinate space into the one OpenScreen's
+ * Converts a rect from Electron's coordinate space into the one Drift's
  * native capture and cursor helpers speak. This is the single place that knows
  * the difference; every rect crossing into a helper goes through it.
  *

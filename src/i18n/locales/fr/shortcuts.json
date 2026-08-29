@@ -1,0 +1,41 @@
+{
+	"title": "Raccourcis clavier",
+	"customize": "Personnaliser",
+	"configurable": "Configurable",
+	"fixed": "Fixe",
+	"pressKey": "Appuyez sur une touche…",
+	"clickToChange": "Cliquez pour modifier",
+	"pressEscToCancel": "Appuyez sur Échap pour annuler",
+	"helpText": "Cliquez sur un raccourci puis appuyez sur la nouvelle combinaison de touches. Appuyez sur Échap pour annuler.",
+	"resetToDefaults": "Réinitialiser les valeurs par défaut",
+	"alreadyUsedBy": "Déjà utilisé par {{action}}",
+	"swap": "Échanger",
+	"reservedShortcut": "Ce raccourci est réservé pour « {{label}} » et ne peut pas être réassigné.",
+	"savedToast": "Raccourcis clavier enregistrés",
+	"resetToast": "Réinitialisé aux raccourcis par défaut — cliquez sur Enregistrer pour appliquer",
+	"registrationFailed": "Échec de l'enregistrement du raccourci. Il est peut-être utilisé par une autre application. Essayez une autre touche.",
+	"actions": {
+		"openApp": "Ouvrir l'application",
+		"addZoom": "Ajouter un zoom",
+		"addTrim": "Ajouter une coupe",
+		"addSpeed": "Ajouter une vitesse",
+		"addAnnotation": "Ajouter une annotation",
+		"addKeyframe": "Ajouter une image-clé",
+		"addCameraFullscreen": "Ajouter une caméra en plein écran",
+		"deleteSelected": "Supprimer la sélection",
+		"playPause": "Lecture / Pause",
+		"copySelected": "Copier la sélection",
+		"paste": "Coller"
+	},
+	"fixedActions": {
+		"undo": "Annuler",
+		"redo": "Rétablir",
+		"cycleAnnotationsForward": "Parcourir les annotations en avant",
+		"cycleAnnotationsBackward": "Parcourir les annotations en arrière",
+		"deleteSelectedAlt": "Supprimer la sélection (alt)",
+		"panTimeline": "Panoramique de la timeline",
+		"zoomTimeline": "Zoom de la timeline",
+		"frameBack": "Image précédente",
+		"frameForward": "Image suivante"
+	}
+}

@@ -4,7 +4,7 @@
 //
 // The existing sidecar conventions (`<name>.session.json` next to a screen
 // recording, `<path>.cursor.json` next to a video) only work while the file
-// stays exactly where it was recorded. This registry lets OpenScreen re-find
+// stays exactly where it was recorded. This registry lets Drift re-find
 // the same links after the screen video has been imported into a different
 // project from a different location — the caller (electron/ipc/handlers.ts)
 // tries the cheap path-adjacency sidecars first and falls back to this

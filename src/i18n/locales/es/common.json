@@ -1,0 +1,69 @@
+{
+	"actions": {
+		"cancel": "Cancelar",
+		"save": "Guardar",
+		"delete": "Eliminar",
+		"close": "Cerrar",
+		"share": "Compartir",
+		"done": "Listo",
+		"open": "Abrir",
+		"checkForUpdates": "Buscar actualizaciones",
+		"viewRelease": "Ver versión",
+		"downloadUpdate": "Descargar actualización",
+		"restartNow": "Reiniciar ahora",
+		"upload": "Subir",
+		"export": "Exportar",
+		"showInFolder": "Mostrar en carpeta",
+		"file": "Archivo",
+		"edit": "Editar",
+		"view": "Vista",
+		"window": "Ventana",
+		"help": "Ayuda",
+		"quit": "Salir",
+		"stopRecording": "Detener grabación",
+		"undo": "Deshacer",
+		"redo": "Rehacer",
+		"cut": "Cortar",
+		"copy": "Copiar",
+		"paste": "Pegar",
+		"selectAll": "Seleccionar todo",
+		"minimize": "Minimizar",
+		"reload": "Recargar",
+		"forceReload": "Forzar recarga",
+		"toggleDevTools": "Alternar herramientas de desarrollador",
+		"actualSize": "Tamaño real",
+		"zoomIn": "Acercar",
+		"zoomOut": "Alejar",
+		"toggleFullScreen": "Alternar pantalla completa",
+		"recordingStatus": "Grabando: {{source}}",
+		"about": "Acerca de Drift",
+		"services": "Servicios",
+		"hide": "Ocultar Drift",
+		"hideOthers": "Ocultar otros",
+		"unhide": "Mostrar todo",
+		"saveDiagnostics": "Guardar diagnósticos"
+	},
+	"updates": {
+		"available": "Drift {{latestVersion}} está disponible. Estás usando {{currentVersion}}.",
+		"current": "Drift está actualizado ({{currentVersion}}).",
+		"readyToInstall": "Se ha descargado Drift {{latestVersion}}. Reinicia para completar la instalación.",
+		"blockedRecording": "Termina la grabación antes de instalar la actualización.",
+		"blockedLocation": "Mueve Drift a la carpeta Aplicaciones antes de actualizar.",
+		"failed": "No se pudieron buscar actualizaciones.",
+		"downloadFailed": "No se pudo descargar la actualización."
+	},
+	"units": {
+		"pixelsPerSecond": "{{value}} píxeles/s",
+		"pixels": "{{value}} píxeles"
+	},
+	"locale": {
+		"name": "Español",
+		"short": "ES"
+	},
+	"recordingSource": {
+		"window": "Ventana",
+		"screen": "Pantalla",
+		"virtual": "Pantalla virtual",
+		"unknown": "Grabación de pantalla"
+	}
+}

@@ -1,0 +1,99 @@
+{
+	"tooltips": {
+		"hideHUD": "隱藏控制面板",
+		"closeApp": "關閉應用程式",
+		"restartRecording": "重新開始錄製",
+		"cancelRecording": "取消錄製",
+		"pauseRecording": "暫停錄製",
+		"resumeRecording": "繼續錄製",
+		"useVerticalTray": "使用直向托盤",
+		"useHorizontalTray": "使用橫向托盤",
+		"openStudio": "開啟工作室",
+		"openNotes": "開啟筆記",
+		"openNotesPlaceholder": "在此輸入筆記...",
+		"notesToolbar": {
+			"bold": "粗體",
+			"italic": "斜體",
+			"strikethrough": "刪除線",
+			"bulletList": "項目符號清單",
+			"numberedList": "編號清單",
+			"blockquote": "引言",
+			"codeBlock": "程式碼區塊",
+			"play": "開始自動捲動",
+			"pause": "暫停自動捲動",
+			"speed": "捲動速度",
+			"decreaseSpeed": "降低捲動速度",
+			"increaseSpeed": "提高捲動速度",
+			"fontSize": "字體大小",
+			"decreaseFontSize": "縮小字體",
+			"increaseFontSize": "放大字體",
+			"mirror": "水平鏡像"
+		}
+	},
+	"audio": {
+		"enableSystemAudio": "啟用系統音訊",
+		"disableSystemAudio": "停用系統音訊",
+		"enableMicrophone": "啟用麥克風",
+		"disableMicrophone": "停用麥克風",
+		"defaultMicrophone": "預設麥克風",
+		"systemAudio": "系統音訊",
+		"microphone": "麥克風",
+		"on": "開",
+		"off": "關",
+		"inputDevice": "輸入裝置"
+	},
+	"webcam": {
+		"enableWebcam": "啟用攝影機",
+		"disableWebcam": "停用攝影機",
+		"defaultCamera": "預設攝影機",
+		"searching": "正在搜尋...",
+		"noneFound": "未找到攝影機",
+		"unavailable": "攝影機不可用",
+		"camera": "攝影機",
+		"cameraDevice": "攝影機裝置"
+	},
+	"cursor": {
+		"useEditableCursor": "使用可編輯游標",
+		"useSystemCursor": "使用系統游標"
+	},
+	"sourceSelector": {
+		"loading": "正在載入來源...",
+		"screens": "螢幕 ({{count}})",
+		"windows": "視窗 ({{count}})",
+		"emptyTitle": "找不到螢幕或視窗",
+		"emptyDescription": "如果您剛授予螢幕錄製權限，請重新載入此選擇器。在 macOS 上，您可能需要重新開啟 Drift。",
+		"loadFailedDescription": "Drift 無法載入擷取來源。請重新載入此選擇器並再試一次。",
+		"defaultSourceName": "螢幕"
+	},
+	"recording": {
+		"selectSource": "請選擇要錄製的來源",
+		"systemPicker": "系統將詢問要分享的內容",
+		"inProgress": "正在錄製",
+		"saving": "正在儲存..."
+	},
+	"language": "語言",
+	"systemLanguagePrompt": {
+		"title": "要使用系統語言嗎？",
+		"description": "偵測到系統語言為 {{language}}。要將 Drift 切換為 {{language}} 嗎？",
+		"switch": "切換為 {{language}}",
+		"keepDefault": "保持目前語言"
+	},
+	"softwareEncoderFallback": {
+		"title": "已切換至軟體編碼",
+		"description": "預設 GPU 編碼器啟動失敗，Drift 已改用軟體 H.264 編碼。錄製會照常繼續，但 CPU 使用率可能較高。",
+		"dismiss": "知道了",
+		"dontShowAgain": "不再顯示"
+	},
+	"deviceSettings": {
+		"title": "裝置設定",
+		"done": "完成",
+		"micLevel": "輸入音量",
+		"micHint": "說話以測試麥克風",
+		"noMicrophones": "找不到麥克風",
+		"preview": "預覽",
+		"previewUnavailable": "預覽無法使用",
+		"about": "關於",
+		"version": "版本 {{version}}",
+		"checkingForUpdates": "檢查中…"
+	}
+}

@@ -1,0 +1,41 @@
+{
+	"title": "键盘快捷键",
+	"customize": "自定义",
+	"configurable": "可配置",
+	"fixed": "固定",
+	"pressKey": "请按下按键…",
+	"clickToChange": "点击以更改",
+	"pressEscToCancel": "按 Esc 取消",
+	"helpText": "点击一个快捷键，然后按下新的组合键。按 Esc 取消。",
+	"resetToDefaults": "恢复默认设置",
+	"alreadyUsedBy": "已被 \"{{action}}\" 使用",
+	"swap": "交换",
+	"reservedShortcut": "此快捷键已保留给 \"{{label}}\"，无法重新分配。",
+	"savedToast": "键盘快捷键已保存",
+	"resetToast": "已恢复默认快捷键 — 点击保存以应用",
+	"registrationFailed": "快捷键注册失败。可能已被其他应用占用。请尝试其他按键。",
+	"actions": {
+		"openApp": "打开应用",
+		"addZoom": "添加缩放",
+		"addTrim": "添加剪辑",
+		"addSpeed": "添加速度",
+		"addAnnotation": "添加标注",
+		"addKeyframe": "添加关键帧",
+		"addCameraFullscreen": "添加全屏摄像头",
+		"deleteSelected": "删除所选",
+		"playPause": "播放 / 暂停",
+		"copySelected": "复制所选",
+		"paste": "粘贴"
+	},
+	"fixedActions": {
+		"undo": "撤销",
+		"redo": "重做",
+		"cycleAnnotationsForward": "向前切换标注",
+		"cycleAnnotationsBackward": "向后切换标注",
+		"deleteSelectedAlt": "删除所选（替代）",
+		"panTimeline": "平移时间轴",
+		"zoomTimeline": "缩放时间轴",
+		"frameBack": "上一帧",
+		"frameForward": "下一帧"
+	}
+}

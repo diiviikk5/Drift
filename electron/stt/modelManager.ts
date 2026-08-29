@@ -14,7 +14,7 @@ import { pipeline } from "node:stream/promises";
  * `ggml-org/whisper.cpp` on HuggingFace is a different, access-gated repo
  * and returns 401 on every file including README.md — confirmed by curl).
  * whisper.cpp bakes precision into the file, so
- * there is no runtime `--int8` flag; OpenScreen ships the q8_0 quantized
+ * there is no runtime `--int8` flag; Drift ships the q8_0 quantized
  * `small` multilingual model by default.
  *
  * The file is verified by SHA-256 and written atomically (via .partial rename)
@@ -125,7 +125,7 @@ async function fetchWithRetry(url: string, fetcher: typeof fetch): Promise<Respo
 	for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
 		try {
 			const res = await fetcher(url, {
-				headers: { "user-agent": "openscreen-stt" },
+				headers: { "user-agent": "drift-stt" },
 			});
 			if (res.ok && res.body) return res;
 			if (res.status >= 400 && res.status < 500 && !RETRYABLE_STATUS.has(res.status)) {

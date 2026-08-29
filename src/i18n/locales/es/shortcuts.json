@@ -1,0 +1,41 @@
+{
+	"title": "Atajos de teclado",
+	"customize": "Personalizar",
+	"configurable": "Configurables",
+	"fixed": "Fijos",
+	"pressKey": "Presiona una tecla…",
+	"clickToChange": "Haz clic para cambiar",
+	"pressEscToCancel": "Presiona Esc para cancelar",
+	"helpText": "Haz clic en un atajo y luego presiona la nueva combinación de teclas. Presiona Esc para cancelar.",
+	"resetToDefaults": "Restablecer valores predeterminados",
+	"alreadyUsedBy": "Ya está en uso por {{action}}",
+	"swap": "Intercambiar",
+	"reservedShortcut": "Este atajo está reservado para \"{{label}}\" y no se puede reasignar.",
+	"savedToast": "Atajos de teclado guardados",
+	"resetToast": "Restablecido a los atajos predeterminados — haz clic en Guardar para aplicar",
+	"registrationFailed": "Error al registrar el atajo. Puede estar en uso por otra aplicación. Prueba otra tecla.",
+	"actions": {
+		"openApp": "Abrir aplicación",
+		"addZoom": "Agregar zoom",
+		"addTrim": "Agregar recorte",
+		"addSpeed": "Agregar velocidad",
+		"addAnnotation": "Agregar anotación",
+		"addKeyframe": "Agregar fotograma clave",
+		"addCameraFullscreen": "Agregar cámara a pantalla completa",
+		"deleteSelected": "Eliminar seleccionado",
+		"playPause": "Reproducir / Pausar",
+		"copySelected": "Copiar selección",
+		"paste": "Pegar"
+	},
+	"fixedActions": {
+		"undo": "Deshacer",
+		"redo": "Rehacer",
+		"cycleAnnotationsForward": "Recorrer anotaciones hacia adelante",
+		"cycleAnnotationsBackward": "Recorrer anotaciones hacia atrás",
+		"deleteSelectedAlt": "Eliminar seleccionado (alt)",
+		"panTimeline": "Desplazar línea de tiempo",
+		"zoomTimeline": "Zoom en línea de tiempo",
+		"frameBack": "Fotograma anterior",
+		"frameForward": "Fotograma siguiente"
+	}
+}

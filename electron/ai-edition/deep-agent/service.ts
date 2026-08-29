@@ -52,13 +52,13 @@ import {
 	setZoomArgs,
 } from "../agent-tools";
 import {
-	createOpenScreenChatModel,
+	createDriftChatModel,
 	messageContentToText,
 	messageContentToThinking,
-	type OpenScreenChatModelConfig,
+	type DriftChatModelConfig,
 } from "./chat-model";
 
-export interface OpenScreenAgentSink {
+export interface DriftAgentSink {
 	text: (delta: string) => void;
 	/** Streaming delta from the model's reasoning block (Anthropic/MiniMax
 	 * thinking). Provider-agnostic — for providers without thinking this is
@@ -98,7 +98,7 @@ const CONSENT_PROMPT_BLOCK = [
 // string and NOTHING else — the deepagents regression was invisible precisely
 // because the middlewares appended their prompts downstream of this constant.
 const BASE_SYSTEM_PROMPT = [
-	"You are an AI video editor working inside OpenScreen. The user is editing a recording.",
+	"You are an AI video editor working inside Drift. The user is editing a recording.",
 	"Help them cut silences, tighten pacing, add captions, and rewrite titles.",
 	"Be concise, action-oriented, and reference the timeline or transcript by time when relevant.",
 	"You can call the tools below against the live document snapshot; the runtime executes each edit and feeds the result back into the loop.",
@@ -119,7 +119,7 @@ const BASE_SYSTEM_PROMPT = [
 	"- Deleting is a first-class action, not a workaround: removeTrim, removeModifier, removeClip. Never fake a deletion by re-adding an element or zeroing it out (span 0, speed 1×) — that leaves it in the document and misreports what you did.",
 	"If nothing in the list does what was asked, say so; do not approximate it with a bigger tool.",
 	"",
-	"Cursor telemetry: while the screen was captured, OpenScreen recorded where the pointer went. assets[].hasCursorTelemetry in getCurrentDocument says which assets carry it, and getCursorTrack returns the recorded track for one of them — positions over time, and the pointer shape at each moment. What it means is yours to read.",
+	"Cursor telemetry: while the screen was captured, Drift recorded where the pointer went. assets[].hasCursorTelemetry in getCurrentDocument says which assets carry it, and getCursorTrack returns the recorded track for one of them — positions over time, and the pointer shape at each moment. What it means is yours to read.",
 	"Blindness is not evidence. When a tool reports it could not read something (reason 'unavailable'), that is a limit of your runtime, not a fact about the project. Only an explicit negative — reason 'no-sidecar', or a false flag — supports telling the user the data is not there.",
 	"",
 	"Honesty rules: if a request has NO matching tool (e.g. deleting an asset/recording, exporting), say so plainly — do not substitute a different edit and report it as the requested one. After your edits, if you are at all unsure the document ended up as intended, call getCurrentDocument and reconcile what you claim with the real state; each tool result already tells you exactly what it did, so never report a change the results don't support.",
@@ -246,7 +246,7 @@ const TOOLS_READING_CURSOR: ReadonlySet<string> = new Set([
 // never throws, so `execution.ok` is the only honest signal available.
 function documentTool<S extends z.ZodType>(
 	holder: DocumentHolder,
-	sink: OpenScreenAgentSink,
+	sink: DriftAgentSink,
 	name: string,
 	schema: S,
 	editsAllowed: boolean,
@@ -314,7 +314,7 @@ async function loadCursorTelemetry(
  */
 export function buildTools(
 	holder: DocumentHolder,
-	sink: OpenScreenAgentSink,
+	sink: DriftAgentSink,
 	editsAllowed = true,
 	runtime: ToolRuntime = {},
 ) {
@@ -369,10 +369,10 @@ export function anthropicCachingMiddleware(chatModel: { getName?: () => string }
 
 export interface InvokeArgs {
 	document: AxcutDocument;
-	model: OpenScreenChatModelConfig;
+	model: DriftChatModelConfig;
 	history: Array<{ role: "user" | "assistant" | "system"; content: string }>;
 	userMessage: string;
-	sink: OpenScreenAgentSink;
+	sink: DriftAgentSink;
 	/** `config.allowAgentEdits !== false`, resolved by the chat-service. When
 	 *  false the write tools refuse and the prompt tells the model to ask.
 	 *  Defaults to allowed so a caller that predates the flag behaves as before. */
@@ -438,7 +438,7 @@ export interface InvokeResult {
 	reason?: string;
 }
 
-export async function invokeOpenScreenAgent(args: InvokeArgs): Promise<InvokeResult> {
+export async function invokeDriftAgent(args: InvokeArgs): Promise<InvokeResult> {
 	const { document, model, history, userMessage, sink } = args;
 	const editsAllowed = args.editsAllowed !== false;
 
@@ -449,7 +449,7 @@ export async function invokeOpenScreenAgent(args: InvokeArgs): Promise<InvokeRes
 	// runtime side-effects (langgraph thread) are tied to the agent instance —
 	// checkpoint-based stateful threads can land later by passing a
 	// `checkpointer`; for v1 each turn is single-shot.
-	const chatModel = await createOpenScreenChatModel(model);
+	const chatModel = await createDriftChatModel(model);
 	const availableByAssetId = await probeCursorTelemetry(document, args.cursor);
 	const tools = buildTools(holder, sink, editsAllowed, {
 		cursor: args.cursor,

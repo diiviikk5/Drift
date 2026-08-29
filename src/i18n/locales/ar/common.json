@@ -1,0 +1,69 @@
+{
+	"actions": {
+		"cancel": "الغاء",
+		"save": "حفظ",
+		"delete": "حذف",
+		"close": "اغلاق",
+		"share": "مشاركة",
+		"done": "تم",
+		"open": "فتح",
+		"checkForUpdates": "التحقق من وجود تحديثات",
+		"viewRelease": "عرض الإصدار",
+		"downloadUpdate": "تنزيل التحديث",
+		"restartNow": "إعادة التشغيل الآن",
+		"upload": "رفع",
+		"export": "تصدير",
+		"showInFolder": "عرض في المجلد",
+		"file": "ملف",
+		"edit": "تعديل",
+		"view": "عرض",
+		"window": "نافذة",
+		"help": "مساعدة",
+		"quit": "خروج",
+		"stopRecording": "إيقاف التسجيل",
+		"undo": "تراجع",
+		"redo": "إعادة",
+		"cut": "قص",
+		"copy": "نسخ",
+		"paste": "لصق",
+		"selectAll": "تحديد الكل",
+		"minimize": "تصغير",
+		"reload": "إعادة تحميل",
+		"forceReload": "إعادة تحميل إجبارية",
+		"toggleDevTools": "أدوات المطور",
+		"actualSize": "الحجم الفعلي",
+		"zoomIn": "تكبير",
+		"zoomOut": "تصغير",
+		"toggleFullScreen": "ملء الشاشة",
+		"recordingStatus": "جاري التسجيل: {{source}}",
+		"about": "حول Drift",
+		"services": "خدمات",
+		"hide": "إخفاء Drift",
+		"hideOthers": "إخفاء الآخرين",
+		"unhide": "إظهار الكل",
+		"saveDiagnostics": "حفظ التشخيصات"
+	},
+	"updates": {
+		"available": "يتوفر Drift {{latestVersion}}. الإصدار المثبت هو {{currentVersion}}.",
+		"current": "Drift محدّث ({{currentVersion}}).",
+		"readyToInstall": "تم تنزيل Drift {{latestVersion}}. أعد التشغيل لإكمال التثبيت.",
+		"blockedRecording": "أنهِ التسجيل قبل تثبيت التحديث.",
+		"blockedLocation": "انقل Drift إلى مجلد التطبيقات قبل التحديث.",
+		"failed": "تعذّر التحقق من وجود تحديثات.",
+		"downloadFailed": "تعذّر تنزيل التحديث."
+	},
+	"units": {
+		"pixelsPerSecond": "{{value}} بكسل/ثانية",
+		"pixels": "{{value}} بكسل"
+	},
+	"locale": {
+		"name": "عربي",
+		"short": "AR"
+	},
+	"recordingSource": {
+		"window": "نافذة",
+		"screen": "شاشة",
+		"virtual": "شاشة افتراضية",
+		"unknown": "تسجيل الشاشة"
+	}
+}

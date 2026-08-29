@@ -50,7 +50,7 @@ export async function writeSamplesAsWav(samples: Float32Array): Promise<string> 
 		buf.writeInt16LE(Math.round(s * 32_767), HEADER_BYTES + i * 2);
 	}
 
-	const tmpDir = await mkdtemp(path.join(os.tmpdir(), "openscreen-stt-"));
+	const tmpDir = await mkdtemp(path.join(os.tmpdir(), "drift-stt-"));
 	const outPath = path.join(tmpDir, "audio.wav");
 	await writeFile(outPath, buf);
 	return outPath;

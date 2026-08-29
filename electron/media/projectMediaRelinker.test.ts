@@ -10,7 +10,7 @@ describe("relinkProjectMedia", () => {
 	let logged: string[];
 
 	beforeEach(async () => {
-		tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openscreen-project-relink-"));
+		tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "drift-project-relink-"));
 		logged = [];
 		const record = (...args: unknown[]) => {
 			logged.push(args.join(" "));

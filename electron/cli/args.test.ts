@@ -16,9 +16,9 @@ describe("parseCliArgs", () => {
 	});
 
 	it("skips leading Chromium switches before the subcommand (AppImage --no-sandbox)", () => {
-		expect(parse(["--no-sandbox", "export", "demo.openscreen"])).toMatchObject({
+		expect(parse(["--no-sandbox", "export", "demo.drift"])).toMatchObject({
 			kind: "export",
-			projectPath: inCwd("demo.openscreen"),
+			projectPath: inCwd("demo.drift"),
 		});
 		expect(parse(["--no-sandbox", "--enable-unsafe-swiftshader", "record"])).toMatchObject({
 			kind: "record",
@@ -28,10 +28,10 @@ describe("parseCliArgs", () => {
 	});
 
 	it("parses a minimal export command and resolves relative paths", () => {
-		const cmd = parse(["export", "demo.openscreen"]);
+		const cmd = parse(["export", "demo.drift"]);
 		expect(cmd).toMatchObject({
 			kind: "export",
-			projectPath: inCwd("demo.openscreen"),
+			projectPath: inCwd("demo.drift"),
 			outPath: null,
 			format: null,
 		});
@@ -40,7 +40,7 @@ describe("parseCliArgs", () => {
 	it("parses export options and infers format from --out extension", () => {
 		const cmd = parse([
 			"export",
-			"/p/demo.openscreen",
+			"/p/demo.drift",
 			"-o",
 			"out.gif",
 			"--gif-fps",
@@ -57,7 +57,7 @@ describe("parseCliArgs", () => {
 	});
 
 	it("rejects a --format that conflicts with the --out extension", () => {
-		const cmd = parse(["export", "a.openscreen", "-o", "x.mp4", "--format", "gif"]);
+		const cmd = parse(["export", "a.drift", "-o", "x.mp4", "--format", "gif"]);
 		expect(cmd).toMatchObject({ kind: "error" });
 	});
 
@@ -68,7 +68,7 @@ describe("parseCliArgs", () => {
 	it("parses voiceover audio options", () => {
 		const cmd = parse([
 			"export",
-			"a.openscreen",
+			"a.drift",
 			"--audio",
 			"voice.mp3",
 			"--audio-mode",
@@ -85,18 +85,18 @@ describe("parseCliArgs", () => {
 	});
 
 	it("defaults audio mode to mix and rejects --audio with gif", () => {
-		expect(parse(["export", "a.openscreen", "--audio", "v.mp3"])).toMatchObject({
+		expect(parse(["export", "a.drift", "--audio", "v.mp3"])).toMatchObject({
 			audioMode: "mix",
 			audioOffsetSec: 0,
 		});
-		expect(parse(["export", "a.openscreen", "--audio", "v.mp3", "--format", "gif"])).toMatchObject({
+		expect(parse(["export", "a.drift", "--audio", "v.mp3", "--format", "gif"])).toMatchObject({
 			kind: "error",
 		});
 		// gif inferred from --out, with no explicit --format
-		expect(parse(["export", "a.openscreen", "--audio", "v.mp3", "-o", "out.gif"])).toMatchObject({
+		expect(parse(["export", "a.drift", "--audio", "v.mp3", "-o", "out.gif"])).toMatchObject({
 			kind: "error",
 		});
-		expect(parse(["export", "a.openscreen", "--audio-offset", "-1"])).toMatchObject({
+		expect(parse(["export", "a.drift", "--audio-offset", "-1"])).toMatchObject({
 			kind: "error",
 		});
 	});
@@ -124,7 +124,7 @@ describe("parseCliArgs", () => {
 			"--duration",
 			"12.5",
 			"--project",
-			"demo.openscreen",
+			"demo.drift",
 		]);
 		expect(cmd).toMatchObject({
 			kind: "record",
@@ -133,7 +133,7 @@ describe("parseCliArgs", () => {
 			micDevice: "MacBook",
 			systemAudio: true,
 			durationMs: 12500,
-			projectOut: inCwd("demo.openscreen"),
+			projectOut: inCwd("demo.drift"),
 		});
 	});
 
@@ -144,11 +144,11 @@ describe("parseCliArgs", () => {
 	});
 
 	it("parses --auto-zoom", () => {
-		expect(parse(["export", "a.openscreen", "--auto-zoom"])).toMatchObject({
+		expect(parse(["export", "a.drift", "--auto-zoom"])).toMatchObject({
 			kind: "export",
 			autoZoom: true,
 		});
-		expect(parse(["export", "a.openscreen"])).toMatchObject({ autoZoom: false });
+		expect(parse(["export", "a.drift"])).toMatchObject({ autoZoom: false });
 	});
 
 	it("parses sources", () => {
@@ -173,54 +173,54 @@ describe("parseCliArgs", () => {
 	});
 
 	it("rejects an empty flag value rather than resolving it to cwd", () => {
-		// `openscreen sources -o "$OUT"` with OUT unset arrives as an empty
+		// `drift sources -o "$OUT"` with OUT unset arrives as an empty
 		// argument. resolvePath would turn it into cwd, which only fails later as
 		// EISDIR from the write; the omitted-value spelling is the same mistake and
 		// must get the same answer.
 		expect(parse(["sources", "-o", ""])).toMatchObject({ kind: "error" });
 		// takeValue is shared, so every flag that takes a value gets this.
-		expect(parse(["pack", "demo.openscreen", "--out", ""])).toMatchObject({ kind: "error" });
-		expect(parse(["export", "demo.openscreen", "-o", ""])).toMatchObject({ kind: "error" });
+		expect(parse(["pack", "demo.drift", "--out", ""])).toMatchObject({ kind: "error" });
+		expect(parse(["export", "demo.drift", "-o", ""])).toMatchObject({ kind: "error" });
 	});
 
 	it("parses pack", () => {
-		expect(parse(["pack", "demo.openscreen", "--out", "bundle"])).toMatchObject({
+		expect(parse(["pack", "demo.drift", "--out", "bundle"])).toMatchObject({
 			kind: "pack",
-			projectPath: inCwd("demo.openscreen"),
+			projectPath: inCwd("demo.drift"),
 			outDir: inCwd("bundle"),
 		});
-		expect(parse(["pack", "demo.openscreen"])).toMatchObject({ kind: "error" });
+		expect(parse(["pack", "demo.drift"])).toMatchObject({ kind: "error" });
 		expect(parse(["pack", "--out", "bundle"])).toMatchObject({ kind: "error" });
-		expect(parse(["pack", "demo.openscreen", "--out", "bundle", "--bogus"])).toMatchObject({
+		expect(parse(["pack", "demo.drift", "--out", "bundle", "--bogus"])).toMatchObject({
 			kind: "error",
 		});
-		expect(parse(["pack", "a.openscreen", "b.openscreen", "--out", "bundle"])).toMatchObject({
+		expect(parse(["pack", "a.drift", "b.drift", "--out", "bundle"])).toMatchObject({
 			kind: "error",
 		});
 	});
 
 	it("parses captions", () => {
 		expect(
-			parse(["captions", "demo.openscreen", "--min-words", "1", "--max-words", "5"]),
+			parse(["captions", "demo.drift", "--min-words", "1", "--max-words", "5"]),
 		).toMatchObject({
 			kind: "captions",
-			projectPath: inCwd("demo.openscreen"),
+			projectPath: inCwd("demo.drift"),
 			minWordsPerCaption: 1,
 			maxWordsPerCaption: 5,
 		});
-		expect(parse(["captions", "demo.openscreen"])).toMatchObject({
+		expect(parse(["captions", "demo.drift"])).toMatchObject({
 			minWordsPerCaption: 2,
 			maxWordsPerCaption: 7,
 		});
 		expect(
-			parse(["captions", "a.openscreen", "--min-words", "9", "--max-words", "3"]),
+			parse(["captions", "a.drift", "--min-words", "9", "--max-words", "3"]),
 		).toMatchObject({ kind: "error" });
 	});
 
 	it("parses info and help", () => {
-		expect(parse(["info", "demo.openscreen", "--json"])).toMatchObject({
+		expect(parse(["info", "demo.drift", "--json"])).toMatchObject({
 			kind: "info",
-			projectPath: inCwd("demo.openscreen"),
+			projectPath: inCwd("demo.drift"),
 			json: true,
 		});
 		expect(parse(["help"])).toMatchObject({ kind: "help" });

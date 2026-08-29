@@ -522,7 +522,7 @@ export const removeClipArgs = z.object({
  * because `npm run wb` is not part of CI — so the bench asserted a surface the
  * product had not had for some time.
  */
-export const OPENSCREEN_TOOL_NAMES = [
+export const DRIFT_TOOL_NAMES = [
 	"getCurrentDocument",
 	"getTranscript",
 	"getCursorTrack",
@@ -1149,7 +1149,7 @@ export function executeAgentTool(
 						assetId: load.assetId,
 						note:
 							"Checked: this asset has no cursor-telemetry sidecar. That normally means it " +
-							"was imported rather than recorded with OpenScreen's cursor recorder. This is " +
+							"was imported rather than recorded with Drift's cursor recorder. This is " +
 							"a fact about the asset, not a limit of yours.",
 					}),
 				};
