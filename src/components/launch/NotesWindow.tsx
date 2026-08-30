@@ -130,7 +130,7 @@ export function NotesWindow() {
 	}, []);
 
 	return (
-		<div className="flex h-screen w-screen flex-col overflow-hidden bg-white px-6 pb-4 pt-3 gap-4">
+		<div className="flex h-screen w-screen flex-col overflow-hidden bg-[#07070a] text-white/90 px-6 pb-4 pt-3 gap-4 select-none">
 			<div className="flex min-w-0 shrink-0 justify-center">
 				<NotesToolbar
 					editor={editor}

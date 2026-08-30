@@ -28,7 +28,7 @@ import styles from "./EditorShellV4.module.css";
 const ASSET_MIME = "application/x-axcut-asset";
 const THUMB_GRADIENTS = [
 	"linear-gradient(135deg, #fb7185, #f97316)",
-	"linear-gradient(135deg, #10b981, #0d986a)",
+	"linear-gradient(135deg, #DCFE50, #0d986a)",
 	"linear-gradient(135deg, #fbbf24, #f59e0b)",
 	"linear-gradient(135deg, #38bdf8, #6366f1)",
 ];

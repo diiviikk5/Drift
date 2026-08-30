@@ -1,6 +1,6 @@
 /* Drift design system — light + dark.
  * Single source of truth for tokens used by the new editor shell.
- * Mint #10b981 is the sole chromatic accent. Red is reserved for
+ * Mint #DCFE50 is the sole chromatic accent. Red is reserved for
  * REC / cut / skip / trim / transcript-highlight only. */
 
 /* :root:root (doubled pseudo-class) deliberately outranks a plain `:root` —
@@ -86,7 +86,7 @@
 	--speed-soft: rgba(249, 115, 22, 0.14);
 	--speed-wash: rgba(249, 115, 22, 0.14);
 
-	--success: #10b981;
+	--success: #DCFE50;
 	--success-soft: rgba(16, 185, 129, 0.10);
 
 	/* macOS traffic lights */

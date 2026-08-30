@@ -12,11 +12,10 @@ const bars = [
 ];
 
 function getBarColor(level: number, threshold: number) {
-	if (!level || level < threshold) return "bg-slate-700";
-	if (threshold > 80) return "bg-red-500";
-	if (threshold > 60) return "bg-yellow-500";
-	if (threshold > 40) return "bg-green-500";
-	return "bg-emerald-500";
+	if (!level || level < threshold) return "bg-white/10";
+	if (threshold > 80) return "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]";
+	if (threshold > 60) return "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]";
+	return "bg-[#DCFE50] shadow-[0_0_8px_rgba(220,254,80,0.5)]";
 }
 
 export function AudioLevelMeter({ level, className = "" }: AudioLevelMeterProps) {

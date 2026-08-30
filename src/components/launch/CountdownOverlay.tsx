@@ -17,10 +17,10 @@ export function CountdownOverlay() {
 
 	return (
 		<div className="w-screen h-screen bg-transparent flex items-center justify-center pointer-events-none select-none">
-			<div className="flex items-center justify-center w-40 h-40 rounded-full bg-black/50">
+			<div className="relative flex items-center justify-center w-48 h-48 rounded-full bg-[#0c0c14]/85 border-2 border-[#DCFE50]/40 shadow-[0_0_50px_rgba(220,254,80,0.35)] backdrop-blur-2xl animate-pulse">
 				<div
-					className="text-white/90 text-[80px] font-bold leading-none tabular-nums"
-					style={{ textShadow: "0 4px 24px rgba(0, 0, 0, 0.65)" }}
+					className="text-[#DCFE50] text-[96px] font-black leading-none tabular-nums font-mono"
+					style={{ textShadow: "0 0 30px rgba(220, 254, 80, 0.6)" }}
 				>
 					{value}
 				</div>

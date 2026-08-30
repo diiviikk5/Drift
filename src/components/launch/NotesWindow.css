@@ -6,8 +6,8 @@
 	width: 100%;
 	outline: none;
 	overflow-y: auto;
-	color: #111827;
-	caret-color: #111827;
+	color: #e6e9ef;
+	caret-color: #DCFE50;
 }
 
 .notes-teleprompter-content[data-mirrored="true"] {
