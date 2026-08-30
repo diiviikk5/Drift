@@ -31,11 +31,11 @@ const hudDisabledClasses =
 // (btnRadius + padY) / dividerLen 22. Every control is its own standalone
 // transparent icon button (no shared "group" pill background) — grouping
 // reads purely from proximity + the divider spans between logical sections.
-const hudIconBtnClasses = `flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] border-0 bg-transparent cursor-pointer text-[#828c99] transition-all duration-150 hover:bg-[#1a1e25] hover:text-[#f5f7fa] active:scale-95 ${hudDisabledClasses} ${styles.electronNoDrag}`;
+const hudIconBtnClasses = `flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] border-0 bg-transparent cursor-pointer text-[#828c99] transition-all duration-150 hover:bg-white/[0.08] hover:text-[#DCFE50] active:scale-95 ${hudDisabledClasses} ${styles.electronNoDrag}`;
 
-const hudAuxIconBtnClasses = `flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] border-0 bg-transparent cursor-pointer text-[#828c99] transition-colors duration-150 hover:bg-[#1a1e25] hover:text-[#f5f7fa] ${hudDisabledClasses}`;
+const hudAuxIconBtnClasses = `flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] border-0 bg-transparent cursor-pointer text-[#828c99] transition-colors duration-150 hover:bg-white/[0.08] hover:text-[#DCFE50] ${hudDisabledClasses}`;
 
-const windowBtnClasses = `flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] border-0 bg-transparent cursor-pointer text-[#828c99] transition-all duration-150 hover:bg-[#1a1e25] hover:text-[#e9edf3] ${hudDisabledClasses}`;
+const windowBtnClasses = `flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] border-0 bg-transparent cursor-pointer text-[#828c99] transition-all duration-150 hover:bg-white/[0.08] hover:text-[#DCFE50] ${hudDisabledClasses}`;
 
 const closeBtnClasses = `flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] border-0 bg-transparent cursor-pointer text-[#828c99] transition-all duration-150 hover:bg-[rgba(248,113,113,0.16)] hover:text-[#f87171] ${hudDisabledClasses}`;
 
@@ -270,7 +270,7 @@ export const HudCursorButton = memo(function HudCursorButton({
 			className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] border-0 cursor-pointer transition-all duration-150 active:scale-95 ${hudDisabledClasses} ${styles.electronNoDrag} ${
 				editableOverlay
 					? "bg-[#10b981] text-[#08090d] hover:bg-[#0e9e6e]"
-					: "bg-transparent text-[#828c99] hover:bg-[#1a1e25] hover:text-[#f5f7fa]"
+					: "bg-transparent text-[#828c99] hover:bg-white/[0.08] hover:text-[#DCFE50]"
 			}`}
 			onClick={onClick}
 			disabled={disabled}
@@ -462,7 +462,7 @@ export const HudLanguageButton = memo(function HudLanguageButton({
 			disabled={disabled}
 			onClick={onClick}
 			title={label}
-			className={`flex h-[34px] items-center rounded-[10px] border-0 bg-transparent text-[#828c99] transition-all duration-150 hover:bg-[#1a1e25] hover:text-[#e9edf3] ${
+			className={`flex h-[34px] items-center rounded-[10px] border-0 bg-transparent text-[#828c99] transition-all duration-150 hover:bg-white/[0.08] hover:text-[#DCFE50] ${
 				vertical ? "w-[34px] justify-center px-0" : "gap-1.5 px-2.5"
 			} ${styles.electronNoDrag} ${disabled ? "opacity-30 cursor-not-allowed pointer-events-none" : ""}`}
 		>

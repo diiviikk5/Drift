@@ -14,7 +14,6 @@ import {
 	Sun,
 } from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState } from "react";
-import logoMark from "@/assets/drift-mark.png";
 import { useI18n, useScopedT } from "@/contexts/I18nContext";
 import { useTheme } from "@/hooks/useTheme";
 import { getAvailableLocales, getLocaleName, getLocaleShort } from "@/i18n/loader";
@@ -388,8 +387,12 @@ function AppMenu({ actions }: { actions: TopBarActions }) {
 			>
 				{/* Decorative: the wordmark beside it already names the app — and, being the
 				    button's only text, is also its accessible name. */}
-				<img src={logoMark} alt="" draggable={false} />
-				<span className={styles.name}>Drift</span>
+				<div className="w-6 h-6 rounded-md bg-gradient-to-br from-[#DCFE50] to-[#80c000] flex items-center justify-center text-black font-black text-xs shadow-[0_0_15px_rgba(220,254,80,0.35)] shrink-0 select-none">
+					D
+				</div>
+				<span className="font-extrabold text-[13px] tracking-tight bg-gradient-to-r from-white via-gray-100 to-gray-400 bg-clip-text text-transparent">
+					DRIFT <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.08] text-[#DCFE50] ml-1">STUDIO 2.0</span>
+				</span>
 				<ChevronDown size={13} className={styles.brandChevron} aria-hidden />
 			</button>
 			{open ? (

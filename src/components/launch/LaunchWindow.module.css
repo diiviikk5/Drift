@@ -46,8 +46,8 @@
 	pointer-events: auto;
 	display: flex;
 	border-radius: 17px;
-	border: 1px solid #242932;
-	background: #14171c;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	background: rgba(12, 12, 20, 0.92);
 	box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.35);
 	backdrop-filter: blur(24px) saturate(140%);
 }
@@ -78,7 +78,7 @@
 	padding: 6px;
 	border-radius: 15px;
 	border: 1px solid rgba(255, 255, 255, 0.1);
-	background: #1a1e25;
+	background: #10101a;
 	box-shadow: 0 20px 44px -14px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
@@ -116,7 +116,7 @@
 /* The mic and camera toggles plus the gear that configures them read as one
    unit: tighter spacing than the bar's 5px, inside a hairline outline.
    Deliberately an outline rather than the tinted pill the design rules out —
-   a fill that reads at all on #14171c lands brighter than the buttons' own
+   a fill that reads at all on rgba(12, 12, 20, 0.92) lands brighter than the buttons' own
    hover colour, which would invert the hover affordance. */
 .hudControlGroup {
 	display: flex;
@@ -149,7 +149,7 @@
 	padding: 6px;
 	border-radius: 15px;
 	border: 1px solid rgba(255, 255, 255, 0.1);
-	background: #1a1e25;
+	background: #10101a;
 	box-shadow: 0 20px 44px -14px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
@@ -267,7 +267,7 @@
 }
 
 .levelSegmentOn {
-	background: #10b981;
+	background: #DCFE50;
 }
 
 .cameraPreview {

@@ -36,18 +36,18 @@
 	--meta: #7c8aa0;
 	--dim: #b6c2d1;
 
-	/* mint brand */
-	--brand: #10b981;
-	--brand-lo: #059669;
-	--brand-glow: rgba(16, 185, 129, 0.35);
-	--brand-soft: rgba(16, 185, 129, 0.10);
-	--accent: #10b981;
-	--accent-on: #04221a;
-	--accent-soft: rgba(16, 185, 129, 0.10);
-	--accent-wash: rgba(16, 185, 129, 0.06);
-	--accent-border: rgba(16, 185, 129, 0.26);
-	--accent-ring: rgba(16, 185, 129, 0.28);
-	--accent-stripe: rgba(16, 185, 129, 0.30);
+	/* Drift Neon Brand */
+	--brand: #DCFE50;
+	--brand-lo: #c0ea36;
+	--brand-glow: rgba(220, 254, 80, 0.35);
+	--brand-soft: rgba(220, 254, 80, 0.10);
+	--accent: #DCFE50;
+	--accent-on: #07070a;
+	--accent-soft: rgba(220, 254, 80, 0.10);
+	--accent-wash: rgba(220, 254, 80, 0.06);
+	--accent-border: rgba(220, 254, 80, 0.26);
+	--accent-ring: rgba(220, 254, 80, 0.28);
+	--accent-stripe: rgba(220, 254, 80, 0.30);
 
 	/* timeline playhead — deliberately NOT the mint accent. The scrub cursor
 	   crosses every lane, including the accent-coloured zoom pills, so it needs
@@ -167,38 +167,38 @@
 }
 
 :root[data-theme="dark"] {
-	--bg: #0a0d12;
-	--bg-grad: radial-gradient(ellipse at 50% 0%, #13171f 0%, #0a0d12 60%);
-	--surface: #14181f;
-	--surface-1: #14181f;
-	--surface-2: #1c2029;
-	--surface-3: #252a35;
-	--surface-hi: #2b313b;
-	--surface-warm: #1c2029;
+	--bg: #07070a;
+	--bg-grad: radial-gradient(ellipse at 50% 0%, #111118 0%, #07070a 70%);
+	--surface: #0c0c14;
+	--surface-1: #0c0c14;
+	--surface-2: #141420;
+	--surface-3: #1c1c2e;
+	--surface-hi: #24243a;
+	--surface-warm: #141420;
 
 	--fg-emphasis: #ffffff;
-	--border: #252a35;
-	--border-soft: #1c2029;
-	--border-hi: #3a4150;
-	--border-dark: #0a0d12;
+	--border: rgba(255, 255, 255, 0.08);
+	--border-soft: rgba(255, 255, 255, 0.04);
+	--border-hi: rgba(255, 255, 255, 0.15);
+	--border-dark: #07070a;
 
 	--fg: #e6e9ef;
 	--fg-2: #f3f5f8;
 	--muted: #8b95a3;
 	--meta: #5b6470;
-	--dim: #1c2029;
+	--dim: #141420;
 
-	--brand: #10b981;
-	--brand-lo: #34d399;
-	--brand-glow: rgba(16, 185, 129, 0.40);
-	--brand-soft: rgba(16, 185, 129, 0.14);
-	--accent: #10b981;
-	--accent-on: #0a0d12;
-	--accent-soft: rgba(16, 185, 129, 0.14);
-	--accent-wash: rgba(16, 185, 129, 0.06);
-	--accent-border: rgba(16, 185, 129, 0.26);
-	--accent-ring: rgba(16, 185, 129, 0.32);
-	--accent-stripe: rgba(16, 185, 129, 0.34);
+	--brand: #DCFE50;
+	--brand-lo: #c0ea36;
+	--brand-glow: rgba(220, 254, 80, 0.40);
+	--brand-soft: rgba(220, 254, 80, 0.14);
+	--accent: #DCFE50;
+	--accent-on: #07070a;
+	--accent-soft: rgba(220, 254, 80, 0.14);
+	--accent-wash: rgba(220, 254, 80, 0.06);
+	--accent-border: rgba(220, 254, 80, 0.28);
+	--accent-ring: rgba(220, 254, 80, 0.35);
+	--accent-stripe: rgba(220, 254, 80, 0.38);
 
 	--danger: #f87171;
 	--danger-lo: #ef4444;
@@ -216,8 +216,8 @@
 	--speed-soft: rgba(251, 146, 60, 0.16);
 	--speed-wash: rgba(251, 146, 60, 0.16);
 
-	--success: #10b981;
-	--success-soft: rgba(16, 185, 129, 0.14);
+	--success: #DCFE50;
+	--success-soft: rgba(220, 254, 80, 0.14);
 
 	--scene-sky-hi: #2e3440;
 	--scene-sky-mid: #252a35;
@@ -242,5 +242,5 @@
 	--elev-card: 0 1px 2px rgba(0, 0, 0, 0.40), 0 4px 12px -4px rgba(0, 0, 0, 0.50);
 	--elev-card-soft: 0 1px 2px rgba(0, 0, 0, 0.30);
 	--elev-pop: 0 8px 24px -8px rgba(0, 0, 0, 0.60);
-	--focus-ring: 0 0 0 3px rgba(16, 185, 129, 0.30);
+	--focus-ring: 0 0 0 3px rgba(220, 254, 80, 0.25);
 }
