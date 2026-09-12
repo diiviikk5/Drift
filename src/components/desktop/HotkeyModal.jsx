@@ -1,20 +1,18 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Keyboard, X, Sparkles, Check, RotateCcw } from 'lucide-react';
+import { Keyboard, X, Check } from 'lucide-react';
 
 export default function HotkeyModal({
     isOpen,
     hotkeys = {},
     onUpdate,
     onSave,
-    onClose,
-    platform = 'tauri'
+    onClose
 }) {
-    // Also support conditional render if parent passes showHotkeySettings directly
     if (isOpen === false) return null;
 
-    const [capturing, setCapturing] = useState(null); // which key action is being captured
+    const [capturing, setCapturing] = useState(null);
     const [localHotkeys, setLocalHotkeys] = useState({
         toggle_recording: 'CmdOrCtrl+Shift+R',
         stop_recording: 'CmdOrCtrl+Shift+S',
@@ -29,7 +27,7 @@ export default function HotkeyModal({
         }
     }, [hotkeys]);
 
-    // Capture key combinations
+    // Key capture
     useEffect(() => {
         if (!capturing) return;
 
@@ -84,40 +82,40 @@ export default function HotkeyModal({
         { key: 'toggle_recording', label: 'Start / Stop Recording', defaultKey: 'Ctrl+Shift+R' },
         { key: 'stop_recording', label: 'Instant Force Stop', defaultKey: 'Ctrl+Shift+S' },
         { key: 'toggle_pause', label: 'Pause / Resume Recording', defaultKey: 'Ctrl+Shift+P' },
-        { key: 'toggle_zoom', label: 'Trigger Auto-Zoom Keyframe', defaultKey: 'Ctrl+Shift+Z' },
+        { key: 'toggle_zoom', label: 'Add Auto-Zoom Point', defaultKey: 'Ctrl+Shift+Z' },
     ];
 
     const staticShortcuts = [
         { key: 'Space', label: 'Play / Pause Video (in Studio)' },
-        { key: 'Esc', label: 'Cancel Countdown / Reset Zoom' },
+        { key: 'Esc', label: 'Cancel Countdown / Reset' },
     ];
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 select-none animate-in fade-in duration-150">
-            <div className="max-w-md w-full rounded-2xl bg-[#0D0E16] border border-white/[0.1] shadow-2xl p-6 space-y-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 select-none animate-in fade-in duration-150">
+            <div className="max-w-md w-full rounded-2xl bg-[var(--bg-card)] border border-[var(--border-app)] shadow-2xl p-6 space-y-5 text-[var(--text-app)]">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-[#DCFE50]/15 border border-[#DCFE50]/30 flex items-center justify-center text-[#DCFE50]">
+                        <div className="w-7 h-7 rounded-lg bg-[var(--bg-card-subtle)] border border-[var(--border-app)] flex items-center justify-center text-[var(--accent-app)]">
                             <Keyboard className="w-4 h-4" />
                         </div>
                         <div>
-                            <h3 className="text-sm font-bold text-white tracking-tight">Global Shortcuts</h3>
-                            <p className="text-[11px] text-gray-400">Click any shortcut to rebind with custom keys</p>
+                            <h3 className="text-sm font-bold tracking-tight">Keyboard Shortcuts</h3>
+                            <p className="text-[11px] text-[var(--text-app-muted)]">Click any shortcut to rebind</p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/[0.06] transition-all"
+                        className="text-[var(--text-app-muted)] hover:text-[var(--text-app)]"
                     >
                         <X className="w-4 h-4" />
                     </button>
                 </div>
 
-                {/* Interactive Hotkey Rebind List */}
+                {/* Configurable Shortcuts */}
                 <div className="space-y-2">
-                    <label className="text-[10px] font-mono uppercase font-bold text-gray-400 tracking-wider">
-                        Configurable Global Hotkeys
+                    <label className="text-[10px] font-mono uppercase font-semibold text-[var(--text-app-muted)] tracking-wider">
+                        Configurable Hotkeys
                     </label>
                     {entries.map((item) => {
                         const isBinding = capturing === item.key;
@@ -128,18 +126,18 @@ export default function HotkeyModal({
                             <button
                                 key={item.key}
                                 onClick={() => setCapturing(isBinding ? null : item.key)}
-                                className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left ${
+                                className={`w-full flex items-center justify-between p-2.5 rounded-xl border transition-all text-left ${
                                     isBinding
-                                        ? 'bg-[#DCFE50]/10 border-[#DCFE50] shadow-[0_0_15px_rgba(220,254,80,0.15)] ring-1 ring-[#DCFE50]/40'
-                                        : 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.1]'
+                                        ? 'bg-[var(--bg-card-subtle)] border-[var(--accent-app)] ring-1 ring-[var(--accent-app)]'
+                                        : 'border-[var(--border-app)] hover:border-[var(--border-app-hover)]'
                                 }`}
                             >
-                                <span className="text-xs font-medium text-gray-200">{item.label}</span>
+                                <span className="text-xs text-[var(--text-app)]">{item.label}</span>
                                 <kbd
-                                    className={`px-2.5 py-1 rounded-lg font-mono text-xs font-bold transition-all border ${
+                                    className={`px-2 py-0.5 rounded-md font-mono text-xs font-semibold border ${
                                         isBinding
-                                            ? 'bg-[#DCFE50] text-black border-[#DCFE50] animate-pulse'
-                                            : 'bg-black/40 text-[#DCFE50] border-white/[0.1]'
+                                            ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] border-[var(--accent-app)] animate-pulse'
+                                            : 'bg-[var(--bg-card-subtle)] text-[var(--accent-app)] border-[var(--border-app)]'
                                     }`}
                                 >
                                     {isBinding ? '⏎ Press keys...' : formatted}
@@ -149,19 +147,19 @@ export default function HotkeyModal({
                     })}
                 </div>
 
-                {/* Static Workspace Shortcuts */}
-                <div className="space-y-2 pt-1 border-t border-white/[0.06]">
-                    <label className="text-[10px] font-mono uppercase font-bold text-gray-500 tracking-wider">
+                {/* Workspace Shortcuts */}
+                <div className="space-y-2 pt-2 border-t border-[var(--border-app)]">
+                    <label className="text-[10px] font-mono uppercase font-semibold text-[var(--text-app-muted)] tracking-wider">
                         Workspace Hotkeys
                     </label>
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                         {staticShortcuts.map((s, idx) => (
                             <div
                                 key={idx}
-                                className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.02] text-xs"
+                                className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs"
                             >
-                                <span className="text-gray-400 text-[11px]">{s.label}</span>
-                                <kbd className="px-2 py-0.5 rounded bg-white/[0.06] text-gray-300 font-mono text-[10px] border border-white/[0.08]">
+                                <span className="text-[var(--text-app-muted)] text-[11px]">{s.label}</span>
+                                <kbd className="px-2 py-0.5 rounded bg-[var(--bg-card-subtle)] text-[var(--text-app)] font-mono text-[10px] border border-[var(--border-app)]">
                                     {s.key}
                                 </kbd>
                             </div>
@@ -169,20 +167,20 @@ export default function HotkeyModal({
                     </div>
                 </div>
 
-                {/* Footer Buttons */}
-                <div className="flex gap-2.5 pt-2">
+                {/* Action Buttons */}
+                <div className="flex gap-2 pt-2">
                     <button
                         onClick={onClose}
-                        className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-xs font-semibold text-gray-300 transition-all"
+                        className="flex-1 py-2.5 rounded-xl bg-[var(--bg-card-subtle)] hover:bg-[var(--bg-card-subtle)]/80 text-xs font-medium text-[var(--text-app-muted)] transition-all"
                     >
                         Cancel
                     </button>
                     <button
                         onClick={handleSave}
-                        className="flex-1 py-2.5 rounded-xl bg-[#DCFE50] hover:bg-[#c9ea3e] text-black text-xs font-extrabold uppercase tracking-wide shadow-[0_0_15px_rgba(220,254,80,0.25)] transition-all flex items-center justify-center gap-1.5"
+                        className="flex-1 py-2.5 rounded-xl bg-[var(--accent-app)] text-[var(--accent-app-fg)] hover:opacity-90 text-xs font-bold uppercase tracking-wider shadow-sm transition-all flex items-center justify-center gap-1.5"
                     >
-                        <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        <span>Save & Apply</span>
+                        <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                        <span>Save Shortcuts</span>
                     </button>
                 </div>
             </div>

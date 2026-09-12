@@ -430,16 +430,18 @@ export class StudioEngine {
 
             ctx.drawImage(v, x, y + titleBarHeight, w, vh);
 
-            // Draw cursor overlay (from Rust state)
+            // Always draw click ripple rings if active
+            if (this.cursorState.click_progress > 0.01) {
+                const cursorX = x + this.cursorState.x * w;
+                const cursorY = y + titleBarHeight + this.cursorState.y * vh;
+                this.drawClickRing(ctx, cursorX, cursorY, this.cursorState.click_progress);
+            }
+
+            // Only draw synthetic cursor overlay if explicitly enabled (prevents double cursor)
             if (this.showCursor && this.cursorState.opacity > 0.01) {
                 const cursorX = x + this.cursorState.x * w;
                 const cursorY = y + titleBarHeight + this.cursorState.y * vh;
                 ctx.globalAlpha = this.cursorState.opacity;
-
-                if (this.cursorState.click_progress > 0.01) {
-                    this.drawClickRing(ctx, cursorX, cursorY, this.cursorState.click_progress);
-                }
-
                 this.drawCursor(ctx, cursorX, cursorY, this.cursorState.motion, this.cursorState.click_progress);
                 ctx.globalAlpha = 1;
             }

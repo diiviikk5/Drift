@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef } from 'react';
-import { Play, Pause, RotateCcw, FastForward, Scissors, Sparkles, Volume2, ZoomIn } from 'lucide-react';
+import { Play, Pause, ZoomIn, RotateCcw } from 'lucide-react';
 
 export default function StudioTimeline({
     isPlaying,
@@ -9,7 +9,6 @@ export default function StudioTimeline({
     currentTime,
     duration,
     onSeek,
-    zoomSegments = [],
     clicks = [],
     onAddZoom,
     onClearZooms
@@ -34,46 +33,46 @@ export default function StudioTimeline({
     const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
 
     return (
-        <div className="bg-[#0B0C13]/95 backdrop-blur-2xl border-t border-white/[0.08] p-4 select-none flex-shrink-0 space-y-3">
-            {/* Top Bar: Playback Controls & Keyframe Tools */}
+        <div className="bg-[var(--bg-card)] border-t border-[var(--border-app)] p-4 select-none flex-shrink-0 space-y-3 transition-colors">
+            {/* Top Bar: Controls & Zoom Tools */}
             <div className="flex items-center justify-between">
                 {/* Transport Buttons */}
                 <div className="flex items-center gap-3">
                     <button
                         onClick={onTogglePlay}
-                        className="w-10 h-10 rounded-xl bg-[#DCFE50] hover:bg-[#c8ea3e] text-black flex items-center justify-center shadow-[0_0_15px_rgba(220,254,80,0.3)] transition-all font-bold"
+                        className="w-9 h-9 rounded-xl bg-[var(--accent-app)] text-[var(--accent-app-fg)] hover:opacity-90 flex items-center justify-center shadow-sm transition-all font-bold"
                         title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
                     >
-                        {isPlaying ? <Pause className="w-5 h-5 fill-black" /> : <Play className="w-5 h-5 fill-black ml-0.5" />}
+                        {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
                     </button>
 
                     {/* Timecode */}
-                    <div className="flex items-center gap-1.5 font-mono text-xs bg-white/[0.04] px-3 py-2 rounded-xl border border-white/[0.08]">
-                        <span className="text-[#DCFE50] font-bold">{formatTime(currentTime)}</span>
-                        <span className="text-gray-600">/</span>
-                        <span className="text-gray-400">{formatTime(duration)}</span>
+                    <div className="flex items-center gap-1.5 font-mono text-xs bg-[var(--bg-card-subtle)] px-3 py-1.5 rounded-lg border border-[var(--border-app)]">
+                        <span className="font-bold text-[var(--text-app)]">{formatTime(currentTime)}</span>
+                        <span className="text-[var(--text-app-muted)]">/</span>
+                        <span className="text-[var(--text-app-muted)]">{formatTime(duration)}</span>
                     </div>
                 </div>
 
-                {/* Zoom Pins Badges & Actions */}
+                {/* Keyframe Badges & Actions */}
                 <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5 text-xs text-gray-300 bg-white/[0.04] px-3 py-1.5 rounded-xl border border-white/[0.06]">
-                        <ZoomIn className="w-3.5 h-3.5 text-[#DCFE50]" />
-                        <span className="font-mono font-bold text-white">{clicks.length}</span>
-                        <span className="text-gray-400">Zoom Focal Points</span>
+                    <div className="flex items-center gap-1.5 text-xs text-[var(--text-app-muted)] bg-[var(--bg-card-subtle)] px-2.5 py-1 rounded-lg border border-[var(--border-app)]">
+                        <ZoomIn className="w-3.5 h-3.5 text-[var(--accent-app)]" />
+                        <span className="font-mono font-bold text-[var(--text-app)]">{clicks.length}</span>
+                        <span>Zooms</span>
                     </div>
 
                     <button
                         onClick={onAddZoom}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-xs font-semibold text-white border border-white/[0.08] transition-all"
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--bg-card-subtle)] hover:border-[var(--border-app-hover)] text-xs font-medium text-[var(--text-app)] border border-[var(--border-app)] transition-all"
                     >
-                        <span>+ Add Zoom at Cursor</span>
+                        <span>+ Add Zoom Point</span>
                     </button>
 
                     {clicks.length > 0 && (
                         <button
                             onClick={onClearZooms}
-                            className="text-xs text-gray-500 hover:text-red-400 transition-colors"
+                            className="text-xs text-[var(--text-app-muted)] hover:text-red-500 transition-colors"
                         >
                             Reset Zooms
                         </button>
@@ -85,22 +84,22 @@ export default function StudioTimeline({
             <div
                 ref={trackRef}
                 onClick={handleTrackClick}
-                className="relative h-12 w-full bg-[#11121C] rounded-xl border border-white/[0.08] overflow-hidden cursor-pointer group"
+                className="relative h-10 w-full bg-[var(--bg-card-subtle)] rounded-xl border border-[var(--border-app)] overflow-hidden cursor-pointer group shadow-inner"
             >
                 {/* Simulated Audio Waveform Peaks */}
-                <div className="absolute inset-0 flex items-center justify-between px-2 opacity-20 pointer-events-none">
+                <div className="absolute inset-0 flex items-center justify-between px-2 opacity-25 pointer-events-none">
                     {[...Array(60)].map((_, i) => (
                         <div
                             key={i}
-                            className="w-1 bg-white rounded-full"
-                            style={{ height: `${15 + Math.sin(i * 0.4) * 15 + ((i % 5) * 4)}px` }}
+                            className="w-1 bg-[var(--text-app)] rounded-full"
+                            style={{ height: `${12 + Math.sin(i * 0.4) * 12 + ((i % 5) * 3)}px` }}
                         />
                     ))}
                 </div>
 
                 {/* Progress Fill */}
                 <div
-                    className="absolute top-0 bottom-0 left-0 bg-[#DCFE50]/15 border-r-2 border-[#DCFE50] transition-none pointer-events-none"
+                    className="absolute top-0 bottom-0 left-0 bg-[var(--accent-app)]/20 border-r-2 border-[var(--accent-app)] pointer-events-none"
                     style={{ width: `${progressPct}%` }}
                 />
 
@@ -113,10 +112,10 @@ export default function StudioTimeline({
                         <div
                             key={idx}
                             style={{ left: `${posPct}%` }}
-                            className="absolute top-0 bottom-0 w-1 bg-[#DCFE50] shadow-[0_0_8px_#DCFE50] group/pin pointer-events-auto"
+                            className="absolute top-0 bottom-0 w-1 bg-[var(--accent-app)] shadow-sm group/pin pointer-events-auto"
                             title={`Zoom Keyframe ${idx + 1} at ${formatTime(clickTime)}`}
                         >
-                            <div className="absolute -top-1 -left-2 w-5 h-5 rounded-full bg-[#DCFE50] text-black text-[9px] font-mono font-black flex items-center justify-center shadow-lg transform group-hover/pin:scale-125 transition-transform">
+                            <div className="absolute -top-1 -left-2 w-4 h-4 rounded-full bg-[var(--accent-app)] text-[var(--accent-app-fg)] text-[8px] font-mono font-black flex items-center justify-center shadow-md transform group-hover/pin:scale-125 transition-transform">
                                 {idx + 1}
                             </div>
                         </div>
@@ -125,10 +124,10 @@ export default function StudioTimeline({
 
                 {/* Playhead Marker */}
                 <div
-                    className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_8px_white] pointer-events-none"
+                    className="absolute top-0 bottom-0 w-0.5 bg-[var(--text-app)] shadow-sm pointer-events-none"
                     style={{ left: `${progressPct}%` }}
                 >
-                    <div className="w-3 h-3 rounded-full bg-white -ml-[5px] -mt-1 shadow-md" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-[var(--text-app)] -ml-[4px] -mt-1 shadow-md" />
                 </div>
             </div>
         </div>

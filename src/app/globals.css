@@ -627,4 +627,75 @@ body {
 
 .neon-glow {
   box-shadow: 0 0 20px rgba(220, 254, 80, 0.35);
+}
+
+/* === Desktop App Theme Tokens === */
+.theme-dark {
+  --bg-app: #09090b;
+  --bg-card: #111115;
+  --bg-card-subtle: #18181b;
+  --border-app: rgba(255, 255, 255, 0.08);
+  --border-app-hover: rgba(255, 255, 255, 0.16);
+  --text-app: #fafafa;
+  --text-app-muted: #a1a1aa;
+  --accent-app: #fafafa;
+  --accent-app-fg: #09090b;
+  --pill-bg: #18181b;
+  --pill-active-bg: #fafafa;
+  --pill-active-fg: #09090b;
+}
+
+.theme-light {
+  --bg-app: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-card-subtle: #f1f5f9;
+  --border-app: rgba(0, 0, 0, 0.08);
+  --border-app-hover: rgba(0, 0, 0, 0.16);
+  --text-app: #0f172a;
+  --text-app-muted: #64748b;
+  --accent-app: #0f172a;
+  --accent-app-fg: #ffffff;
+  --pill-bg: #f1f5f9;
+  --pill-active-bg: #0f172a;
+  --pill-active-fg: #ffffff;
+}
+
+.theme-midnight {
+  --bg-app: #030712;
+  --bg-card: #0b0f19;
+  --bg-card-subtle: #111827;
+  --border-app: rgba(56, 189, 248, 0.12);
+  --border-app-hover: rgba(56, 189, 248, 0.28);
+  --text-app: #f9fafb;
+  --text-app-muted: #9ca3af;
+  --accent-app: #38bdf8;
+  --accent-app-fg: #030712;
+  --pill-bg: #111827;
+  --pill-active-bg: #38bdf8;
+  --pill-active-fg: #030712;
+}
+
+.theme-drift {
+  --bg-app: #08090e;
+  --bg-card: #0e1017;
+  --bg-card-subtle: #161924;
+  --border-app: rgba(220, 254, 80, 0.15);
+  --border-app-hover: rgba(220, 254, 80, 0.35);
+  --text-app: #ffffff;
+  --text-app-muted: #94a3b8;
+  --accent-app: #dcfe50;
+  --accent-app-fg: #08090e;
+  --pill-bg: #141722;
+  --pill-active-bg: #dcfe50;
+  --pill-active-fg: #08090e;
+}
+
+/* Hide Next.js dev toast/badge in desktop app */
+nextjs-portal,
+#__next-build-watcher,
+[data-nextjs-toast],
+[data-next-badge] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }

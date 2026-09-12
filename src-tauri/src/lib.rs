@@ -16,12 +16,18 @@ pub fn run() {
         .manage(InputListenerState::default())
         .manage(NativeRecorderState::default())
         .setup(|app| {
+            use tauri::Manager;
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
                         .level(log::LevelFilter::Info)
                         .build(),
                 )?;
+            }
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
             }
             Ok(())
         })

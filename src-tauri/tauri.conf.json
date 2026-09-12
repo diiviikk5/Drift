@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Drift",
         "width": 1280,
         "height": 800,
@@ -20,7 +21,10 @@
         "resizable": true,
         "fullscreen": false,
         "decorations": true,
-        "transparent": false
+        "transparent": false,
+        "visible": true,
+        "center": true,
+        "focus": true
       }
     ],
     "security": {

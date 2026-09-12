@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Palette, Camera, MousePointer, Layers, Sliders, Check, Sparkles } from 'lucide-react';
+import { Palette, Camera, MousePointer, Sparkles, Download, Check } from 'lucide-react';
 
 export default function InspectorPanel({
     background,
@@ -11,28 +11,24 @@ export default function InspectorPanel({
     onChangeZoomLevel,
     showCursor,
     onToggleCursor,
-    exportFormat,
-    onChangeExportFormat,
     onTriggerExport,
     isExporting
 }) {
     const [activeTab, setActiveTab] = useState('style');
 
     const aspectRatios = [
-        { id: '16:9', label: '16:9 Landscape', desc: 'YouTube & Presentation' },
-        { id: '9:16', label: '9:16 Vertical', desc: 'TikTok & Reels' },
-        { id: '1:1', label: '1:1 Square', desc: 'Social & Feed' },
-        { id: '4:5', label: '4:5 Portrait', desc: 'Instagram Post' },
+        { id: '16:9', label: '16:9', desc: 'Landscape' },
+        { id: '9:16', label: '9:16', desc: 'Vertical' },
+        { id: '1:1', label: '1:1', desc: 'Square' },
+        { id: '4:5', label: '4:5', desc: 'Portrait' },
     ];
     const [selectedAspect, setSelectedAspect] = useState('16:9');
-    const [springProfile, setSpringProfile] = useState('cinematic'); // 'cinematic' | 'natural' | 'snappy'
-    const [cursorScale, setCursorScale] = useState(1.2);
-    const [clickHighlight, setClickHighlight] = useState(true);
+    const [springProfile, setSpringProfile] = useState('cinematic');
 
     return (
-        <aside className="w-80 flex-shrink-0 border-l border-white/[0.08] bg-[#090A10]/95 backdrop-blur-2xl flex flex-col h-full select-none">
-            {/* Inspector Tab Bar */}
-            <div className="flex border-b border-white/[0.08] bg-white/[0.02]">
+        <aside className="w-72 flex-shrink-0 border-l border-[var(--border-app)] bg-[var(--bg-card)] flex flex-col h-full select-none transition-colors">
+            {/* Tab Bar */}
+            <div className="flex border-b border-[var(--border-app)] bg-[var(--bg-card-subtle)] p-1">
                 {[
                     { id: 'style', label: 'Canvas', icon: Palette },
                     { id: 'camera', label: 'Zoom', icon: Camera },
@@ -45,10 +41,10 @@ export default function InspectorPanel({
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex-1 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all border-b-2 ${
+                            className={`flex-1 py-1.5 text-xs font-medium flex items-center justify-center gap-1.5 rounded-md transition-all ${
                                 isActive
-                                    ? 'border-[#DCFE50] text-[#DCFE50] bg-white/[0.02]'
-                                    : 'border-transparent text-gray-400 hover:text-white'
+                                    ? 'bg-[var(--bg-card)] text-[var(--text-app)] shadow-xs font-semibold'
+                                    : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
                             }`}
                         >
                             <Icon className="w-3.5 h-3.5" />
@@ -62,35 +58,35 @@ export default function InspectorPanel({
             <div className="flex-1 overflow-y-auto p-4 space-y-5">
                 {activeTab === 'style' && (
                     <>
-                        {/* Aspect Ratio Presets */}
+                        {/* Aspect Ratio */}
                         <div className="space-y-2">
-                            <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider font-mono">
+                            <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
                                 Framing Aspect Ratio
                             </label>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-2 gap-1.5">
                                 {aspectRatios.map((item) => (
                                     <button
                                         key={item.id}
                                         onClick={() => setSelectedAspect(item.id)}
-                                        className={`p-2.5 rounded-xl border text-left transition-all ${
+                                        className={`p-2 rounded-lg border text-left transition-all ${
                                             selectedAspect === item.id
-                                                ? 'bg-[#DCFE50]/10 border-[#DCFE50] text-white shadow-xs ring-1 ring-[#DCFE50]/20'
-                                                : 'bg-white/[0.03] border-white/[0.06] text-gray-400 hover:bg-white/[0.06]'
+                                                ? 'bg-[var(--bg-card-subtle)] border-[var(--accent-app)] text-[var(--text-app)] shadow-xs'
+                                                : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
                                         }`}
                                     >
                                         <div className="font-mono font-bold text-xs">{item.id}</div>
-                                        <div className="text-[10px] text-gray-500">{item.desc}</div>
+                                        <div className="text-[10px] opacity-75">{item.desc}</div>
                                     </button>
                                 ))}
                             </div>
                         </div>
 
-                        {/* Background Wallpapers */}
+                        {/* Wallpapers */}
                         <div className="space-y-2">
-                            <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider font-mono">
+                            <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
                                 Studio Wallpaper
                             </label>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-2 gap-1.5">
                                 {Object.entries(backgrounds).map(([key, val]) => {
                                     const isSelected = background === key;
                                     const gradient = `linear-gradient(135deg, ${val.colors.join(', ')})`;
@@ -99,17 +95,17 @@ export default function InspectorPanel({
                                         <button
                                             key={key}
                                             onClick={() => onChangeBackground(key)}
-                                            className={`p-2 rounded-xl border flex items-center gap-2.5 transition-all text-left ${
+                                            className={`p-1.5 rounded-lg border flex items-center gap-2 transition-all text-left ${
                                                 isSelected
-                                                    ? 'border-[#DCFE50] bg-white/[0.06] ring-1 ring-[#DCFE50]/30'
-                                                    : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]'
+                                                    ? 'border-[var(--accent-app)] bg-[var(--bg-card-subtle)]'
+                                                    : 'border-[var(--border-app)] hover:border-[var(--border-app-hover)]'
                                             }`}
                                         >
                                             <div
-                                                className="w-7 h-7 rounded-lg shadow-sm flex-shrink-0"
+                                                className="w-5 h-5 rounded-md shadow-xs flex-shrink-0"
                                                 style={{ background: gradient }}
                                             />
-                                            <span className="text-xs font-medium text-white truncate">{val.name}</span>
+                                            <span className="text-xs text-[var(--text-app)] truncate">{val.name}</span>
                                         </button>
                                     );
                                 })}
@@ -120,13 +116,12 @@ export default function InspectorPanel({
 
                 {activeTab === 'camera' && (
                     <>
-                        {/* Zoom Factor */}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider font-mono">
+                                <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
                                     Zoom Depth
                                 </label>
-                                <span className="text-xs font-mono font-bold text-[#DCFE50]">{zoomLevel}×</span>
+                                <span className="text-xs font-mono font-bold text-[var(--accent-app)]">{zoomLevel}×</span>
                             </div>
                             <input
                                 type="range"
@@ -135,50 +130,39 @@ export default function InspectorPanel({
                                 step="0.1"
                                 value={zoomLevel}
                                 onChange={(e) => onChangeZoomLevel(parseFloat(e.target.value))}
-                                className="w-full accent-[#DCFE50] cursor-pointer"
+                                className="w-full accent-[var(--accent-app)] cursor-pointer"
                             />
-                            <div className="flex justify-between text-[10px] text-gray-500 font-mono">
-                                <span>Subtle (1.2×)</span>
-                                <span>Cinema (2.0×)</span>
-                                <span>Extreme (3.0×)</span>
+                            <div className="flex justify-between text-[10px] text-[var(--text-app-muted)] font-mono">
+                                <span>1.2×</span>
+                                <span>2.0×</span>
+                                <span>3.0×</span>
                             </div>
                         </div>
 
-                        {/* Spring Physics Presets */}
+                        {/* Motion Presets */}
                         <div className="space-y-2">
-                            <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider font-mono">
-                                Spring Physics Motion
+                            <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
+                                Spring Easing
                             </label>
-                            <div className="grid grid-cols-3 gap-1.5">
+                            <div className="grid grid-cols-3 gap-1">
                                 {[
-                                    { id: 'cinematic', label: 'Cinema', desc: 'Damped' },
-                                    { id: 'natural', label: 'Natural', desc: 'Fluid' },
-                                    { id: 'snappy', label: 'Snappy', desc: 'Fast' },
+                                    { id: 'cinematic', label: 'Cinema' },
+                                    { id: 'natural', label: 'Natural' },
+                                    { id: 'snappy', label: 'Snappy' },
                                 ].map((p) => (
                                     <button
                                         key={p.id}
                                         onClick={() => setSpringProfile(p.id)}
-                                        className={`py-2 px-1 rounded-xl border text-center transition-all ${
+                                        className={`py-1.5 px-1 rounded-md border text-center text-xs transition-all ${
                                             springProfile === p.id
-                                                ? 'bg-[#DCFE50]/15 border-[#DCFE50] text-[#DCFE50] font-bold'
-                                                : 'bg-white/[0.03] border-white/[0.06] text-gray-400 hover:text-white'
+                                                ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold'
+                                                : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
                                         }`}
                                     >
-                                        <div className="text-xs font-semibold">{p.label}</div>
-                                        <div className="text-[9px] text-gray-500">{p.desc}</div>
+                                        {p.label}
                                     </button>
                                 ))}
                             </div>
-                        </div>
-
-                        <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-1.5">
-                            <h5 className="text-xs font-bold text-white flex items-center gap-1.5">
-                                <Sparkles className="w-3.5 h-3.5 text-[#DCFE50]" />
-                                <span>Harmonic Camera Engine</span>
-                            </h5>
-                            <p className="text-[11px] text-gray-400 leading-relaxed">
-                                Drift tracks clicks and smoothly pans the camera using damped harmonic spring curves to keep context clear.
-                            </p>
                         </div>
                     </>
                 )}
@@ -186,59 +170,25 @@ export default function InspectorPanel({
                 {activeTab === 'cursor' && (
                     <>
                         <div className="space-y-4">
-                            {/* Show Cursor Toggle */}
                             <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-white">Render Cursor</span>
+                                <div>
+                                    <div className="text-xs font-semibold text-[var(--text-app)]">Overlay Synthetic Cursor</div>
+                                    <div className="text-[10px] text-[var(--text-app-muted)]">Default off to prevent double cursor</div>
+                                </div>
                                 <button
                                     onClick={onToggleCursor}
-                                    className={`w-10 h-5 rounded-full transition-all relative ${
-                                        showCursor ? 'bg-[#DCFE50]' : 'bg-gray-700'
+                                    className={`w-9 h-5 rounded-full transition-all relative ${
+                                        showCursor ? 'bg-[var(--accent-app)]' : 'bg-gray-600'
                                     }`}
                                 >
-                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-black shadow transition-transform ${
-                                        showCursor ? 'left-[22px]' : 'left-0.5'
+                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                                        showCursor ? 'left-[18px]' : 'left-0.5'
                                     }`} />
                                 </button>
                             </div>
 
-                            {/* Cursor Scale Slider */}
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider font-mono">
-                                        Cursor Size
-                                    </label>
-                                    <span className="text-xs font-mono font-bold text-[#DCFE50]">{cursorScale}×</span>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="0.8"
-                                    max="2.0"
-                                    step="0.1"
-                                    value={cursorScale}
-                                    onChange={(e) => setCursorScale(parseFloat(e.target.value))}
-                                    className="w-full accent-[#DCFE50] cursor-pointer"
-                                />
-                            </div>
-
-                            {/* Click Highlight Ripple Toggle */}
-                            <div className="flex items-center justify-between">
-                                <span className="text-xs font-medium text-gray-300">Click Highlight Ring</span>
-                                <button
-                                    onClick={() => setClickHighlight(!clickHighlight)}
-                                    className={`w-9 h-[18px] rounded-full transition-all relative ${
-                                        clickHighlight ? 'bg-[#DCFE50]' : 'bg-gray-700'
-                                    }`}
-                                >
-                                    <div className={`absolute top-[2px] w-[14px] h-[14px] bg-white rounded-full shadow transition-transform ${
-                                        clickHighlight ? 'left-[19px]' : 'left-[2px]'
-                                    }`} />
-                                </button>
-                            </div>
-
-                            <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                                <p className="text-[11px] text-gray-400 leading-relaxed font-mono">
-                                    240Hz sub-pixel cursor interpolation smooths jittery hand movements into cinematic sweeps.
-                                </p>
+                            <div className="p-3 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] text-[11px] text-[var(--text-app-muted)] leading-relaxed">
+                                Click ripple effects are automatically applied on user clicks. Synthetic cursor overlay can be enabled if your screen recorder hides the system mouse.
                             </div>
                         </div>
                     </>
@@ -246,13 +196,14 @@ export default function InspectorPanel({
             </div>
 
             {/* Bottom Export Action */}
-            <div className="p-4 border-t border-white/[0.08] bg-[#0E0F17] space-y-2">
+            <div className="p-4 border-t border-[var(--border-app)] bg-[var(--bg-card)]">
                 <button
                     onClick={onTriggerExport}
                     disabled={isExporting}
-                    className="w-full py-3.5 rounded-xl bg-[#DCFE50] hover:bg-[#c9ea3e] text-black font-extrabold text-sm tracking-wide uppercase shadow-[0_0_20px_rgba(220,254,80,0.3)] transition-all flex items-center justify-center gap-2"
+                    className="w-full py-3 rounded-xl bg-[var(--accent-app)] text-[var(--accent-app-fg)] hover:opacity-90 font-bold text-xs uppercase tracking-wide shadow-sm transition-all flex items-center justify-center gap-2"
                 >
-                    {isExporting ? 'Exporting Video...' : 'Export Final Video'}
+                    <Download className="w-3.5 h-3.5" />
+                    <span>{isExporting ? 'Exporting...' : 'Export Video'}</span>
                 </button>
             </div>
         </aside>

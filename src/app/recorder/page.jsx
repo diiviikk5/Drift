@@ -5,17 +5,16 @@ import { DriftEngine } from '@/lib/DriftEngine';
 import { StudioEngine } from '@/lib/StudioEngine';
 import drift from '@/lib/tauri-bridge';
 
-// Modular Desktop Components
+// Modular Shadcn Desktop Components
 import DesktopHeader from '@/components/desktop/DesktopHeader';
-import SourcePickerGrid from '@/components/desktop/SourcePickerGrid';
-import CaptureDock from '@/components/desktop/CaptureDock';
+import CaptureCockpit from '@/components/desktop/CaptureCockpit';
 import CountdownOverlay from '@/components/desktop/CountdownOverlay';
 import StudioTimeline from '@/components/desktop/StudioTimeline';
 import InspectorPanel from '@/components/desktop/InspectorPanel';
 import ExportDialog from '@/components/desktop/ExportDialog';
 import HotkeyModal from '@/components/desktop/HotkeyModal';
 
-// macOS & Studio Gradient Wallpapers
+// Studio Gradient Wallpapers
 const BACKGROUNDS = {
     midnight: { name: 'Midnight', colors: ['#0A0B10', '#121420', '#1C2035'] },
     bigSur: { name: 'Big Sur', colors: ['#ff6b9d', '#c44569', '#6c5ce7', '#0c3483'] },
@@ -41,6 +40,9 @@ export default function RecorderPage() {
     const [platform, setPlatform] = useState('browser'); // 'tauri' | 'electron' | 'browser'
     const isDesktop = platform === 'tauri' || platform === 'electron';
 
+    // Theme state ('dark' | 'light' | 'midnight' | 'drift')
+    const [theme, setTheme] = useState('dark');
+
     // Recorder State
     const [sources, setSources] = useState([]);
     const [selectedSource, setSelectedSource] = useState(null);
@@ -65,7 +67,8 @@ export default function RecorderPage() {
     const [trimEnd, setTrimEnd] = useState(0);
     const [background, setBackground] = useState('midnight');
     const [zoomLevel, setZoomLevel] = useState(1.8);
-    const [showCursor, setShowCursor] = useState(true);
+    // showCursor defaults to FALSE to completely prevent double cursor!
+    const [showCursor, setShowCursor] = useState(false);
 
     // Export State
     const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
@@ -74,7 +77,7 @@ export default function RecorderPage() {
 
     // Hotkeys & Telemetry
     const [showHotkeySettings, setShowHotkeySettings] = useState(false);
-    const [hookStatus, setHookStatus] = useState('Initializing...');
+    const [hookStatus, setHookStatus] = useState('Active');
     const [hotkeys, setHotkeys] = useState({
         toggle_recording: 'CmdOrCtrl+Shift+R',
         stop_recording: 'CmdOrCtrl+Shift+S',
@@ -82,13 +85,28 @@ export default function RecorderPage() {
         toggle_zoom: 'CmdOrCtrl+Shift+Z',
     });
 
-    // --- PLATFORM DETECTION ---
+    // Load saved theme
+    useEffect(() => {
+        try {
+            const savedTheme = localStorage.getItem('drift_theme');
+            if (savedTheme) setTheme(savedTheme);
+        } catch (e) {}
+    }, []);
+
+    const handleSelectTheme = (newTheme) => {
+        setTheme(newTheme);
+        try {
+            localStorage.setItem('drift_theme', newTheme);
+        } catch (e) {}
+    };
+
+    // Platform detection
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
         if (drift.isTauri()) {
             setPlatform('tauri');
-            setHookStatus('Active (Tauri IPC)');
+            setHookStatus('Tauri IPC');
             drift.getHotkeys().then(saved => {
                 if (saved) setHotkeys(saved);
                 drift.registerGlobalShortcuts(saved || hotkeys);
@@ -97,7 +115,7 @@ export default function RecorderPage() {
             });
         } else if (window.electron) {
             setPlatform('electron');
-            setHookStatus(window.electron.onGlobalClick ? 'Active (Electron)' : 'Unavailable');
+            setHookStatus('Electron');
             if (window.electron.getHotkeys) {
                 window.electron.getHotkeys().then(saved => {
                     if (saved) setHotkeys(saved);
@@ -105,13 +123,12 @@ export default function RecorderPage() {
             }
         } else {
             setPlatform('browser');
-            setHookStatus('Browser Mode');
-            // Browser recorder is retired - redirect web users to download section
+            setHookStatus('Browser');
             window.location.replace('/#install');
         }
     }, []);
 
-    // --- LOAD NATIVE THUMBNAILS (Tauri only) ---
+    // Load Native Display Thumbnails
     const loadThumbnails = useCallback(async (monitorSources) => {
         if (!drift.isTauri()) return;
         const thumbs = {};
@@ -130,7 +147,7 @@ export default function RecorderPage() {
         setSourceThumbnails(thumbs);
     }, []);
 
-    // --- INIT ENGINES ---
+    // Init Engines
     useEffect(() => {
         if (!isDesktop) return;
 
@@ -156,14 +173,12 @@ export default function RecorderPage() {
                 setViewMode('studio');
             };
 
-            // Load Sources
             async function load() {
                 setLoadingSources(true);
                 try {
                     const srcs = await engineRef.current.getSources();
                     setSources(srcs);
                     if (srcs.length > 0) {
-                        // Default to primary monitor or first available
                         const primary = srcs.find(s => s.is_primary) || srcs[0];
                         setSelectedSource(primary.id);
                         if (drift.isTauri()) {
@@ -193,6 +208,7 @@ export default function RecorderPage() {
                     );
                     studioRef.current.background = background;
                     studioRef.current.zoomLevel = zoomLevel;
+                    // showCursor defaults to FALSE to prevent double cursor
                     studioRef.current.showCursor = showCursor;
 
                     if (videoRef.current) {
@@ -227,7 +243,7 @@ export default function RecorderPage() {
         if (studioRef.current) studioRef.current.showCursor = showCursor;
     }, [showCursor]);
 
-    // --- ACTIONS ---
+    // Source selection
     const selectSource = async (id) => {
         setSelectedSource(id);
         if (platform === 'tauri') {
@@ -315,11 +331,10 @@ export default function RecorderPage() {
 
     useEffect(() => { toggleRecordRef.current = toggleRecord; }, [toggleRecord]);
 
-    // Global Hotkey Event Handler
+    // Hotkey listener
     useEffect(() => {
         const handler = (e) => {
             const { action } = e.detail || {};
-            console.log('[Drift] Global hotkey received:', action);
             switch (action) {
                 case 'toggle_recording':
                     if (toggleRecordRef.current) toggleRecordRef.current();
@@ -345,7 +360,7 @@ export default function RecorderPage() {
         };
     }, [isRecording, viewMode]);
 
-    // Studio Controls
+    // Studio controls
     const togglePlayback = () => {
         if (!studioRef.current) return;
         if (videoRef.current?.paused) {
@@ -409,7 +424,7 @@ export default function RecorderPage() {
             if (platform === 'tauri') {
                 try {
                     const savePath = await drift.showSaveDialog({
-                        defaultPath: `drift-cinema-${Date.now()}.${ext}`,
+                        defaultPath: `drift-recording-${Date.now()}.${ext}`,
                         filters: [{ name: `${ext.toUpperCase()} Video`, extensions: [ext] }],
                     });
 
@@ -447,12 +462,11 @@ export default function RecorderPage() {
         URL.revokeObjectURL(a.href);
     };
 
-    const saveHotkeys = async () => {
+    const saveHotkeys = async (newHotkeys) => {
+        setHotkeys(newHotkeys);
         if (platform === 'tauri') {
-            await drift.setHotkeys(hotkeys);
-            await drift.registerGlobalShortcuts(hotkeys);
-        } else if (window.electron?.setHotkeys) {
-            await window.electron.setHotkeys(hotkeys);
+            await drift.setHotkeys(newHotkeys);
+            await drift.registerGlobalShortcuts(newHotkeys);
         }
         setShowHotkeySettings(false);
     };
@@ -470,7 +484,6 @@ export default function RecorderPage() {
         setViewMode('recorder');
     };
 
-    // Keyboard Spacebar play/pause in Studio
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (viewMode === 'studio' && e.code === 'Space' && !e.target.matches('input, textarea, button')) {
@@ -485,24 +498,21 @@ export default function RecorderPage() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [viewMode, activeCountdown]);
 
-    // ══════════════════════════════════════════════
-    //  DESKTOP GATE (Browser redirect)
-    // ══════════════════════════════════════════════
     if (!isDesktop) {
         return (
-            <div className="h-screen bg-[#07080D] text-white flex flex-col items-center justify-center p-6 text-center font-mono select-none">
-                <div className="max-w-md w-full border-2 border-[#DCFE50] bg-[#0E0F17] p-8 rounded-3xl shadow-[0_20px_60px_rgba(220,254,80,0.15)]">
-                    <div className="w-16 h-16 mx-auto mb-6 bg-[#DCFE50] rounded-2xl flex items-center justify-center shadow-[0_0_25px_rgba(220,254,80,0.4)]">
-                        <span className="text-black font-black text-2xl font-mono">D</span>
+            <div className="h-screen bg-[#07080D] text-white flex flex-col items-center justify-center p-6 text-center font-sans select-none">
+                <div className="max-w-md w-full border border-white/10 bg-[#0E0F17] p-8 rounded-2xl shadow-xl">
+                    <div className="w-12 h-12 mx-auto mb-4 bg-white text-black rounded-xl flex items-center justify-center font-black text-xl">
+                        D
                     </div>
-                    <h1 className="text-xl font-bold uppercase mb-2 text-white font-mono">Drift Desktop Required</h1>
+                    <h1 className="text-lg font-bold mb-2 text-white">Drift Desktop Required</h1>
                     <p className="text-xs text-gray-400 mb-6 leading-relaxed">
-                        In-browser recording has been retired. Drift is now available exclusively as a native desktop application for cinema-grade auto-zoom and GPU-accelerated capture.
+                        In-browser recording has been retired. Drift is now available exclusively as a native desktop application.
                     </p>
                     <a
                         href="/downloads/Drift_2.0.0_x64-setup.exe"
                         download
-                        className="block w-full py-3.5 bg-[#DCFE50] text-black font-black uppercase text-xs rounded-xl hover:bg-[#c8ea3c] transition-all shadow-lg"
+                        className="block w-full py-3 bg-white text-black font-bold text-xs rounded-xl hover:bg-gray-100 transition-all shadow-sm"
                     >
                         Download Drift Desktop (21 MB)
                     </a>
@@ -511,9 +521,11 @@ export default function RecorderPage() {
         );
     }
 
+    const isDark = theme !== 'light';
+
     return (
-        <div className="h-screen bg-[#07080D] text-white font-sans select-none flex flex-col overflow-hidden">
-            {/* Hidden media elements for canvas rendering */}
+        <div className={`h-screen font-sans select-none flex flex-col overflow-hidden theme-${theme} ${isDark ? 'dark' : ''} bg-[var(--bg-app)] text-[var(--text-app)] transition-colors duration-200`}>
+            {/* Hidden media elements */}
             <video ref={videoRef} className="hidden" muted={viewMode === 'recorder'} playsInline />
 
             {/* Top Navigation Bar */}
@@ -528,68 +540,61 @@ export default function RecorderPage() {
                 recordingTime={timer}
                 isRecording={isRecording}
                 clickCount={clickCount}
+                theme={theme}
+                onSelectTheme={handleSelectTheme}
             />
 
             {/* Main Stage */}
             <div className="flex-1 min-h-0 flex flex-col relative overflow-hidden">
                 {viewMode === 'recorder' ? (
-                    /* ═══ CAPTURE MODE ═══ */
-                    <div className="flex-1 flex flex-col items-center justify-between p-6 max-w-5xl w-full mx-auto overflow-y-auto">
-                        {/* Hidden canvas in recorder view */}
+                    /* ═══ CAPTURE COCKPIT ═══ */
+                    <div className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-4xl mx-auto overflow-y-auto">
                         <canvas ref={canvasRef} width={1280} height={720} className="hidden" />
 
-                        {/* Top: Source Picker */}
-                        <div className="w-full mt-4">
-                            <SourcePickerGrid
-                                sources={sources}
-                                selectedSource={selectedSource}
-                                onSelectSource={selectSource}
-                                onSelectBrowserSource={selectBrowserSource}
-                                sourceThumbnails={sourceThumbnails}
-                                loadingSources={loadingSources}
-                            />
-                        </div>
-
-                        {/* Center / Bottom: Floating Command Dock */}
-                        <div className="w-full max-w-2xl my-6">
-                            <CaptureDock
-                                isRecording={isRecording}
-                                onToggleRecord={toggleRecord}
-                                timer={timer}
-                                micEnabled={micEnabled}
-                                onToggleMic={toggleMic}
-                                countdownSeconds={countdownSeconds}
-                                onChangeCountdown={setCountdownSeconds}
-                                hotkey={(typeof hotkeys.toggle_recording === 'string' ? hotkeys.toggle_recording : 'Ctrl+Shift+R').replace('CmdOrCtrl', 'Ctrl')}
-                            />
-                        </div>
+                        {/* Centered Cockpit Card */}
+                        <CaptureCockpit
+                            sources={sources}
+                            selectedSource={selectedSource}
+                            onSelectSource={selectSource}
+                            onSelectBrowserSource={selectBrowserSource}
+                            sourceThumbnails={sourceThumbnails}
+                            loadingSources={loadingSources}
+                            isRecording={isRecording}
+                            onToggleRecord={toggleRecord}
+                            timer={timer}
+                            micEnabled={micEnabled}
+                            onToggleMic={toggleMic}
+                            countdownSeconds={countdownSeconds}
+                            onChangeCountdown={setCountdownSeconds}
+                            hotkey={(typeof hotkeys.toggle_recording === 'string' ? hotkeys.toggle_recording : 'Ctrl+Shift+R').replace('CmdOrCtrl', 'Ctrl')}
+                        />
                     </div>
                 ) : (
                     /* ═══ STUDIO MODE ═══ */
                     <div className="flex-1 flex min-h-0">
-                        {/* Center Canvas Stage */}
-                        <main className="flex-1 flex flex-col min-w-0 bg-[#06070B] relative">
+                        {/* Center Video Stage */}
+                        <main className="flex-1 flex flex-col min-w-0 bg-black/10 relative">
                             <div className="flex-1 flex items-center justify-center p-6 relative overflow-hidden">
                                 <div
-                                    className="relative w-full max-w-5xl aspect-video rounded-2xl overflow-hidden border border-white/[0.1] shadow-[0_25px_60px_rgba(0,0,0,0.8)] cursor-crosshair group"
+                                    className="relative w-full max-w-5xl aspect-video rounded-2xl overflow-hidden border border-[var(--border-app)] shadow-2xl cursor-crosshair group bg-black"
                                     onClick={handleCanvasClick}
-                                    title="Click anywhere on the preview to place an auto-zoom focal point"
+                                    title="Click anywhere to add an auto-zoom point"
                                 >
                                     <canvas
                                         ref={canvasRef}
                                         width={1280}
                                         height={720}
-                                        className="w-full h-full bg-[#0E0F17]"
+                                        className="w-full h-full"
                                     />
 
-                                    {/* Subtle Canvas Hint Overlay */}
-                                    <div className="absolute top-4 left-4 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10 text-[11px] font-mono text-[#DCFE50]">
+                                    {/* Canvas Hint */}
+                                    <div className="absolute top-3 left-3 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity bg-black/75 backdrop-blur-md px-2.5 py-1 rounded-md text-[11px] font-mono text-white border border-white/10">
                                         ✦ Click anywhere to add a zoom focal point
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Studio Timeline Bar */}
+                            {/* Studio Timeline Scrubber */}
                             <StudioTimeline
                                 isPlaying={isPlaying}
                                 onTogglePlay={togglePlayback}
@@ -618,14 +623,13 @@ export default function RecorderPage() {
                 )}
             </div>
 
-            {/* ═══ MODALS & OVERLAYS ═══ */}
             {/* Countdown Overlay */}
             <CountdownOverlay
                 count={activeCountdown}
                 onCancel={cancelCountdown}
             />
 
-            {/* Export Modal */}
+            {/* Export Dialog */}
             <ExportDialog
                 isOpen={isExportDialogOpen}
                 onClose={() => setIsExportDialogOpen(false)}
@@ -634,14 +638,14 @@ export default function RecorderPage() {
                 exportProgress={exportProgress}
             />
 
-            {/* Hotkeys Config Modal */}
+            {/* Hotkeys Modal */}
             {showHotkeySettings && (
                 <HotkeyModal
+                    isOpen={showHotkeySettings}
                     hotkeys={hotkeys}
                     onUpdate={setHotkeys}
                     onSave={saveHotkeys}
                     onClose={() => setShowHotkeySettings(false)}
-                    platform={platform}
                 />
             )}
         </div>
