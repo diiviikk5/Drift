@@ -470,35 +470,6 @@ export default function RecorderPage() {
         return `Added focal point to timeline`;
     };
 
-    const handleUpdateSegment = (id, updates) => {
-        if (studioRef.current) {
-            studioRef.current.updateFocusSegment(id, updates);
-            setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
-        }
-    };
-
-    const handleAddAnnotation = (type) => {
-        if (!studioRef.current || !videoRef.current) return;
-        const ct = videoRef.current.currentTime;
-        const newAnn = {
-            id: `ann_${Date.now()}`,
-            type,
-            startTime: ct,
-            endTime: ct + 3.0,
-            x: 0.5,
-            y: 0.5,
-            startX: 0.35,
-            startY: 0.65,
-            endX: 0.5,
-            endY: 0.45,
-            text: type === 'text' ? 'Important Note' : '',
-            color: '#DCFE50',
-        };
-        const next = [...annotations, newAnn];
-        setAnnotations(next);
-        studioRef.current.setAnnotations(next);
-    };
-
     const startRecordingActual = async () => {
         try {
             if (!selectedSource || platform !== 'electron') {
