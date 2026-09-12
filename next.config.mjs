@@ -7,6 +7,7 @@ const internalHost = process.env.TAURI_DEV_HOST || 'localhost';
 const nextConfig = {
   /* config options here */
   reactCompiler: true,
+  trailingSlash: true,
 
   // When building for Tauri production, use static export (SSG)
   // During tauri dev, keep SSR so headers/rewrites work

@@ -14,6 +14,7 @@
       {
         "label": "main",
         "title": "Drift",
+        "url": "/recorder",
         "width": 1280,
         "height": 800,
         "minWidth": 900,
@@ -28,7 +29,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://openrouter.ai https://unpkg.com; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:;"
+      "csp": null
     }
   },
   "bundle": {

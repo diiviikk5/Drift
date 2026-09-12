@@ -25,6 +25,10 @@ pub fn run() {
                 )?;
             }
             if let Some(window) = app.get_webview_window("main") {
+                #[cfg(debug_assertions)]
+                {
+                    let _ = window.open_devtools();
+                }
                 let _ = window.show();
                 let _ = window.unminimize();
                 let _ = window.set_focus();
