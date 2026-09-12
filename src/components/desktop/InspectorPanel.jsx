@@ -15,7 +15,8 @@ import {
     RectangleHorizontal,
     Send,
     Subtitles,
-    RefreshCw
+    RefreshCw,
+    Settings2
 } from 'lucide-react';
 
 export default function InspectorPanel({
@@ -46,6 +47,7 @@ export default function InspectorPanel({
     onGenerateCaptions,
     isTranscribing = false,
     onApplyAICommand,
+    onOpenAISettings,
     onTriggerExport,
     isExporting = false
 }) {
@@ -470,11 +472,22 @@ export default function InspectorPanel({
 
                         {/* Natural Language AI Editor */}
                         <div className="p-3.5 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] space-y-3">
-                            <div className="flex items-center gap-2">
-                                <Sparkles className="w-4 h-4 text-[var(--accent-app)]" />
-                                <span className="text-xs font-semibold text-[var(--text-app)]">
-                                    AI Editing Assistant
-                                </span>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Sparkles className="w-4 h-4 text-[var(--accent-app)]" />
+                                    <span className="text-xs font-semibold text-[var(--text-app)]">
+                                        AI Editing Assistant
+                                    </span>
+                                </div>
+                                {onOpenAISettings && (
+                                    <button
+                                        onClick={onOpenAISettings}
+                                        className="p-1 rounded-md text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:bg-[var(--bg-card)] transition-colors"
+                                        title="Configure AI Providers (BYOK: Claude, OpenAI, Gemini, OpenRouter)"
+                                    >
+                                        <Settings2 className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
                             </div>
 
                             <p className="text-[11px] text-[var(--text-app-muted)] leading-relaxed">

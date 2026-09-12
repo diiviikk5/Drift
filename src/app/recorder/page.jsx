@@ -14,6 +14,7 @@ import StudioTimeline from '@/components/desktop/StudioTimeline';
 import InspectorPanel from '@/components/desktop/InspectorPanel';
 import ExportDialog from '@/components/desktop/ExportDialog';
 import HotkeyModal from '@/components/desktop/HotkeyModal';
+import AISettings from '@/app/components/settings/AISettings';
 
 // Studio Gradient Wallpapers
 const BACKGROUNDS = {
@@ -95,6 +96,9 @@ export default function RecorderPage() {
     const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
     const [exportProgress, setExportProgress] = useState(0);
+
+    // AI BYOK Settings Modal State
+    const [isAISettingsOpen, setIsAISettingsOpen] = useState(false);
 
     // Hotkeys & Telemetry
     const [showHotkeySettings, setShowHotkeySettings] = useState(false);
@@ -906,6 +910,7 @@ export default function RecorderPage() {
                             onGenerateCaptions={handleGenerateCaptions}
                             isTranscribing={isTranscribing}
                             onApplyAICommand={handleApplyAICommand}
+                            onOpenAISettings={() => setIsAISettingsOpen(true)}
                             onTriggerExport={() => setIsExportDialogOpen(true)}
                             isExporting={isExporting}
                         />
@@ -926,6 +931,12 @@ export default function RecorderPage() {
                 onStartExport={executeExport}
                 isExporting={isExporting}
                 exportProgress={exportProgress}
+            />
+
+            {/* AI Settings Modal (BYOK: Claude, OpenAI, Gemini, OpenRouter) */}
+            <AISettings
+                isOpen={isAISettingsOpen}
+                onClose={() => setIsAISettingsOpen(false)}
             />
 
             {/* Hotkeys Modal */}
