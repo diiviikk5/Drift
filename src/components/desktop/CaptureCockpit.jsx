@@ -16,6 +16,8 @@ export default function CaptureCockpit({
     timer,
     micEnabled,
     onToggleMic,
+    webcamEnabled,
+    onToggleWebcam,
     countdownSeconds,
     onChangeCountdown,
     hotkey
@@ -112,7 +114,7 @@ export default function CaptureCockpit({
             </div>
 
             {/* Quick Settings Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {/* Microphone Card */}
                 <div className="p-3.5 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] space-y-2">
                     <div className="flex items-center justify-between">
@@ -128,11 +130,11 @@ export default function CaptureCockpit({
                                 {micEnabled ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
                             </button>
                             <span className="text-xs font-semibold text-[var(--text-app)]">
-                                Microphone
+                                Mic
                             </span>
                         </div>
                         <span className={`text-[10px] font-mono ${micEnabled ? 'text-green-500 font-bold' : 'text-[var(--text-app-muted)]'}`}>
-                            {micEnabled ? 'Active' : 'Muted'}
+                            {micEnabled ? 'On' : 'Muted'}
                         </span>
                     </div>
 
@@ -149,17 +151,45 @@ export default function CaptureCockpit({
                     </div>
                 </div>
 
+                {/* Webcam PiP Card */}
+                <div className="p-3.5 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] space-y-2">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={onToggleWebcam}
+                                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                                    webcamEnabled
+                                        ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)]'
+                                        : 'bg-black/20 text-[var(--text-app-muted)]'
+                                }`}
+                            >
+                                <Camera className="w-3.5 h-3.5" />
+                            </button>
+                            <span className="text-xs font-semibold text-[var(--text-app)]">
+                                Webcam
+                            </span>
+                        </div>
+                        <span className={`text-[10px] font-mono ${webcamEnabled ? 'text-green-500 font-bold' : 'text-[var(--text-app-muted)]'}`}>
+                            {webcamEnabled ? 'PiP Active' : 'Off'}
+                        </span>
+                    </div>
+
+                    <div className="text-[10px] font-mono text-[var(--text-app-muted)] truncate">
+                        {webcamEnabled ? 'Picture-in-Picture' : 'Click to enable camera'}
+                    </div>
+                </div>
+
                 {/* Countdown Timer Card */}
                 <div className="p-3.5 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] space-y-2">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <Timer className="w-4 h-4 text-[var(--text-app-muted)]" />
                             <span className="text-xs font-semibold text-[var(--text-app)]">
-                                Countdown
+                                Delay
                             </span>
                         </div>
                         <span className="text-[10px] font-mono text-[var(--text-app-muted)]">
-                            {countdownSeconds === 0 ? 'No delay' : `${countdownSeconds}s delay`}
+                            {countdownSeconds === 0 ? 'Instant' : `${countdownSeconds}s`}
                         </span>
                     </div>
 
@@ -175,7 +205,7 @@ export default function CaptureCockpit({
                                         : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
                                 }`}
                             >
-                                {sec === 0 ? 'Instant' : `${sec}s`}
+                                {sec === 0 ? '0s' : `${sec}s`}
                             </button>
                         ))}
                     </div>

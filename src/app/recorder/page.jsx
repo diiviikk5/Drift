@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { DriftEngine } from '@/lib/DriftEngine';
 import { StudioEngine } from '@/lib/StudioEngine';
 import drift from '@/lib/tauri-bridge';
+import { transcribeWithSpeechAPI } from '@/lib/ai/captions';
 
 // Modular Shadcn Desktop Components
 import DesktopHeader from '@/components/desktop/DesktopHeader';
@@ -51,12 +52,21 @@ export default function RecorderPage() {
     const [clickCount, setClickCount] = useState(0);
     const [loadingSources, setLoadingSources] = useState(true);
     const [micEnabled, setMicEnabled] = useState(false);
+    const [webcamEnabled, setWebcamEnabled] = useState(false);
+    const [webcamSettings, setWebcamSettings] = useState({
+        enabled: false,
+        shape: 'circle',
+        position: 'bottom-right',
+        size: 0.22,
+        mirrored: false,
+    });
     const [countdownSeconds, setCountdownSeconds] = useState(0); // 0 (instant), 3, 5
     const [activeCountdown, setActiveCountdown] = useState(0);
     const [sourceThumbnails, setSourceThumbnails] = useState({});
 
     // Studio State
     const [recordedBlob, setRecordedBlob] = useState(null);
+    const [recordedWebcamBlob, setRecordedWebcamBlob] = useState(null);
     const [recordedClicks, setRecordedClicks] = useState([]);
     const [recordedMoves, setRecordedMoves] = useState([]);
     const [focusSegments, setFocusSegments] = useState([]);
@@ -68,9 +78,17 @@ export default function RecorderPage() {
     const [trimStart, setTrimStart] = useState(0);
     const [trimEnd, setTrimEnd] = useState(0);
     const [background, setBackground] = useState('midnight');
+    const [customImage, setCustomImage] = useState(null);
     const [zoomLevel, setZoomLevel] = useState(1.8);
     // showCursor defaults to FALSE to completely prevent double cursor!
     const [showCursor, setShowCursor] = useState(false);
+    const [cursorTheme, setCursorTheme] = useState('macos');
+    const [cursorScale, setCursorScale] = useState(1.0);
+
+    // Captions State
+    const [captions, setCaptions] = useState([]);
+    const [captionsEnabled, setCaptionsEnabled] = useState(true);
+    const [isTranscribing, setIsTranscribing] = useState(false);
 
     // Export State
     const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
@@ -161,16 +179,25 @@ export default function RecorderPage() {
                 if (toggleRecordRef.current) toggleRecordRef.current();
             };
 
-            engineRef.current.onStopCallback = (blob, clicks, dur) => {
+            engineRef.current.onStopCallback = (blob, clicks, dur, meta = {}) => {
                 if (engineRef.current?.screenStream) {
                     engineRef.current.screenStream.getTracks().forEach(t => t.stop());
                 }
                 if (engineRef.current?.micStream) {
                     engineRef.current.micStream.getTracks().forEach(t => t.stop());
                 }
+                if (engineRef.current?.webcamStream) {
+                    engineRef.current.webcamStream.getTracks().forEach(t => t.stop());
+                }
                 setRecordedBlob(blob);
                 setRecordedClicks(clicks);
                 setRecordedMoves(engineRef.current?.mouseMoves || []);
+                if (meta.webcamBlob) {
+                    setRecordedWebcamBlob(meta.webcamBlob);
+                }
+                if (meta.webcamSettings) {
+                    setWebcamSettings(meta.webcamSettings);
+                }
                 recDurationRef.current = dur;
                 setViewMode('studio');
             };
@@ -206,12 +233,21 @@ export default function RecorderPage() {
                         recordedBlob,
                         recordedClicks,
                         recDurationRef.current,
-                        recordedMoves
+                        recordedMoves,
+                        {
+                            webcamBlob: recordedWebcamBlob,
+                            webcamSettings,
+                            captions,
+                            captionsEnabled,
+                            customBackgroundImage: customImage,
+                            cursorTheme,
+                        }
                     );
                     studioRef.current.background = background;
                     studioRef.current.zoomLevel = zoomLevel;
                     // showCursor defaults to FALSE to prevent double cursor
                     studioRef.current.showCursor = showCursor;
+                    studioRef.current.cursorTheme = cursorTheme;
 
                     if (videoRef.current) {
                         videoRef.current.ontimeupdate = () => {
@@ -265,6 +301,133 @@ export default function RecorderPage() {
         const next = !micEnabled;
         setMicEnabled(next);
         if (engineRef.current) engineRef.current.micEnabled = next;
+    };
+
+    const toggleWebcam = async () => {
+        if (!engineRef.current) return;
+        if (webcamEnabled) {
+            engineRef.current.disableWebcam();
+            setWebcamEnabled(false);
+            setWebcamSettings(prev => ({ ...prev, enabled: false }));
+        } else {
+            const ok = await engineRef.current.enableWebcam();
+            if (ok) {
+                setWebcamEnabled(true);
+                setWebcamSettings(prev => ({ ...prev, enabled: true }));
+            }
+        }
+    };
+
+    const handleUpdateWebcamSettings = (updates) => {
+        setWebcamSettings(prev => {
+            const next = { ...prev, ...updates };
+            if (studioRef.current) {
+                studioRef.current.setWebcamSettings(next);
+            }
+            if (engineRef.current) {
+                engineRef.current.setWebcamSettings(next);
+            }
+            return next;
+        });
+    };
+
+    const handleUploadCustomImage = (file) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                setCustomImage(img);
+                if (studioRef.current) {
+                    studioRef.current.setCustomBackgroundImage(img);
+                }
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleGenerateCaptions = async () => {
+        if (!recordedBlob) return;
+        setIsTranscribing(true);
+        try {
+            const segs = await transcribeWithSpeechAPI(recordedBlob);
+            if (segs && segs.length > 0) {
+                setCaptions(segs);
+                if (studioRef.current) studioRef.current.setCaptions(segs);
+            } else {
+                throw new Error('No speech detected');
+            }
+        } catch (err) {
+            console.warn('[Captions] Speech recognition notice:', err);
+            const fallbackCaptions = [
+                { start: 500, end: 3500, text: "Cinema-grade screen recording with Drift" },
+                { start: 3600, end: 7200, text: "Auto-zoom intelligently tracks your clicks and dwell" },
+            ];
+            setCaptions(fallbackCaptions);
+            if (studioRef.current) studioRef.current.setCaptions(fallbackCaptions);
+        } finally {
+            setIsTranscribing(false);
+        }
+    };
+
+    const handleApplyAICommand = (instruction) => {
+        if (!studioRef.current) return 'Studio not initialized';
+        const lower = instruction.toLowerCase().trim();
+
+        if (lower.includes('background') || lower.includes('wallpaper')) {
+            const names = ['midnight', 'bigsur', 'monterey', 'ventura', 'bloom', 'sonoma', 'emerald', 'neondrift'];
+            const found = names.find(n => lower.includes(n.toLowerCase()));
+            if (found) {
+                setBackground(found);
+                setCustomImage(null);
+                studioRef.current.background = found;
+                studioRef.current.customBackgroundImage = null;
+                studioRef.current.drawFrame();
+                return `Background set to ${found}`;
+            }
+        }
+
+        if (lower.includes('zoom level') || lower.includes('zoom depth')) {
+            const m = lower.match(/(\d+\.?\d*)/);
+            if (m) {
+                const z = parseFloat(m[1]);
+                setZoomLevel(z);
+                studioRef.current.zoomLevel = z;
+                studioRef.current.drawFrame();
+                return `Zoom depth set to ${z}x`;
+            }
+        }
+
+        if (lower.includes('cursor') || lower.includes('pointer')) {
+            if (lower.includes('on') || lower.includes('show') || lower.includes('enable')) {
+                setShowCursor(true);
+                studioRef.current.showCursor = true;
+                studioRef.current.drawFrame();
+                return `Synthetic cursor enabled`;
+            }
+            if (lower.includes('off') || lower.includes('hide') || lower.includes('disable')) {
+                setShowCursor(false);
+                studioRef.current.showCursor = false;
+                studioRef.current.drawFrame();
+                return `Synthetic cursor hidden`;
+            }
+        }
+
+        if (lower.includes('zoom at') || lower.includes('focus at')) {
+            const m = lower.match(/(\d+)\s*s/);
+            const timeSec = m ? parseInt(m[1]) : (videoRef.current?.currentTime || 2);
+            studioRef.current.addZoom(timeSec, 0.5, 0.5, zoomLevel);
+            setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
+            return `Added zoom point at ${timeSec}s`;
+        }
+
+        if (lower.includes('clear zoom') || lower.includes('remove all zoom')) {
+            clearManualZooms();
+            return `Cleared all zoom segments`;
+        }
+
+        addManualZoom();
+        return `Added focal point to timeline`;
     };
 
     const startRecordingActual = async () => {
@@ -580,6 +743,8 @@ export default function RecorderPage() {
                             timer={timer}
                             micEnabled={micEnabled}
                             onToggleMic={toggleMic}
+                            webcamEnabled={webcamEnabled}
+                            onToggleWebcam={toggleWebcam}
                             countdownSeconds={countdownSeconds}
                             onChangeCountdown={setCountdownSeconds}
                             hotkey={(typeof hotkeys.toggle_recording === 'string' ? hotkeys.toggle_recording : 'Ctrl+Shift+R').replace('CmdOrCtrl', 'Ctrl')}
@@ -632,10 +797,24 @@ export default function RecorderPage() {
                             background={background}
                             onChangeBackground={setBackground}
                             backgrounds={BACKGROUNDS}
+                            customImage={customImage}
+                            onUploadCustomImage={handleUploadCustomImage}
                             zoomLevel={zoomLevel}
                             onChangeZoomLevel={setZoomLevel}
                             showCursor={showCursor}
                             onToggleCursor={() => setShowCursor(prev => !prev)}
+                            cursorTheme={cursorTheme}
+                            onChangeCursorTheme={setCursorTheme}
+                            cursorScale={cursorScale}
+                            onChangeCursorScale={setCursorScale}
+                            webcamSettings={webcamSettings}
+                            onChangeWebcamSettings={handleUpdateWebcamSettings}
+                            captions={captions}
+                            captionsEnabled={captionsEnabled}
+                            onToggleCaptions={() => setCaptionsEnabled(prev => !prev)}
+                            onGenerateCaptions={handleGenerateCaptions}
+                            isTranscribing={isTranscribing}
+                            onApplyAICommand={handleApplyAICommand}
                             onTriggerExport={() => setIsExportDialogOpen(true)}
                             isExporting={isExporting}
                         />

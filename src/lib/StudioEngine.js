@@ -10,7 +10,7 @@ const FRAME_SCALE = 0.82;
 const TITLE_BAR_HEIGHT = 36;
 
 export class StudioEngine {
-    constructor(canvas, videoElement, blob, clicks = [], duration = null, mouseMoves = []) {
+    constructor(canvas, videoElement, blob, clicks = [], duration = null, mouseMoves = [], options = {}) {
         console.log('[Studio] Initializing with', clicks.length, 'clicks, duration:', duration);
 
         this.canvas = canvas;
@@ -25,6 +25,35 @@ export class StudioEngine {
         this.clicks = clicks;
         this.explicitDuration = duration;
         this.mouseMoves = mouseMoves;
+
+        // Webcam PiP Video & Settings
+        this.webcamBlob = options.webcamBlob || null;
+        this.webcamVideo = null;
+        this.webcamSettings = options.webcamSettings || {
+            enabled: Boolean(options.webcamBlob),
+            shape: 'circle',
+            position: 'bottom-right',
+            size: 0.22,
+            mirrored: false,
+        };
+        if (this.webcamBlob) {
+            this.webcamVideo = document.createElement('video');
+            this.webcamVideo.src = URL.createObjectURL(this.webcamBlob);
+            this.webcamVideo.muted = true;
+            this.webcamVideo.playsInline = true;
+            this.webcamVideo.load();
+        }
+
+        // Auto-Captions Subtitles
+        this.captions = options.captions || [];
+        this.captionsEnabled = options.captionsEnabled ?? true;
+
+        // Annotations Layer
+        this.annotations = options.annotations || [];
+
+        // Custom Background Image
+        this.customBackgroundImage = options.customBackgroundImage || null;
+        this.cursorTheme = options.cursorTheme || 'macos';
 
         // Semantic Interaction Analyzer & Focus Track
         this.interactionAnalyzer = new InteractionAnalyzer();
@@ -153,10 +182,17 @@ export class StudioEngine {
 
     play() {
         this.video.play().catch(e => console.error('[Studio] Play failed:', e));
+        if (this.webcamVideo) {
+            this.webcamVideo.currentTime = this.video.currentTime;
+            this.webcamVideo.play().catch(() => {});
+        }
     }
 
     pause() {
         this.video.pause();
+        if (this.webcamVideo) {
+            this.webcamVideo.pause();
+        }
     }
 
     resetCamera() {
@@ -405,12 +441,39 @@ export class StudioEngine {
             },
             {
                 background: this.background,
+                customBackgroundImage: this.customBackgroundImage,
                 windowChrome: true,
                 showCursor: this.showCursor,
+                cursorTheme: this.cursorTheme || 'macos',
                 zoomMagnification: (this.zoomLevel || 2.0) / 2.0,
                 clickRipples: true,
+                webcamSource: this.webcamVideo && this.webcamVideo.readyState >= 2 ? this.webcamVideo : null,
+                webcamSettings: this.webcamSettings,
+                captions: this.captions || [],
+                captionsEnabled: this.captionsEnabled,
+                annotations: this.annotations || [],
             }
         );
+    }
+
+    setCaptions(captions) {
+        this.captions = captions;
+        this.drawFrame();
+    }
+
+    setAnnotations(annotations) {
+        this.annotations = annotations;
+        this.drawFrame();
+    }
+
+    setWebcamSettings(settings) {
+        this.webcamSettings = { ...this.webcamSettings, ...settings };
+        this.drawFrame();
+    }
+
+    setCustomBackgroundImage(img) {
+        this.customBackgroundImage = img;
+        this.drawFrame();
     }
 
     drawClickRing(ctx, x, y, progress) {
@@ -581,6 +644,9 @@ export class StudioEngine {
                     }
 
                     this.video.currentTime = targetTime;
+                    if (this.webcamVideo) {
+                        this.webcamVideo.currentTime = targetTime;
+                    }
                     const onSeeked = () => {
                         this.video.removeEventListener('seeked', onSeeked);
 

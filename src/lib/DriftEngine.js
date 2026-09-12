@@ -15,6 +15,18 @@ export class DriftEngine {
 
         this.screenStream = null;
         this.micStream = null;
+        this.webcamStream = null;
+        this.webcamVideo = null;
+        this.webcamEnabled = false;
+        this.webcamChunks = [];
+        this.webcamRecorder = null;
+        this.webcamSettings = {
+            enabled: false,
+            shape: 'circle',
+            position: 'bottom-right',
+            size: 0.22,
+            mirrored: false,
+        };
         this.mediaRecorder = null;
         this.recordedChunks = [];
         this.clicks = [];
@@ -292,6 +304,52 @@ export class DriftEngine {
         } catch (e) { return false; }
     }
 
+    async enableWebcam(deviceId = null) {
+        try {
+            if (this.webcamStream) {
+                this.webcamStream.getTracks().forEach(t => t.stop());
+            }
+            const constraints = {
+                video: deviceId
+                    ? { deviceId: { exact: deviceId } }
+                    : { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+                audio: false,
+            };
+            this.webcamStream = await navigator.mediaDevices.getUserMedia(constraints);
+            if (!this.webcamVideo) {
+                this.webcamVideo = document.createElement('video');
+                this.webcamVideo.muted = true;
+                this.webcamVideo.playsInline = true;
+            }
+            this.webcamVideo.srcObject = this.webcamStream;
+            await this.webcamVideo.play().catch(() => {});
+            this.webcamEnabled = true;
+            this.webcamSettings.enabled = true;
+            return true;
+        } catch (e) {
+            console.error('[Drift] Webcam enable failed:', e);
+            this.webcamEnabled = false;
+            this.webcamSettings.enabled = false;
+            return false;
+        }
+    }
+
+    disableWebcam() {
+        if (this.webcamStream) {
+            this.webcamStream.getTracks().forEach(t => t.stop());
+            this.webcamStream = null;
+        }
+        if (this.webcamVideo) {
+            this.webcamVideo.srcObject = null;
+        }
+        this.webcamEnabled = false;
+        this.webcamSettings.enabled = false;
+    }
+
+    setWebcamSettings(updates = {}) {
+        this.webcamSettings = { ...this.webcamSettings, ...updates };
+    }
+
     async startRecording(onTimer) {
         if (!this.screenStream) throw new Error("No screen selected");
 
@@ -373,6 +431,23 @@ export class DriftEngine {
         this.mediaRecorder.ondataavailable = e => { if (e.data.size > 0) this.recordedChunks.push(e.data); };
         this.mediaRecorder.start(1000); // 1s timeslice — less overhead, still fast stop
 
+        // Start secondary webcam stream recorder for lossless Studio post-production
+        if (this.webcamEnabled && this.webcamStream) {
+            this.webcamChunks = [];
+            try {
+                this.webcamRecorder = new MediaRecorder(this.webcamStream, {
+                    mimeType: mime,
+                    videoBitsPerSecond: 8_000_000,
+                });
+                this.webcamRecorder.ondataavailable = e => {
+                    if (e.data.size > 0) this.webcamChunks.push(e.data);
+                };
+                this.webcamRecorder.start(1000);
+            } catch (err) {
+                console.warn('[Drift] Webcam recording init error:', err);
+            }
+        }
+
         // Timer Loop
         this.timerInt = setInterval(() => {
             const s = (Date.now() - this.startTime) / 1000;
@@ -384,6 +459,9 @@ export class DriftEngine {
         if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') return;
 
         this.mediaRecorder.stop();
+        if (this.webcamRecorder && this.webcamRecorder.state !== 'inactive') {
+            try { this.webcamRecorder.stop(); } catch (e) {}
+        }
         this.isRecording = false;
         clearInterval(this.timerInt);
 
@@ -404,8 +482,14 @@ export class DriftEngine {
                 }
             }
             const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
+            const webcamBlob = this.webcamChunks.length > 0 ? new Blob(this.webcamChunks, { type: 'video/webm' }) : null;
             const duration = (Date.now() - this.startTime) / 1000;
-            if (this.onStopCallback) this.onStopCallback(blob, this.clicks, duration);
+            if (this.onStopCallback) {
+                this.onStopCallback(blob, this.clicks, duration, {
+                    webcamBlob,
+                    webcamSettings: { ...this.webcamSettings },
+                });
+            }
         };
     }
 
@@ -487,6 +571,44 @@ export class DriftEngine {
                 ctx.fillStyle = '#27C93F'; ctx.beginPath(); ctx.arc(bx + gap * 2, by, 6, 0, Math.PI * 2); ctx.fill();
 
                 ctx.restore(); // Restore camera transform
+
+                // Draw Live Webcam PiP Overlay if active
+                if (this.webcamEnabled && this.webcamVideo && this.webcamVideo.readyState >= 2) {
+                    const pipSize = Math.round(vw * (this.webcamSettings.size || 0.22));
+                    const pipMargin = Math.round(vw * 0.025);
+                    const pipX = frameX + vw - pipSize - pipMargin;
+                    const pipY = frameY + vh - pipSize - pipMargin;
+
+                    ctx.save();
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+                    ctx.shadowBlur = 18;
+                    ctx.shadowOffsetY = 8;
+                    ctx.beginPath();
+                    ctx.arc(pipX + pipSize / 2, pipY + pipSize / 2, pipSize / 2, 0, Math.PI * 2);
+                    ctx.fillStyle = '#000000';
+                    ctx.fill();
+
+                    ctx.clip();
+                    if (this.webcamSettings.mirrored) {
+                        ctx.translate(pipX + pipSize, pipY);
+                        ctx.scale(-1, 1);
+                        ctx.translate(-pipX, -pipY);
+                    }
+                    const minD = Math.min(this.webcamVideo.videoWidth, this.webcamVideo.videoHeight);
+                    const sx = (this.webcamVideo.videoWidth - minD) / 2;
+                    const sy = (this.webcamVideo.videoHeight - minD) / 2;
+                    ctx.drawImage(this.webcamVideo, sx, sy, minD, minD, pipX, pipY, pipSize, pipSize);
+                    ctx.restore();
+
+                    // PiP Ring border
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(pipX + pipSize / 2, pipY + pipSize / 2, pipSize / 2, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                    ctx.lineWidth = 2.5;
+                    ctx.stroke();
+                    ctx.restore();
+                }
 
                 // Draw zoom state indicator
                 if (this.isRecording && this.camera.scale > 1.05) {

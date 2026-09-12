@@ -167,6 +167,7 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
     const { width, height } = ctx.canvas;
     const {
         background = 'bigSur',
+        customBackgroundImage = null,
         insetPadding = 0.08,      // 8% inset
         borderRadius = 18,        // corner radius in canvas px
         windowChrome = true,
@@ -176,8 +177,23 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         shadowOpacity = 0.42,
         showCursor = false,
         cursorScale = 1.0,
+        cursorTheme = 'macos',    // 'macos' | 'dot' | 'neon'
         clickRipples = true,
         zoomMagnification = 1.0,
+        // Webcam PiP Settings
+        webcamSource = null,
+        webcamSettings = {
+            enabled: false,
+            shape: 'circle',       // 'circle' | 'squircle' | 'rounded' | 'square'
+            position: 'bottom-right', // 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
+            size: 0.22,           // 22% of screen frame width
+            mirrored: false,
+        },
+        // Captions Subtitles
+        captions = [],
+        captionsEnabled = true,
+        // Annotations
+        annotations = [],
     } = renderSettings;
 
     const {
@@ -186,13 +202,17 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         clicks = [],
     } = sessionData;
 
-    // 1. Draw Background Gradient
-    const colors = WALLPAPERS[background] || WALLPAPERS.bigSur;
-    const grad = ctx.createLinearGradient(0, 0, width, height);
-    const step = 1 / (colors.length - 1);
-    colors.forEach((c, i) => grad.addColorStop(i * step, c));
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, width, height);
+    // 1. Draw Background (Custom Image or Gradient)
+    if (customBackgroundImage && (customBackgroundImage.complete !== false)) {
+        _drawCoverImage(ctx, customBackgroundImage, 0, 0, width, height);
+    } else {
+        const colors = WALLPAPERS[background] || WALLPAPERS.bigSur;
+        const grad = ctx.createLinearGradient(0, 0, width, height);
+        const step = 1 / (colors.length - 1);
+        colors.forEach((c, i) => grad.addColorStop(i * step, c));
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, width, height);
+    }
 
     // 2. Compute Inset Screen Frame
     const padX = width * insetPadding;
@@ -287,20 +307,59 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
             }
         }
 
-        // 8. Draw Synthetic Pointer (if clean capture without baked cursor)
+        // 8. Draw Synthetic Pointer
         if (showCursor && mouseSamples && mouseSamples.length > 0) {
             const cursor = getInterpolatedCursor(timeSec, mouseSamples);
             if (cursor) {
                 const curScreenX = cursor.x * frameW;
                 const curScreenY = cursor.y * videoH;
-                _drawSyntheticCursor(ctx, curScreenX, curScreenY, cursorScale * (frameW / 1920));
+                _drawThemedCursor(ctx, curScreenX, curScreenY, cursorScale * (frameW / 1920), cursorTheme);
             }
         }
 
-        ctx.restore();
+        ctx.restore(); // restore video camera transform
+    }
+
+    // 9. Draw Annotations Layer (Pinned to Frame Space)
+    if (annotations && annotations.length > 0) {
+        _drawAnnotations(ctx, annotations, timeSec, { padX, padY: padY + headerH, frameW, videoH });
+    }
+
+    // 10. Draw Captions Subtitle Overlay (Pinned to Bottom of Frame)
+    if (captionsEnabled && captions && captions.length > 0) {
+        const timeMs = timeSec * 1000;
+        const currentCaption = captions.find(c => timeMs >= c.start && timeMs <= c.end);
+        if (currentCaption && currentCaption.text) {
+            _drawCaptionPill(ctx, currentCaption.text, { padX, padY: padY + headerH, frameW, videoH });
+        }
+    }
+
+    // 11. Draw Webcam Picture-in-Picture (Pinned to User Corner, Not Zoomed)
+    if (webcamSettings?.enabled && webcamSource) {
+        _drawWebcamPiP(ctx, webcamSource, webcamSettings, { padX, padY: padY + headerH, frameW, videoH });
     }
 
     ctx.restore(); // restore clipping rect
+}
+
+/**
+ * Aspect-fill helper for background images
+ */
+function _drawCoverImage(ctx, img, x, y, w, h) {
+    const imgW = img.naturalWidth || img.width || w;
+    const imgH = img.naturalHeight || img.height || h;
+    const scale = Math.max(w / imgW, h / imgH);
+    const renderW = imgW * scale;
+    const renderH = imgH * scale;
+    const offsetX = x + (w - renderW) / 2;
+    const offsetY = y + (h - renderH) / 2;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+    ctx.drawImage(img, offsetX, offsetY, renderW, renderH);
+    ctx.restore();
 }
 
 /**
@@ -318,6 +377,285 @@ function _drawRoundedRectPath(ctx, x, y, w, h, r) {
     ctx.lineTo(x, y + r);
     ctx.quadraticCurveTo(x, y, x + r, y);
     ctx.closePath();
+}
+
+/**
+ * Path helper for Squircle (Lamé curve of degree 4)
+ */
+function _drawSquirclePath(ctx, x, y, size) {
+    const r = size / 2;
+    const cx = x + r;
+    const cy = y + r;
+    const n = 4;
+    const steps = 48;
+    ctx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+        const theta = (i / steps) * 2 * Math.PI;
+        const cosT = Math.cos(theta);
+        const sinT = Math.sin(theta);
+        const px = cx + Math.sign(cosT) * Math.pow(Math.abs(cosT), 2 / n) * r;
+        const py = cy + Math.sign(sinT) * Math.pow(Math.abs(sinT), 2 / n) * r;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+}
+
+/**
+ * Draw Webcam Picture-in-Picture with sleek styling & clipping
+ */
+function _drawWebcamPiP(ctx, webcamSource, settings, bounds) {
+    const {
+        shape = 'circle',
+        position = 'bottom-right',
+        size: sizeRatio = 0.22,
+        mirrored = false,
+        borderWidth = 3,
+        borderColor = 'rgba(255, 255, 255, 0.25)',
+    } = settings;
+
+    const size = Math.round(bounds.frameW * sizeRatio);
+    const margin = Math.round(bounds.frameW * 0.025);
+
+    let x = bounds.padX + bounds.frameW - size - margin;
+    let y = bounds.padY + bounds.videoH - size - margin;
+
+    if (position === 'top-left') {
+        x = bounds.padX + margin;
+        y = bounds.padY + margin;
+    } else if (position === 'top-right') {
+        x = bounds.padX + bounds.frameW - size - margin;
+        y = bounds.padY + margin;
+    } else if (position === 'bottom-left') {
+        x = bounds.padX + margin;
+        y = bounds.padY + bounds.videoH - size - margin;
+    } else if (typeof position === 'object' && position.x != null) {
+        x = bounds.padX + position.x * (bounds.frameW - size);
+        y = bounds.padY + position.y * (bounds.videoH - size);
+    }
+
+    const drawShape = () => {
+        if (shape === 'circle') {
+            ctx.beginPath();
+            ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+            ctx.closePath();
+        } else if (shape === 'squircle') {
+            _drawSquirclePath(ctx, x, y, size);
+        } else if (shape === 'square') {
+            ctx.beginPath();
+            ctx.rect(x, y, size, size);
+            ctx.closePath();
+        } else {
+            // rounded
+            _drawRoundedRectPath(ctx, x, y, size, size, size * 0.22);
+        }
+    };
+
+    // Ambient drop shadow behind webcam
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 10;
+    ctx.fillStyle = '#000000';
+    drawShape();
+    ctx.fill();
+    ctx.restore();
+
+    // Clip & Draw Webcam Video with Aspect-Fill (Cover)
+    ctx.save();
+    drawShape();
+    ctx.clip();
+
+    if (mirrored) {
+        ctx.translate(x + size, y);
+        ctx.scale(-1, 1);
+        ctx.translate(-x, -y);
+    }
+
+    const vw = webcamSource.videoWidth || webcamSource.naturalWidth || webcamSource.width || size;
+    const vh = webcamSource.videoHeight || webcamSource.naturalHeight || webcamSource.height || size;
+    const minDim = Math.min(vw, vh);
+    const sx = (vw - minDim) / 2;
+    const sy = (vh - minDim) / 2;
+
+    try {
+        ctx.drawImage(webcamSource, sx, sy, minDim, minDim, x, y, size, size);
+    } catch (e) {
+        // Fallback placeholder if webcam not yet providing frames
+        ctx.fillStyle = '#1e1e24';
+        ctx.fillRect(x, y, size, size);
+    }
+    ctx.restore();
+
+    // Outline border
+    ctx.save();
+    drawShape();
+    ctx.lineWidth = borderWidth;
+    ctx.strokeStyle = borderColor;
+    ctx.stroke();
+    ctx.restore();
+}
+
+/**
+ * Draw Sleek Cinema Caption Pill
+ */
+function _drawCaptionPill(ctx, text, bounds) {
+    ctx.save();
+    const fontSize = Math.max(14, Math.round(bounds.frameW * 0.019));
+    ctx.font = `600 ${fontSize}px system-ui, -apple-system, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const textWidth = ctx.measureText(text).width;
+    const paddingX = fontSize * 1.4;
+    const paddingY = fontSize * 0.8;
+    const pillW = textWidth + paddingX * 2;
+    const pillH = fontSize + paddingY * 2;
+    const pillX = bounds.padX + (bounds.frameW - pillW) / 2;
+    const pillY = bounds.padY + bounds.videoH - pillH - Math.round(bounds.frameW * 0.035);
+
+    // Pill background
+    ctx.fillStyle = 'rgba(8, 9, 14, 0.82)';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 6;
+    _drawRoundedRectPath(ctx, pillX, pillY, pillW, pillH, pillH / 2);
+    ctx.fill();
+
+    // Subtle border
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Text with soft glow
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(text, pillX + pillW / 2, pillY + pillH / 2);
+    ctx.restore();
+}
+
+/**
+ * Draw On-Screen Annotations (Arrow, Rect, Text badge)
+ */
+function _drawAnnotations(ctx, annotations, timeSec, bounds) {
+    const curTimeMs = timeSec * 1000;
+    const active = annotations.filter(a => curTimeMs >= (a.startTime || 0) && curTimeMs <= (a.endTime || 999999));
+
+    for (const ann of active) {
+        ctx.save();
+        const color = ann.color || '#DCFE50';
+
+        if (ann.type === 'rect') {
+            const rx = bounds.padX + ann.x * bounds.frameW;
+            const ry = bounds.padY + ann.y * bounds.videoH;
+            const rw = (ann.w || 0.2) * bounds.frameW;
+            const rh = (ann.h || 0.15) * bounds.videoH;
+
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 12;
+            ctx.fillStyle = `${color}22`; // 13% opacity fill
+            _drawRoundedRectPath(ctx, rx, ry, rw, rh, 10);
+            ctx.fill();
+
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = color;
+            ctx.stroke();
+        } else if (ann.type === 'arrow') {
+            const x1 = bounds.padX + ann.startX * bounds.frameW;
+            const y1 = bounds.padY + ann.startY * bounds.videoH;
+            const x2 = bounds.padX + ann.endX * bounds.frameW;
+            const y2 = bounds.padY + ann.endY * bounds.videoH;
+
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            ctx.shadowBlur = 8;
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+
+            // Shaft
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+
+            // Arrow head
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            const headLen = 18;
+            ctx.beginPath();
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+        } else if (ann.type === 'text') {
+            const tx = bounds.padX + ann.x * bounds.frameW;
+            const ty = bounds.padY + ann.y * bounds.videoH;
+
+            ctx.font = 'bold 15px system-ui';
+            const tw = ctx.measureText(ann.text).width;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            _drawRoundedRectPath(ctx, tx - 12, ty - 22, tw + 24, 32, 8);
+            ctx.fill();
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillText(ann.text, tx, ty);
+        }
+        ctx.restore();
+    }
+}
+
+/**
+ * Draw Cursor according to theme
+ */
+function _drawThemedCursor(ctx, x, y, scale = 1.0, theme = 'macos') {
+    if (theme === 'dot') {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, 7 * scale, 0, Math.PI * 2);
+        ctx.fillStyle = '#DCFE50';
+        ctx.shadowColor = 'rgba(220, 254, 80, 0.6)';
+        ctx.shadowBlur = 10;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+        ctx.restore();
+        return;
+    }
+
+    if (theme === 'neon') {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(scale * 1.2, scale * 1.2);
+        ctx.shadowColor = '#00f0ff';
+        ctx.shadowBlur = 14;
+
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, 18);
+        ctx.lineTo(5, 14);
+        ctx.lineTo(9, 21);
+        ctx.lineTo(12, 19.5);
+        ctx.lineTo(8, 13);
+        ctx.lineTo(13.5, 13);
+        ctx.closePath();
+
+        ctx.fillStyle = '#00f0ff';
+        ctx.fill();
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        ctx.restore();
+        return;
+    }
+
+    // Default: macOS style
+    _drawSyntheticCursor(ctx, x, y, scale);
 }
 
 /**
