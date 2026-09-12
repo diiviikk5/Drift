@@ -162,8 +162,7 @@ export default function RecorderPage() {
             }
         } else {
             setPlatform('browser');
-            setHookStatus('Browser');
-            window.location.replace('/#install');
+            setHookStatus('Web Browser');
         }
     }, []);
 
@@ -188,8 +187,6 @@ export default function RecorderPage() {
 
     // Init Engines
     useEffect(() => {
-        if (!isDesktop) return;
-
         if (viewMode === 'recorder') {
             engineRef.current = new DriftEngine(canvasRef.current, videoRef.current);
             engineRef.current.onclickCallback = (c) => setClickCount(c);
@@ -287,7 +284,7 @@ export default function RecorderPage() {
                 }, 100);
             }
         }
-    }, [viewMode, isDesktop]);
+    }, [viewMode, platform]);
 
     useEffect(() => {
         if (studioRef.current) studioRef.current.background = background;
@@ -781,29 +778,6 @@ export default function RecorderPage() {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [viewMode, activeCountdown]);
-
-    if (!isDesktop) {
-        return (
-            <div className="h-screen bg-[#07080D] text-white flex flex-col items-center justify-center p-6 text-center font-sans select-none">
-                <div className="max-w-md w-full border border-white/10 bg-[#0E0F17] p-8 rounded-2xl shadow-xl">
-                    <div className="w-12 h-12 mx-auto mb-4 bg-white text-black rounded-xl flex items-center justify-center font-black text-xl">
-                        D
-                    </div>
-                    <h1 className="text-lg font-bold mb-2 text-white">Drift Desktop Required</h1>
-                    <p className="text-xs text-gray-400 mb-6 leading-relaxed">
-                        In-browser recording has been retired. Drift is now available exclusively as a native desktop application.
-                    </p>
-                    <a
-                        href="/downloads/Drift_2.0.0_x64-setup.exe"
-                        download
-                        className="block w-full py-3 bg-white text-black font-bold text-xs rounded-xl hover:bg-gray-100 transition-all shadow-sm"
-                    >
-                        Download Drift Desktop (21 MB)
-                    </a>
-                </div>
-            </div>
-        );
-    }
 
     const isDark = theme !== 'light';
 
