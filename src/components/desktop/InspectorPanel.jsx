@@ -164,10 +164,12 @@ export default function InspectorPanel({
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-1.5">
+                            <div className="grid grid-cols-2 gap-1.5 max-h-72 overflow-y-auto pr-1">
                                 {Object.entries(backgrounds).map(([key, val]) => {
-                                    const isSelected = background === key && !customImage;
-                                    const gradient = `linear-gradient(135deg, ${val.colors.join(', ')})`;
+                                    const isSelected = background === key && (!customImage || customImage._bgKey === key);
+                                    const bgStyle = val.src
+                                        ? { backgroundImage: `url(${val.src})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                                        : { background: `linear-gradient(135deg, ${val.colors.join(', ')})` };
 
                                     return (
                                         <button
@@ -175,13 +177,13 @@ export default function InspectorPanel({
                                             onClick={() => onChangeBackground(key)}
                                             className={`p-1.5 rounded-lg border flex items-center gap-2 transition-all text-left ${
                                                 isSelected
-                                                    ? 'border-[var(--accent-app)] bg-[var(--bg-card-subtle)] font-bold'
+                                                    ? 'border-[var(--accent-app)] bg-[var(--bg-card-subtle)] font-bold shadow-xs'
                                                     : 'border-[var(--border-app)] hover:border-[var(--border-app-hover)]'
                                             }`}
                                         >
                                             <div
-                                                className="w-5 h-5 rounded-md shadow-xs flex-shrink-0"
-                                                style={{ background: gradient }}
+                                                className="w-6 h-6 rounded-md shadow-xs flex-shrink-0 border border-white/10"
+                                                style={bgStyle}
                                             />
                                             <span className="text-xs text-[var(--text-app)] truncate">{val.name}</span>
                                         </button>
@@ -189,9 +191,9 @@ export default function InspectorPanel({
                                 })}
                             </div>
 
-                            {customImage && (
+                            {customImage && !customImage._bgKey && (
                                 <div className="p-2.5 rounded-lg bg-[var(--bg-card-subtle)] border border-[var(--accent-app)] flex items-center justify-between text-xs">
-                                    <span className="text-[var(--accent-app)] font-mono font-medium">Custom Image Active</span>
+                                    <span className="text-[var(--accent-app)] font-mono font-medium">Uploaded Image Active</span>
                                     <button
                                         onClick={() => onChangeBackground('midnight')}
                                         className="text-[10px] text-[var(--text-app-muted)] hover:text-red-400"

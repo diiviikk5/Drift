@@ -18,14 +18,27 @@ import AISettings from '@/app/components/settings/AISettings';
 
 // Studio Gradient Wallpapers
 const BACKGROUNDS = {
+    // Cinema Gradients (From D:\drift gradients)
+    cosmicMesh: { name: 'Cosmic Mesh', src: '/gradients/cosmic-mesh.jpg', colors: ['#4A00E0', '#8E2DE2', '#F000FF'] },
+    sunsetPrism: { name: 'Sunset Prism', src: '/gradients/sunset-prism.jpg', colors: ['#FF512F', '#DD2476', '#FF9966'] },
+    auroraFlow: { name: 'Aurora Flow', src: '/gradients/aurora-flow.jpg', colors: ['#2E0854', '#8A2BE2', '#00FFFF'] },
+    oceanBreeze: { name: 'Ocean Breeze', src: '/gradients/ocean-breeze.jpg', colors: ['#00c6ff', '#0072ff', '#1D2671'] },
+    deepSpace: { name: 'Deep Space', src: '/gradients/deep-space.jpg', colors: ['#000000', '#130CB7', '#52E5E7'] },
+    hyperGlow: { name: 'Hyper Glow', src: '/gradients/hyper-glow.jpg', colors: ['#FF0844', '#FFB199', '#7F00FF'] },
+    pastelDream: { name: 'Pastel Dream', src: '/gradients/pastel-dream.jpg', colors: ['#FFAFBD', '#C9FFBF', '#FFC3A0'] },
+    velvetHaze: { name: 'Velvet Haze', src: '/gradients/velvet-haze.jpg', colors: ['#200122', '#6f0000', '#3f0c35'] },
+    neonDusk: { name: 'Neon Dusk', src: '/gradients/neon-dusk.jpg', colors: ['#f12711', '#f5af19', '#8e0e00'] },
+    abstractFluid: { name: 'Abstract Fluid', src: '/gradients/abstract-fluid.jpg', colors: ['#654ea3', '#eaafc8', '#5b247a'] },
+
+    // Classic Studio Presets
     midnight: { name: 'Midnight', colors: ['#0A0B10', '#121420', '#1C2035'] },
+    neonDrift: { name: 'Drift Lime', colors: ['#08090E', '#16190B', '#262D0B', '#DCFE50'] },
     bigSur: { name: 'Big Sur', colors: ['#ff6b9d', '#c44569', '#6c5ce7', '#0c3483'] },
     monterey: { name: 'Monterey', colors: ['#00b894', '#00cec9', '#0984e3', '#6c5ce7'] },
     ventura: { name: 'Ventura', colors: ['#e17055', '#d63031', '#fd79a8', '#a855f7'] },
     bloom: { name: 'Bloom', colors: ['#74b9ff', '#0984e3', '#6c5ce7', '#a855f7'] },
     sonoma: { name: 'Sonoma', colors: ['#fdcb6e', '#f39c12', '#e74c3c', '#9b59b6'] },
-    emerald: { name: 'Emerald', colors: ['#059669', '#10b981', '#064e3b', '#022c22'] },
-    neonDrift: { name: 'Drift Lime', colors: ['#08090E', '#16190B', '#262D0B', '#DCFE50'] }
+    emerald: { name: 'Emerald', colors: ['#059669', '#10b981', '#064e3b', '#022c22'] }
 };
 
 export default function RecorderPage() {
@@ -351,6 +364,29 @@ export default function RecorderPage() {
         reader.readAsDataURL(file);
     };
 
+    const handleChangeBackground = (bgKey) => {
+        setBackground(bgKey);
+        const bg = BACKGROUNDS[bgKey];
+        if (bg && bg.src) {
+            const img = new Image();
+            img.onload = () => {
+                img._bgKey = bgKey;
+                setCustomImage(img);
+                if (studioRef.current) {
+                    studioRef.current.background = bgKey;
+                    studioRef.current.setCustomBackgroundImage(img);
+                }
+            };
+            img.src = bg.src;
+        } else {
+            setCustomImage(null);
+            if (studioRef.current) {
+                studioRef.current.background = bgKey;
+                studioRef.current.setCustomBackgroundImage(null);
+            }
+        }
+    };
+
     const handleGenerateCaptions = async () => {
         if (!recordedBlob) return;
         setIsTranscribing(true);
@@ -380,15 +416,14 @@ export default function RecorderPage() {
         const lower = instruction.toLowerCase().trim();
 
         if (lower.includes('background') || lower.includes('wallpaper')) {
-            const names = ['midnight', 'bigsur', 'monterey', 'ventura', 'bloom', 'sonoma', 'emerald', 'neondrift'];
-            const found = names.find(n => lower.includes(n.toLowerCase()));
+            const keys = Object.keys(BACKGROUNDS);
+            const found = keys.find(k => {
+                const name = (BACKGROUNDS[k].name || '').toLowerCase();
+                return lower.includes(k.toLowerCase()) || (name && lower.includes(name));
+            });
             if (found) {
-                setBackground(found);
-                setCustomImage(null);
-                studioRef.current.background = found;
-                studioRef.current.customBackgroundImage = null;
-                studioRef.current.drawFrame();
-                return `Background set to ${found}`;
+                handleChangeBackground(found);
+                return `Background set to ${BACKGROUNDS[found].name}`;
             }
         }
 
@@ -890,7 +925,7 @@ export default function RecorderPage() {
                         {/* Right Inspector Sidebar */}
                         <InspectorPanel
                             background={background}
-                            onChangeBackground={setBackground}
+                            onChangeBackground={handleChangeBackground}
                             backgrounds={BACKGROUNDS}
                             customImage={customImage}
                             onUploadCustomImage={handleUploadCustomImage}

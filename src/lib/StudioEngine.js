@@ -484,6 +484,11 @@ export class StudioEngine {
         this.drawFrame();
     }
 
+    setBackground(bg) {
+        this.background = bg;
+        this.drawFrame();
+    }
+
     drawClickRing(ctx, x, y, progress) {
         ctx.save();
         const radius = 8 + progress * 20;

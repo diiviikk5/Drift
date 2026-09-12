@@ -8,15 +8,27 @@
 
 // Gradient wallpaper palettes
 export const WALLPAPERS = {
+    midnight: ['#090d16', '#111827', '#1f2937', '#0f172a'],
+    driftLime: ['#061a0d', '#0d3319', '#14532d', '#DCFE50'],
+    neonDrift: ['#061a0d', '#0d3319', '#14532d', '#DCFE50'],
+    cosmicMesh: ['#4A00E0', '#8E2DE2', '#F000FF'],
+    sunsetPrism: ['#FF512F', '#DD2476', '#FF9966'],
+    auroraFlow: ['#2E0854', '#8A2BE2', '#00FFFF'],
+    oceanBreeze: ['#00c6ff', '#0072ff', '#1D2671'],
+    deepSpace: ['#000000', '#130CB7', '#52E5E7'],
+    hyperGlow: ['#FF0844', '#FFB199', '#7F00FF'],
+    pastelDream: ['#FFAFBD', '#C9FFBF', '#FFC3A0'],
+    velvetHaze: ['#200122', '#6f0000', '#3f0c35'],
+    neonDusk: ['#f12711', '#f5af19', '#8e0e00'],
+    abstractFluid: ['#654ea3', '#eaafc8', '#5b247a'],
     bigSur: ['#d14545', '#e27b38', '#ebae42', '#2d60b3'],
     monterey: ['#591e77', '#93226a', '#c73a4c', '#181f62'],
     ventura: ['#e55d28', '#f19e38', '#e2385c', '#3b1c6e'],
     bloom: ['#6930c3', '#5390d9', '#4ea8de', '#48bfe3'],
     sonoma: ['#1d3557', '#457b9d', '#a8dadc', '#1d3557'],
-    midnight: ['#090d16', '#111827', '#1f2937', '#0f172a'],
+    emerald: ['#059669', '#10b981', '#064e3b', '#022c22'],
     obsidian: ['#050505', '#121214', '#18181b', '#0a0a0c'],
     cyberpunk: ['#0f051d', '#3b0764', '#701a75', '#0284c7'],
-    driftLime: ['#061a0d', '#0d3319', '#14532d', '#DCFE50'],
 };
 
 /**
