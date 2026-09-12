@@ -32,7 +32,25 @@ export const WALLPAPERS = {
 };
 
 /**
- * Smooth Hermite / Quintic interpolation
+ * Cap physical spring-mass-damper easing (k=200, d=40, m=2.25)
+ */
+export function capSpringEase(t, stiffness = 200, damping = 40, mass = 2.25) {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    const omega0 = Math.sqrt(stiffness / mass);
+    const zeta = damping / (2 * Math.sqrt(stiffness * mass));
+    if (zeta < 1) {
+        const omegaD = omega0 * Math.sqrt(1 - zeta * zeta);
+        const decay = Math.exp(-zeta * omega0 * t);
+        return 1 - decay * (Math.cos(omegaD * t) + (zeta * omega0 / omegaD) * Math.sin(omegaD * t));
+    } else {
+        const decay = Math.exp(-omega0 * t);
+        return 1 - decay * (1 + omega0 * t);
+    }
+}
+
+/**
+ * Smooth Hermite / Quintic interpolation fallback
  */
 function smoothstep(edge0, edge1, x) {
     const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
@@ -41,6 +59,7 @@ function smoothstep(edge0, edge1, x) {
 
 /**
  * Evaluate camera target and zoom at precise timestamp
+ * Implements Cap's calculate_zoom_and_center_for_cursor & safe viewport lock
  */
 export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples = [], options = {}) {
     const zoomMultiplier = options.zoomMultiplier ?? 1.0;
@@ -63,11 +82,13 @@ export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples =
         if (timeSec >= leadIn && timeSec <= leadOut) {
             activeSeg = seg;
             if (timeSec < rampUpEnd) {
-                // Zooming in
-                blendWeight = smoothstep(leadIn, rampUpEnd, timeSec);
+                // Zooming in with physical spring easing
+                const progress = Math.max(0, Math.min(1, (timeSec - leadIn) / transitionDuration));
+                blendWeight = capSpringEase(progress);
             } else if (timeSec > rampDownStart) {
-                // Zooming out
-                blendWeight = 1 - smoothstep(rampDownStart, leadOut, timeSec);
+                // Zooming out with physical spring easing
+                const progress = Math.max(0, Math.min(1, (leadOut - timeSec) / transitionDuration));
+                blendWeight = capSpringEase(progress);
             } else {
                 // Fully zoomed in
                 blendWeight = 1.0;
@@ -77,31 +98,54 @@ export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples =
     }
 
     if (!activeSeg || blendWeight <= 0.001) {
-        return { x: 0.5, y: 0.5, scale: 1.0 };
+        return { x: 0.5, y: 0.5, scale: 1.0, activeSeg: null };
+    }
+
+    // Scene Mode: Spotlight and Overview keep screen framing unzoomed
+    if (activeSeg.sceneMode === 'spotlight' || activeSeg.sceneMode === 'overview') {
+        return {
+            x: 0.5,
+            y: 0.5,
+            scale: 1.0,
+            activeSeg,
+        };
     }
 
     // Target zoom scale
     const targetScale = 1.0 + (activeSeg.zoomScale * zoomMultiplier - 1.0) * blendWeight;
+    const halfW = 0.5 / targetScale;
+    const halfH = 0.5 / targetScale;
 
-    // Deadzone Box logic
-    let targetX = activeSeg.targetX;
-    let targetY = activeSeg.targetY;
+    let targetX = activeSeg.targetX ?? 0.5;
+    let targetY = activeSeg.targetY ?? 0.5;
 
-    // If mouse telemetry is present, check against deadzone radius
-    if (mouseSamples && mouseSamples.length > 0 && blendWeight > 0.5) {
+    // Cap Safe Viewport Lock:
+    // When zoomed in, if cursor is anywhere inside the visible screen viewport,
+    // the camera STAYS ROCK SOLID FROZEN so the audience never feels seasick.
+    if (mouseSamples && mouseSamples.length > 0 && blendWeight > 0.25) {
         const cursor = getInterpolatedCursor(timeSec, mouseSamples);
         if (cursor) {
-            const dx = cursor.x - targetX;
-            const dy = cursor.y - targetY;
-            const dist = Math.hypot(dx, dy);
-            const deadzone = activeSeg.deadzoneRadius || 0.22;
+            const marginW = halfW * 0.75;
+            const marginH = halfH * 0.75;
+            const isInsideSafe = 
+                cursor.x >= (targetX - marginW) &&
+                cursor.x <= (targetX + marginW) &&
+                cursor.y >= (targetY - marginH) &&
+                cursor.y <= (targetY + marginH);
 
-            if (dist > deadzone) {
-                // Cursor moved beyond deadzone bubble, gently pull camera
-                const excess = dist - deadzone;
-                const pullFactor = Math.min(0.5, excess / dist);
-                targetX += dx * pullFactor;
-                targetY += dy * pullFactor;
+            if (!isInsideSafe) {
+                // Cursor moved beyond safe window: gently nudge viewport
+                if (cursor.x < targetX - marginW) {
+                    targetX = cursor.x + marginW;
+                } else if (cursor.x > targetX + marginW) {
+                    targetX = cursor.x - marginW;
+                }
+
+                if (cursor.y < targetY - marginH) {
+                    targetY = cursor.y + marginH;
+                } else if (cursor.y > targetY + marginH) {
+                    targetY = cursor.y - marginH;
+                }
             }
         }
     }
@@ -110,9 +154,7 @@ export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples =
     const curX = 0.5 + (targetX - 0.5) * blendWeight;
     const curY = 0.5 + (targetY - 0.5) * blendWeight;
 
-    // Viewport boundary clamping
-    const halfW = 0.5 / targetScale;
-    const halfH = 0.5 / targetScale;
+    // Strict boundary clamping so screen background is never exposed
     const clampedX = Math.max(halfW, Math.min(1.0 - halfW, curX));
     const clampedY = Math.max(halfH, Math.min(1.0 - halfH, curY));
 
@@ -120,6 +162,7 @@ export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples =
         x: clampedX,
         y: clampedY,
         scale: targetScale,
+        activeSeg,
     };
 }
 
@@ -224,6 +267,15 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         colors.forEach((c, i) => grad.addColorStop(i * step, c));
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, width, height);
+    }
+
+    // Subtle Cap film grain noise overlay (removes color banding, adds texture)
+    const grain = _getNoisePattern(ctx);
+    if (grain) {
+        ctx.save();
+        ctx.fillStyle = grain;
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
     }
 
     // 2. Compute Inset Screen Frame
@@ -343,13 +395,42 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
             }
         }
 
-        // 8. Draw Synthetic Pointer
+        // 8. Draw Synthetic Pointer with Cap Click-Shrink & Idle-Fade Dynamics
         if (showCursor && mouseSamples && mouseSamples.length > 0) {
             const cursor = getInterpolatedCursor(timeSec, mouseSamples);
             if (cursor) {
                 const curScreenX = cursor.x * frameW;
                 const curScreenY = cursor.y * videoH;
-                _drawThemedCursor(ctx, curScreenX, curScreenY, cursorScale * (frameW / 1920), cursorTheme);
+
+                // Cap Click Shrink: 0.72x on click and bounce back within 220ms
+                let clickFactor = 1.0;
+                if (clicks && clicks.length > 0) {
+                    const curMs = timeSec * 1000;
+                    for (const c of clicks) {
+                        const dt = curMs - (c.time > 1000 ? c.time : c.time * 1000);
+                        if (dt >= 0 && dt <= 220) {
+                            clickFactor = 0.72 + 0.28 * (dt / 220);
+                            break;
+                        }
+                    }
+                }
+
+                // Cap Idle Auto-Fade: stationary mouse fades to 25% opacity so product UI is never obscured
+                let idleOpacity = 1.0;
+                if (mouseSamples.length > 5 && timeSec > 0.8) {
+                    const prevCursor = getInterpolatedCursor(timeSec - 0.7, mouseSamples);
+                    if (prevCursor) {
+                        const moveDist = Math.hypot(cursor.x - prevCursor.x, cursor.y - prevCursor.y);
+                        if (moveDist < 0.005) {
+                            idleOpacity = 0.25;
+                        }
+                    }
+                }
+
+                ctx.save();
+                ctx.globalAlpha = idleOpacity;
+                _drawThemedCursor(ctx, curScreenX, curScreenY, cursorScale * clickFactor * (frameW / 1920), cursorTheme);
+                ctx.restore();
             }
         }
 
@@ -372,7 +453,15 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
 
     // 11. Draw Webcam Picture-in-Picture (Pinned to User Corner, Not Zoomed)
     if (webcamSettings?.enabled && webcamSource) {
-        _drawWebcamPiP(ctx, webcamSource, webcamSettings, { padX, padY: padY + headerH, frameW, videoH });
+        const isSpotlight = camera.activeSeg?.sceneMode === 'spotlight' || webcamSettings.position === 'center' || webcamSettings.spotlight;
+        const effectiveWebcamSettings = isSpotlight ? { ...webcamSettings, spotlight: true } : webcamSettings;
+        _drawWebcamPiP(ctx, webcamSource, effectiveWebcamSettings, { padX, padY: padY + headerH, frameW, videoH });
+    }
+
+    // 12. Speed Ramp Cinema Indicator (if active segment is in speed mode)
+    if (camera.activeSeg?.sceneMode === 'speed') {
+        const speedMultiplier = camera.activeSeg.speed || 2.0;
+        _drawSpeedRampBadge(ctx, speedMultiplier, { padX, padY: padY + headerH, frameW, videoH });
     }
 
     ctx.restore(); // restore clipping rect
@@ -446,17 +535,33 @@ function _drawWebcamPiP(ctx, webcamSource, settings, bounds) {
         position = 'bottom-right',
         size: sizeRatio = 0.22,
         mirrored = false,
-        borderWidth = 3,
-        borderColor = 'rgba(255, 255, 255, 0.25)',
-    } = settings;
+        borderWidth: defaultBorderWidth = 3,
+        borderColor: defaultBorderColor = 'rgba(255, 255, 255, 0.25)',
+    } = settings || {};
 
-    const size = Math.round(bounds.frameW * sizeRatio);
+    let borderWidth = defaultBorderWidth;
+    let borderColor = defaultBorderColor;
+    let size = Math.round(bounds.frameW * sizeRatio);
     const margin = Math.round(bounds.frameW * 0.025);
 
+    const isSpotlight = position === 'center' || settings?.spotlight;
     let x = bounds.padX + bounds.frameW - size - margin;
     let y = bounds.padY + bounds.videoH - size - margin;
 
-    if (position === 'top-left') {
+    if (isSpotlight) {
+        // Dim the background screen demo so presenter takes center stage
+        ctx.save();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.62)';
+        ctx.fillRect(bounds.padX, bounds.padY, bounds.frameW, bounds.videoH);
+        ctx.restore();
+
+        // Cinema Spotlight scale
+        size = Math.min(bounds.frameW * 0.44, bounds.videoH * 0.74);
+        x = bounds.padX + (bounds.frameW - size) / 2;
+        y = bounds.padY + (bounds.videoH - size) / 2;
+        borderWidth = 3.5;
+        borderColor = '#DCFE50';
+    } else if (position === 'top-left') {
         x = bounds.padX + margin;
         y = bounds.padY + margin;
     } else if (position === 'top-right') {
@@ -489,9 +594,9 @@ function _drawWebcamPiP(ctx, webcamSource, settings, bounds) {
 
     // Ambient drop shadow behind webcam
     ctx.save();
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
-    ctx.shadowBlur = 24;
-    ctx.shadowOffsetY = 10;
+    ctx.shadowColor = isSpotlight ? 'rgba(220, 254, 80, 0.45)' : 'rgba(0, 0, 0, 0.55)';
+    ctx.shadowBlur = isSpotlight ? 38 : 24;
+    ctx.shadowOffsetY = isSpotlight ? 4 : 10;
     ctx.fillStyle = '#000000';
     drawShape();
     ctx.fill();
@@ -567,6 +672,39 @@ function _drawCaptionPill(ctx, text, bounds) {
     ctx.shadowColor = 'transparent';
     ctx.fillStyle = '#FFFFFF';
     ctx.fillText(text, pillX + pillW / 2, pillY + pillH / 2);
+    ctx.restore();
+}
+
+/**
+ * Draw Cinema Speed Ramp Indicator Pill
+ */
+function _drawSpeedRampBadge(ctx, speed, bounds) {
+    const badgeW = 150;
+    const badgeH = 34;
+    const x = bounds.padX + bounds.frameW - badgeW - 16;
+    const y = bounds.padY + 16;
+
+    ctx.save();
+    // Glassmorphic backdrop
+    ctx.fillStyle = 'rgba(10, 15, 29, 0.88)';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 4;
+    _drawRoundedRectPath(ctx, x, y, badgeW, badgeH, 17);
+    ctx.fill();
+
+    // Luminous neon accent border
+    ctx.strokeStyle = 'rgba(220, 254, 80, 0.65)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Speed typography
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = '#DCFE50';
+    ctx.font = 'bold 12px ui-monospace, SFMono-Regular, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`⏩ ${(speed || 2.0).toFixed(1)}x SPEED`, x + badgeW / 2, y + badgeH / 2);
     ctx.restore();
 }
 
@@ -728,4 +866,34 @@ function _drawSyntheticCursor(ctx, x, y, scale = 1.0) {
     ctx.stroke();
 
     ctx.restore();
+}
+
+/**
+ * Procedural Film Grain Noise Pattern (Cap-inspired)
+ * Prevents 8-bit digital color banding on gradient backgrounds
+ */
+let _cachedNoisePattern = null;
+function _getNoisePattern(ctx) {
+    if (_cachedNoisePattern) return _cachedNoisePattern;
+    if (typeof document === 'undefined') return null;
+    try {
+        const nCanvas = document.createElement('canvas');
+        nCanvas.width = 128;
+        nCanvas.height = 128;
+        const nCtx = nCanvas.getContext('2d');
+        const imgData = nCtx.createImageData(128, 128);
+        const data = imgData.data;
+        for (let i = 0; i < data.length; i += 4) {
+            const val = Math.floor(Math.random() * 255);
+            data[i] = val;
+            data[i + 1] = val;
+            data[i + 2] = val;
+            data[i + 3] = 16; // subtle 6% grain opacity
+        }
+        nCtx.putImageData(imgData, 0, 0);
+        _cachedNoisePattern = ctx.createPattern(nCanvas, 'repeat');
+        return _cachedNoisePattern;
+    } catch (e) {
+        return null;
+    }
 }

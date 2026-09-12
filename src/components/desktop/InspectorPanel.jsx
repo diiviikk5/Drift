@@ -49,7 +49,9 @@ export default function InspectorPanel({
     onApplyAICommand,
     onOpenAISettings,
     onTriggerExport,
-    isExporting = false
+    isExporting = false,
+    aspectRatio = '16:9',
+    onChangeAspectRatio
 }) {
     const [activeTab, setActiveTab] = useState('style');
     const fileInputRef = useRef(null);
@@ -57,12 +59,11 @@ export default function InspectorPanel({
     const [aiNotice, setAiNotice] = useState('');
 
     const aspectRatios = [
-        { id: '16:9', label: '16:9', desc: 'Landscape' },
-        { id: '9:16', label: '9:16', desc: 'Vertical' },
-        { id: '1:1', label: '1:1', desc: 'Square' },
-        { id: '4:5', label: '4:5', desc: 'Portrait' },
+        { id: '16:9', label: '16:9', desc: 'Landscape (YouTube, X)' },
+        { id: '9:16', label: '9:16', desc: 'Vertical (TikTok, Shorts)' },
+        { id: '1:1', label: '1:1', desc: 'Square (LinkedIn, Feed)' },
+        { id: '4:5', label: '4:5', desc: 'Portrait (Instagram)' },
     ];
-    const [selectedAspect, setSelectedAspect] = useState('16:9');
     const [springProfile, setSpringProfile] = useState('cinematic');
 
     const handleFileChange = (e) => {
@@ -128,14 +129,14 @@ export default function InspectorPanel({
                                 {aspectRatios.map((item) => (
                                     <button
                                         key={item.id}
-                                        onClick={() => setSelectedAspect(item.id)}
+                                        onClick={() => onChangeAspectRatio && onChangeAspectRatio(item.id)}
                                         className={`p-2 rounded-lg border text-left transition-all ${
-                                            selectedAspect === item.id
-                                                ? 'bg-[var(--bg-card-subtle)] border-[var(--accent-app)] text-[var(--text-app)] shadow-xs'
+                                            (aspectRatio || '16:9') === item.id
+                                                ? 'bg-[var(--bg-card-subtle)] border-[var(--accent-app)] text-[var(--text-app)] shadow-xs font-bold'
                                                 : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
                                         }`}
                                     >
-                                        <div className="font-mono font-bold text-xs">{item.id}</div>
+                                        <div className="font-mono text-xs">{item.id}</div>
                                         <div className="text-[10px] opacity-75">{item.desc}</div>
                                     </button>
                                 ))}
@@ -398,6 +399,7 @@ export default function InspectorPanel({
                                     { id: 'top-right', label: 'Top-Right' },
                                     { id: 'bottom-left', label: 'Bottom-Left' },
                                     { id: 'bottom-right', label: 'Bottom-Right' },
+                                    { id: 'center', label: '🎙️ Center Spotlight (Intro/Outro)', colSpan: true },
                                 ].map((p) => {
                                     const isSel = (webcamSettings?.position || 'bottom-right') === p.id;
                                     return (
@@ -405,8 +407,10 @@ export default function InspectorPanel({
                                             key={p.id}
                                             onClick={() => onChangeWebcamSettings && onChangeWebcamSettings({ position: p.id })}
                                             className={`py-1.5 px-2 rounded-md border text-center text-xs transition-all ${
+                                                p.colSpan ? 'col-span-2' : ''
+                                            } ${
                                                 isSel
-                                                    ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold'
+                                                    ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold shadow-xs'
                                                     : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
                                             }`}
                                         >

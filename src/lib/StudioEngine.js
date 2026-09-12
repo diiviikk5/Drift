@@ -289,11 +289,26 @@ export class StudioEngine {
         let frameCount = 0;
         const loop = () => {
             frameCount++;
+            if (this.video) {
+                this._applyPlaybackRate(this.video.currentTime);
+            }
             this.updateCamera();
             this.drawFrame();
             if (this.isPlaying) this.animationFrame = requestAnimationFrame(loop);
         };
         loop();
+    }
+
+    _applyPlaybackRate(curTimeSec) {
+        if (!this.video) return;
+        const seg = (this.focusSegments || []).find(s => curTimeSec >= s.startTime && curTimeSec <= s.endTime);
+        const targetRate = (seg && seg.speed) ? seg.speed : 1.0;
+        if (Math.abs(this.video.playbackRate - targetRate) > 0.05) {
+            this.video.playbackRate = targetRate;
+            if (this.webcamVideo) {
+                this.webcamVideo.playbackRate = targetRate;
+            }
+        }
     }
 
     async updateCamera() {
@@ -486,6 +501,26 @@ export class StudioEngine {
 
     setBackground(bg) {
         this.background = bg;
+        this.drawFrame();
+    }
+
+    setAspectRatio(aspectRatio = '16:9') {
+        this.aspectRatio = aspectRatio;
+        if (aspectRatio === '9:16') {
+            this.canvas.width = 1080;
+            this.canvas.height = 1920;
+        } else if (aspectRatio === '1:1') {
+            this.canvas.width = 1080;
+            this.canvas.height = 1080;
+        } else if (aspectRatio === '4:5') {
+            this.canvas.width = 1080;
+            this.canvas.height = 1350;
+        } else {
+            // 16:9
+            this.canvas.width = 1920;
+            this.canvas.height = 1080;
+        }
+        this._cachedBg = null;
         this.drawFrame();
     }
 

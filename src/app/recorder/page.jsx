@@ -98,6 +98,7 @@ export default function RecorderPage() {
     const [showCursor, setShowCursor] = useState(false);
     const [cursorTheme, setCursorTheme] = useState('macos');
     const [cursorScale, setCursorScale] = useState(1.0);
+    const [aspectRatio, setAspectRatio] = useState('16:9');
 
     // Captions & Annotations State
     const [captions, setCaptions] = useState([]);
@@ -299,6 +300,12 @@ export default function RecorderPage() {
     useEffect(() => {
         if (studioRef.current) studioRef.current.showCursor = showCursor;
     }, [showCursor]);
+
+    useEffect(() => {
+        if (studioRef.current && studioRef.current.setAspectRatio) {
+            studioRef.current.setAspectRatio(aspectRatio);
+        }
+    }, [aspectRatio]);
 
     // Source selection
     const selectSource = async (id) => {
@@ -919,6 +926,8 @@ export default function RecorderPage() {
                             onOpenAISettings={() => setIsAISettingsOpen(true)}
                             onTriggerExport={() => setIsExportDialogOpen(true)}
                             isExporting={isExporting}
+                            aspectRatio={aspectRatio}
+                            onChangeAspectRatio={setAspectRatio}
                         />
                     </div>
                 )}

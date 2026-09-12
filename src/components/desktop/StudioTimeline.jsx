@@ -116,6 +116,33 @@ export default function StudioTimeline({
             {/* Selected Segment Speed & Depth Tuning Bar */}
             {selectedSeg && (
                 <div className="flex items-center justify-between p-2 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--accent-app)] text-xs animate-fadeIn">
+                    {/* Scene Mode Selector */}
+                    <div className="flex items-center gap-1.5 border-r border-[var(--border-app)] pr-2.5">
+                        <span className="font-mono font-bold text-[var(--accent-app)] text-[10px] uppercase">
+                            Scene:
+                        </span>
+                        <div className="flex gap-1">
+                            {[
+                                { id: 'focus', label: '⚡ Focus' },
+                                { id: 'spotlight', label: '🎙️ Spotlight' },
+                                { id: 'overview', label: '🖥️ Overview' },
+                                { id: 'speed', label: '⏩ Speed Ramp' },
+                            ].map((mode) => (
+                                <button
+                                    key={mode.id}
+                                    onClick={() => onUpdateSegment && onUpdateSegment(selectedSeg.id, { sceneMode: mode.id })}
+                                    className={`px-2 py-0.5 rounded-md font-mono text-[10px] transition-all ${
+                                        (selectedSeg.sceneMode || 'focus') === mode.id
+                                            ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold shadow-xs'
+                                            : 'bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
+                                    }`}
+                                >
+                                    {mode.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                     <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1 font-mono font-bold text-[var(--accent-app)] text-[10px] uppercase">
                             <Gauge className="w-3 h-3" />
@@ -235,8 +262,11 @@ export default function StudioTimeline({
                             }`}
                             title={`Focus: ${formatTime(seg.startTime)} - ${formatTime(seg.endTime)} (${seg.zoomScale}x, speed ${seg.speed || 1}x)`}
                         >
-                            <span className="text-[9px] font-mono font-bold truncate select-none">
-                                {seg.reason === 'dwell' ? '👁' : '⚡'} {seg.zoomScale}x {seg.speed && seg.speed !== 1 ? `(${seg.speed}x)` : ''}
+                            <span className="text-[9px] font-mono font-bold truncate select-none flex items-center gap-1">
+                                {seg.sceneMode === 'spotlight' ? '🎙️ Spotlight' :
+                                 seg.sceneMode === 'overview' ? '🖥️ Overview' :
+                                 seg.sceneMode === 'speed' ? `⏩ ${seg.speed || 2}x Speed` :
+                                 `${seg.reason === 'dwell' ? '👁' : '⚡'} ${seg.zoomScale}x ${seg.speed && seg.speed !== 1 ? `(${seg.speed}x)` : ''}`}
                             </span>
                             {onDeleteSegment && (
                                 <button
