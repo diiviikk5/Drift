@@ -85,10 +85,11 @@ export default function RecorderPage() {
     const [cursorTheme, setCursorTheme] = useState('macos');
     const [cursorScale, setCursorScale] = useState(1.0);
 
-    // Captions State
+    // Captions & Annotations State
     const [captions, setCaptions] = useState([]);
     const [captionsEnabled, setCaptionsEnabled] = useState(true);
     const [isTranscribing, setIsTranscribing] = useState(false);
+    const [annotations, setAnnotations] = useState([]);
 
     // Export State
     const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
@@ -428,6 +429,35 @@ export default function RecorderPage() {
 
         addManualZoom();
         return `Added focal point to timeline`;
+    };
+
+    const handleUpdateSegment = (id, updates) => {
+        if (studioRef.current) {
+            studioRef.current.updateFocusSegment(id, updates);
+            setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
+        }
+    };
+
+    const handleAddAnnotation = (type) => {
+        if (!studioRef.current || !videoRef.current) return;
+        const ct = videoRef.current.currentTime;
+        const newAnn = {
+            id: `ann_${Date.now()}`,
+            type,
+            startTime: ct,
+            endTime: ct + 3.0,
+            x: 0.5,
+            y: 0.5,
+            startX: 0.35,
+            startY: 0.65,
+            endX: 0.5,
+            endY: 0.45,
+            text: type === 'text' ? 'Important Note' : '',
+            color: '#DCFE50',
+        };
+        const next = [...annotations, newAnn];
+        setAnnotations(next);
+        studioRef.current.setAnnotations(next);
     };
 
     const startRecordingActual = async () => {
@@ -787,8 +817,11 @@ export default function RecorderPage() {
                                 selectedSegmentId={selectedSegmentId}
                                 onSelectSegment={handleSelectSegment}
                                 onDeleteSegment={handleDeleteSegment}
+                                onUpdateSegment={handleUpdateSegment}
                                 onAddZoom={addManualZoom}
                                 onClearZooms={clearManualZooms}
+                                annotations={annotations}
+                                onAddAnnotation={handleAddAnnotation}
                             />
                         </main>
 

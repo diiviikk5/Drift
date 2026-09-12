@@ -214,6 +214,14 @@ export class StudioEngine {
         this.drawFrame();
     }
 
+    updateFocusSegment(id, updates) {
+        const seg = (this.focusSegments || []).find(s => s.id === id);
+        if (seg) {
+            Object.assign(seg, updates);
+            this.drawFrame();
+        }
+    }
+
     addFocusSegment(segment) {
         if (!this.focusSegments) this.focusSegments = [];
         this.focusSegments.push(segment);
