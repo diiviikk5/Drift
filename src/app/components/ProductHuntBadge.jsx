@@ -1,6 +1,12 @@
-export default function ProductHuntBadge({ className }) {
+export default function ProductHuntBadge({ className = "", width, height }) {
     return (
-        <svg width="250" height="54" viewBox="0 0 250 54" version="1.1" xmlns="http://www.w3.org/2000/svg" className={className}>
+        <svg
+            viewBox="0 0 250 54"
+            version="1.1"
+            xmlns="http://www.w3.org/2000/svg"
+            className={className}
+            style={{ width: width || undefined, height: height || undefined }}
+        >
             <g stroke="none" strokeWidth="1" fill="none" fillRule="evenodd">
                 <g transform="translate(-130.000000, -73.000000)">
                     <g transform="translate(130.000000, 73.000000)">

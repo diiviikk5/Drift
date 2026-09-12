@@ -149,8 +149,8 @@ const structuredData = {
       "operatingSystem": ["Windows", "macOS", "Linux", "Chrome OS"],
       "applicationCategory": "MultimediaApplication",
       "applicationSubCategory": "Screen Recording Software",
-      "downloadUrl": "https://drift.dvkk.dev/recorder",
-      "installUrl": "https://drift.dvkk.dev",
+      "downloadUrl": "https://drift.dvkk.dev/downloads/Drift_2.0.0_x64-setup.exe",
+      "installUrl": "https://drift.dvkk.dev/#install",
       "screenshot": "https://drift.dvkk.dev/og.png",
       "softwareVersion": "1.0.0",
       "releaseNotes": "Initial release with auto-zoom, privacy-first recording, and built-in editor",
@@ -319,8 +319,8 @@ const structuredData = {
       "step": [
         {
           "@type": "HowToStep",
-          "name": "Open Drift Recorder",
-          "text": "Navigate to drift.dvkk.dev/recorder in your browser or open the Drift desktop app.",
+          "name": "Download Drift Desktop",
+          "text": "Download and install Drift Desktop from drift.dvkk.dev on your Windows or Mac computer.",
           "position": 1,
         },
         {
@@ -369,14 +369,14 @@ const structuredData = {
         {
           "@type": "ListItem",
           "position": 2,
-          "name": "Recorder",
-          "item": "https://drift.dvkk.dev/recorder",
+          "name": "Install",
+          "item": "https://drift.dvkk.dev/#install",
         },
         {
           "@type": "ListItem",
           "position": 3,
-          "name": "Studio",
-          "item": "https://drift.dvkk.dev/studio",
+          "name": "Guide",
+          "item": "https://drift.dvkk.dev/#usage",
         },
         {
           "@type": "ListItem",
@@ -424,7 +424,7 @@ const structuredData = {
         "price": "0",
         "priceCurrency": "USD",
         "availability": "https://schema.org/InStock",
-        "url": "https://drift.dvkk.dev/recorder",
+        "url": "https://drift.dvkk.dev/#install",
         "priceValidUntil": "2030-12-31",
         "seller": {
           "@id": "https://drift.dvkk.dev/#organization"
@@ -440,18 +440,18 @@ const structuredData = {
     },
     // Action schema for AI assistants
     {
-      "@type": "WebApplication",
-      "@id": "https://drift.dvkk.dev/#webapp",
-      "name": "Drift Browser Recorder",
-      "url": "https://drift.dvkk.dev/recorder",
+      "@type": "SoftwareApplication",
+      "@id": "https://drift.dvkk.dev/#desktopapp",
+      "name": "Drift Desktop",
+      "url": "https://drift.dvkk.dev",
+      "downloadUrl": "https://drift.dvkk.dev/downloads/Drift_2.0.0_x64-setup.exe",
       "applicationCategory": "MultimediaApplication",
-      "operatingSystem": "Any",
-      "browserRequirements": "Requires JavaScript, Screen Capture API",
+      "operatingSystem": "Windows, macOS",
       "potentialAction": {
-        "@type": "UseAction",
-        "target": "https://drift.dvkk.dev/recorder",
-        "name": "Start Recording",
-        "description": "Open the Drift browser-based screen recorder"
+        "@type": "DownloadAction",
+        "target": "https://drift.dvkk.dev/downloads/Drift_2.0.0_x64-setup.exe",
+        "name": "Download Drift Desktop",
+        "description": "Download the Drift native desktop screen recorder"
       }
     },
   ],

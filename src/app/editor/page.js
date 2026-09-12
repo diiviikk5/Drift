@@ -1,15 +1,10 @@
-import { RecordingProvider } from "@/context/RecordingContext";
-import TimelineEditor from "../components/editor/TimelineEditor";
+import { redirect } from "next/navigation";
 
 export const metadata = {
-    title: "Drift Editor | Timeline",
-    description: "Edit your recordings with precision. Adjust zoom keyframes and export in multiple formats.",
+    title: "Drift Desktop | Download",
+    description: "Edit your recordings with precision. Adjust zoom keyframes and export in multiple formats with Drift Desktop.",
 };
 
 export default function EditorPage() {
-    return (
-        <RecordingProvider>
-            <TimelineEditor />
-        </RecordingProvider>
-    );
+    redirect("/#install");
 }

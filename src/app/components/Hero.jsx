@@ -237,14 +237,32 @@ export default function Hero() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.6 }}
                         >
-                            <a href="/recorder" className="brutal-button w-full flex items-center justify-center gap-3 !py-4 !text-lg !bg-[#DCFE50] !text-black shadow-[6px_6px_0px_var(--border-default)] mb-4 group">
-                                <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                                <span className="font-bold">START RECORDING</span>
-                                <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeWidth="3" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                            {/* Product Hunt #5 Badge (Bigger!) */}
+                            <a
+                                href="https://www.producthunt.com/products/drift-6?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_campaign=badge-drift-6ef740e8-671a-4130-90b6-140b7784af27"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group relative block mb-6 transform transition-all hover:-translate-y-1"
+                            >
+                                <div className="absolute inset-0 bg-[#DCFE50] translate-x-2 translate-y-2 border-[4px] border-[var(--border-default)]" />
+                                <div className="relative bg-white border-[4px] border-[var(--border-default)] p-4 flex items-center justify-center shadow-[4px_4px_0px_var(--border-default)]">
+                                    <ProductHuntBadge className="w-full max-w-[340px] h-auto" />
+                                </div>
+                            </a>
+
+                            <a
+                                href="/downloads/Drift_2.0.0_x64-setup.exe"
+                                download
+                                className="brutal-button w-full flex items-center justify-center gap-3 !py-4 !text-lg !bg-[var(--brutal-blue)] !text-[#0a0a0a] shadow-[6px_6px_0px_var(--border-default)] mb-4 group"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                <span className="font-bold">DOWNLOAD FOR WINDOWS</span>
                             </a>
 
                             <p className="text-center font-mono text-xs text-[var(--text-muted)] mb-6">
-                                Free • No download required
+                                100% Free • Native Desktop Software • 21 MB
                             </p>
 
                             {/* Secondary - Downloads */}
@@ -335,47 +353,47 @@ export default function Hero() {
                     >
 
 
-                        {/* Product Hunt Badge */}
-                        {/* Product Hunt Badge */}
-                        <motion.div
-                            initial={{ opacity: 0, y: -20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.8 }}
-                            className="mb-2"
-                        >
-                            <a
-                                href="https://www.producthunt.com/products/drift-6?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_campaign=badge-drift-6ef740e8-671a-4130-90b6-140b7784af27"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block transform hover:scale-105 transition-transform"
-                            >
-                                <ProductHuntBadge />
-                            </a>
-                        </motion.div>
-
                         {/* Desktop Actions */}
                         <motion.div
                             className="w-full max-w-md"
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.9 }}
+                            transition={{ delay: 0.8 }}
                         >
-                            {/* Main CTA */}
+                            {/* Product Hunt #5 Badge (Bigger - replacing the recording button) */}
                             <a
-                                href="/recorder"
+                                href="https://www.producthunt.com/products/drift-6?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_campaign=badge-drift-6ef740e8-671a-4130-90b6-140b7784af27"
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="group relative block mb-8 transform transition-transform hover:-translate-y-1"
                             >
                                 <div className="absolute inset-0 bg-[#DCFE50] translate-x-3 translate-y-3 border-[4px] border-[var(--border-default)]" />
+                                <div className="relative bg-white border-[4px] border-[var(--border-default)] p-4 sm:p-5 flex items-center justify-center shadow-[6px_6px_0px_var(--border-default)]">
+                                    <ProductHuntBadge className="w-full max-w-[360px] sm:max-w-[400px] h-auto" />
+                                </div>
+                            </a>
+
+                            {/* Main CTA - Download Desktop App */}
+                            <a
+                                href="/downloads/Drift_2.0.0_x64-setup.exe"
+                                download
+                                className="group relative block mb-6 transform transition-all hover:-translate-y-1"
+                            >
+                                <div className="absolute inset-0 bg-[var(--brutal-blue)] translate-x-3 translate-y-3 border-[4px] border-[var(--border-default)]" />
                                 <div className="relative bg-[var(--bg-secondary)] border-[4px] border-[var(--border-default)] p-6 flex items-center justify-between">
                                     <div className="flex items-center gap-5">
-                                        <div className="w-14 h-14 bg-[var(--text-primary)] flex items-center justify-center border-[3px] border-[var(--border-default)]">
-                                            <div className="w-5 h-5 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_#ef4444]" />
+                                        <div className="w-14 h-14 bg-[var(--brutal-blue)] flex items-center justify-center border-[3px] border-[var(--border-default)] flex-shrink-0">
+                                            <svg className="w-7 h-7 text-[#0a0a0a] group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                            </svg>
                                         </div>
                                         <div>
-                                            <div className="font-bold text-2xl uppercase tracking-tight text-[var(--text-primary)]">Start Recording</div>
+                                            <div className="font-bold text-2xl uppercase tracking-tight text-[var(--text-primary)]">Download Drift</div>
                                             <div className="text-sm text-[var(--text-muted)] font-mono flex items-center gap-2">
-                                                <span>Launch Browser App</span>
+                                                <span>Windows x64</span>
                                                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--brutal-yellow)]" />
+                                                <span>v2.0 • 21 MB</span>
+                                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--brutal-pink)]" />
                                                 <span>Free</span>
                                             </div>
                                         </div>
@@ -389,42 +407,26 @@ export default function Hero() {
                             {/* Secondary Links */}
                             <div className="flex gap-4 items-stretch">
                                 <a
-                                    href="/downloads/Drift_2.0.0_x64-setup.exe"
-                                    download
+                                    href="#install"
                                     className="group relative flex-1 block transform transition-all hover:-translate-y-0.5"
                                 >
-                                    <div className="absolute inset-0 bg-[var(--brutal-blue)] translate-x-2 translate-y-2 border-[3px] border-[var(--border-default)]" />
-                                    <div className="relative bg-[var(--bg-secondary)] border-[3px] border-[var(--border-default)] px-4 py-3 flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-[var(--brutal-blue)] border-[2px] border-[var(--border-default)] flex items-center justify-center flex-shrink-0">
-                                            <svg className="w-5 h-5 text-[#0a0a0a] group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <div className="font-mono font-bold text-sm text-[var(--text-primary)] uppercase leading-tight">Desktop App</div>
-                                            <div className="font-mono text-[11px] text-[var(--text-muted)] flex items-center gap-1.5">
-                                                <span>v2.0</span>
-                                                <span className="w-1 h-1 rounded-full bg-[var(--text-muted)]" />
-                                                <span>21 MB</span>
-                                                <span className="w-1 h-1 rounded-full bg-[var(--text-muted)]" />
-                                                <span>Windows</span>
-                                            </div>
-                                        </div>
+                                    <div className="absolute inset-0 bg-[var(--brutal-yellow)] translate-x-2 translate-y-2 border-[3px] border-[var(--border-default)]" />
+                                    <div className="relative bg-[var(--bg-secondary)] border-[3px] border-[var(--border-default)] px-4 py-3 flex items-center justify-center gap-2">
+                                        <span className="font-mono font-bold text-sm text-[var(--text-primary)] uppercase">Install Guide</span>
                                     </div>
                                 </a>
                                 <a
                                     href="https://github.com/diiviikk5/Drift"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex flex-col items-center justify-center gap-1 px-4 border-[3px] border-[var(--border-default)] bg-[var(--bg-secondary)] font-mono text-xs font-bold text-[var(--text-secondary)] uppercase hover:text-[var(--text-primary)] hover:shadow-[4px_4px_0px_var(--border-default)] transition-all"
+                                    className="flex flex-col items-center justify-center gap-1 px-5 border-[3px] border-[var(--border-default)] bg-[var(--bg-secondary)] font-mono text-xs font-bold text-[var(--text-secondary)] uppercase hover:text-[var(--text-primary)] hover:shadow-[4px_4px_0px_var(--border-default)] transition-all"
                                 >
                                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                                         <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
                                     </svg>
                                     {starCount !== null && (
                                         <span className="flex items-center gap-0.5 text-[10px]">
-                                            <svg className="w-3 h-3 text-[var(--brutal-yellow)]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279-7.416-3.967-7.417 3.967 1.481-8.279-6.064-5.828 8.332-1.151z"/></svg>
-                                            {starCount}
+                                            ★ {starCount}
                                         </span>
                                     )}
                                 </a>
@@ -441,7 +443,7 @@ export default function Hero() {
                                     <div className="w-4 h-4 bg-[var(--brutal-yellow)] border-2 border-[var(--border-default)]" />
                                     <div className="w-4 h-4 bg-[var(--brutal-blue)] border-2 border-[var(--border-default)]" />
                                     <div className="ml-4 flex-1 h-6 bg-[var(--bg-secondary)] border-2 border-[var(--border-default)] px-2 flex items-center">
-                                        <span className="font-mono text-xs text-[var(--text-muted)] uppercase truncate">drift.local</span>
+                                        <span className="font-mono text-xs text-[var(--text-muted)] uppercase truncate">drift-desktop.exe • native engine</span>
                                     </div>
                                 </div>
 
@@ -450,7 +452,7 @@ export default function Hero() {
                                     {/* Recording indicator */}
                                     <div className="absolute top-4 left-4 z-20 brutal-badge brutal-badge-pink">
                                         <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                                        REC
+                                        NATIVE v2.0
                                     </div>
 
                                     {/* Animated content */}
@@ -467,12 +469,13 @@ export default function Hero() {
                                                 ease: "easeInOut"
                                             }}
                                         >
-                                            <div className="w-20 h-20 mx-auto mb-4 bg-[var(--brutal-yellow)] border-[4px] border-[var(--border-default)] flex items-center justify-center">
-                                                <svg className="w-10 h-10" fill="var(--border-default)" viewBox="0 0 24 24">
-                                                    <path d="M8 5v14l11-7z" />
+                                            <div className="w-20 h-20 mx-auto mb-4 bg-[#DCFE50] border-[4px] border-[var(--border-default)] flex items-center justify-center shadow-[4px_4px_0px_var(--border-default)]">
+                                                <svg className="w-10 h-10 text-[#0a0a0a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                                 </svg>
                                             </div>
-                                            <p className="font-mono font-bold text-[var(--text-primary)] uppercase">Click to Record</p>
+                                            <p className="font-mono font-bold text-[var(--text-primary)] uppercase">Drift Studio Desktop</p>
+                                            <p className="font-mono text-xs text-[var(--text-muted)] mt-1 uppercase">Auto-Zoom • GPU Accelerated</p>
                                         </motion.div>
                                     </div>
 

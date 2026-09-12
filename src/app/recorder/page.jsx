@@ -101,6 +101,8 @@ export default function RecorderPage() {
         } else {
             setPlatform('browser');
             setHookStatus('Browser Mode');
+            // Browser recorder is completely removed - redirect web users to homepage
+            window.location.replace('/#install');
         }
     }, []);
 
@@ -125,6 +127,7 @@ export default function RecorderPage() {
 
     // --- INIT ENGINES ---
     useEffect(() => {
+        if (!isDesktop) return;
         if (viewMode === 'recorder') {
             engineRef.current = new DriftEngine(canvasRef.current, videoRef.current);
             engineRef.current.onclickCallback = (c) => setClickCount(c);
@@ -409,6 +412,37 @@ export default function RecorderPage() {
     // ══════════════════════════════════════════════
     //  RENDER
     // ══════════════════════════════════════════════
+
+    if (!isDesktop) {
+        return (
+            <div className="h-screen bg-[#07070a] text-white flex flex-col items-center justify-center p-6 text-center font-mono">
+                <div className="max-w-md w-full border-[4px] border-[#DCFE50] bg-[#0c0c14] p-8 shadow-[8px_8px_0px_#DCFE50]">
+                    <div className="w-16 h-16 mx-auto mb-6 bg-[#DCFE50] flex items-center justify-center shadow-[4px_4px_0px_rgba(220,254,80,0.3)]">
+                        <svg className="w-8 h-8 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                    </div>
+                    <h1 className="text-2xl font-bold uppercase mb-3 text-white">Desktop App Required</h1>
+                    <p className="text-sm text-gray-400 mb-6">
+                        In-browser recording has been retired. Drift is now available exclusively as a native desktop application for cinema-grade auto-zoom and GPU-accelerated capture.
+                    </p>
+                    <a
+                        href="/downloads/Drift_2.0.0_x64-setup.exe"
+                        download
+                        className="block w-full py-4 bg-[#DCFE50] text-black font-bold uppercase text-base hover:bg-[#c8ea3c] transition-colors mb-4 shadow-[4px_4px_0px_#ffffff]"
+                    >
+                        Download Drift Desktop (21 MB)
+                    </a>
+                    <a
+                        href="/"
+                        className="block text-xs text-gray-500 hover:text-white uppercase transition-colors"
+                    >
+                        ← Back to Homepage
+                    </a>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="h-screen bg-[#0a0a0f] text-white font-sans select-none flex flex-col overflow-hidden">

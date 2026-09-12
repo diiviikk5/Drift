@@ -59,7 +59,7 @@ async function sendWelcomeEmail(userEmail) {
           </p>
 
           <p style="font-size: 14px; line-height: 1.6; color: #444; margin-bottom: 16px;">
-            I realised i did not make the desktop app for such a scale where people use it daily, But now With the Browser Version you can. Its Out Now and You can Customize your zooms with speed and intensity.
+            Drift is built for cinema-grade recording with auto-zoom and GPU acceleration. You can customize your zooms with precision speed and intensity in our native desktop app.
           </p>
 
           <p style="font-size: 14px; line-height: 1.6; color: #444; margin-bottom: 24px;">
@@ -67,8 +67,8 @@ async function sendWelcomeEmail(userEmail) {
           </p>
 
           <div style="margin: 32px 0;">
-            <a href="https://drift.dvkk.dev/recorder" style="background: #c9ff00; color: #000; text-decoration: none; padding: 12px 24px; font-weight: bold; border: 2px solid #000; display: inline-block; font-family: monospace; text-transform: uppercase;">
-              Launch Browser App ->
+            <a href="https://drift.dvkk.dev/#install" style="background: #DCFE50; color: #000; text-decoration: none; padding: 12px 24px; font-weight: bold; border: 2px solid #000; display: inline-block; font-family: monospace; text-transform: uppercase;">
+              Download Desktop App ->
             </a>
           </div>
 

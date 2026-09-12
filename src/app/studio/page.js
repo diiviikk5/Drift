@@ -1,15 +1,10 @@
-import { RecordingProvider } from "@/context/RecordingContext";
-import RecordingStudio from "../components/studio/RecordingStudio";
+import { redirect } from "next/navigation";
 
 export const metadata = {
-    title: "Drift Studio | Record",
-    description: "Professional screen recording with cinematic zoom effects. Free, privacy-first.",
+    title: "Drift Desktop | Download",
+    description: "Professional screen recording with cinematic zoom effects. Free, privacy-first desktop software.",
 };
 
 export default function StudioPage() {
-    return (
-        <RecordingProvider>
-            <RecordingStudio />
-        </RecordingProvider>
-    );
+    redirect("/#install");
 }
