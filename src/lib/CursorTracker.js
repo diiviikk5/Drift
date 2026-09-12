@@ -12,6 +12,7 @@ export class CursorTracker {
         // Tracking state
         this.isTracking = false;
         this.events = [];
+        this.samples = [];
         this.startTime = 0;
 
         // Position
@@ -84,6 +85,7 @@ export class CursorTracker {
         this.isTracking = true;
         this.startTime = performance.now();
         this.events = [];
+        this.samples = [];
 
         // Try Tauri global tracking first (works outside the app window)
         if (drift.isDesktop()) {
@@ -97,14 +99,27 @@ export class CursorTracker {
                         time: performance.now() - this.startTime,
                     };
                     this.events.push(event);
+                    this.samples.push({
+                        t: event.time,
+                        x: data.x,
+                        y: data.y,
+                        click: 'left',
+                    });
                     if (this.onClick && this.clickZoomEnabled) {
                         this.onClick(event);
                     }
                 });
 
                 this._tauriMoveCleanup = await drift.onGlobalMouseMove((data) => {
+                    const elapsed = performance.now() - this.startTime;
                     this.currentX = this.lastX + (data.x - this.lastX) * this.smoothing;
                     this.currentY = this.lastY + (data.y - this.lastY) * this.smoothing;
+
+                    this.samples.push({
+                        t: elapsed,
+                        x: data.x,
+                        y: data.y,
+                    });
 
                     if (this.onPositionUpdate) {
                         this.onPositionUpdate({
@@ -112,7 +127,7 @@ export class CursorTracker {
                             y: this.currentY,
                             rawX: data.x,
                             rawY: data.y,
-                            time: performance.now() - this.startTime,
+                            time: elapsed,
                         });
                     }
                 });
@@ -160,8 +175,14 @@ export class CursorTracker {
             this._tauriMoveCleanup = null;
         }
 
-        // Clean up Tauri global listener process
+        // Clean up Tauri global listener process and retrieve high-res telemetry buffer
         if (drift.isDesktop()) {
+            try {
+                const nativeSamples = await drift.getSessionTelemetry();
+                if (nativeSamples && nativeSamples.length > 0) {
+                    this.samples = nativeSamples;
+                }
+            } catch { /* ignore */ }
             try { await drift.stopGlobalListener(); } catch { /* ignore */ }
         }
 
@@ -182,9 +203,16 @@ export class CursorTracker {
      * Handle mouse move
      */
     _handleMouseMove(e) {
+        const elapsed = performance.now() - this.startTime;
         // Apply smoothing
         this.currentX = this.lastX + (e.clientX - this.lastX) * this.smoothing;
         this.currentY = this.lastY + (e.clientY - this.lastY) * this.smoothing;
+
+        this.samples.push({
+            t: elapsed,
+            x: e.clientX,
+            y: e.clientY,
+        });
 
         if (this.onPositionUpdate) {
             this.onPositionUpdate({
@@ -192,7 +220,7 @@ export class CursorTracker {
                 y: this.currentY,
                 rawX: e.clientX,
                 rawY: e.clientY,
-                time: performance.now() - this.startTime,
+                time: elapsed,
             });
         }
     }
@@ -267,6 +295,13 @@ export class CursorTracker {
      */
     getEvents() {
         return [...this.events];
+    }
+
+    /**
+     * Get continuous high-frequency telemetry samples
+     */
+    getSamples() {
+        return [...this.samples];
     }
 
     /**

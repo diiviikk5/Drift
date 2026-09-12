@@ -59,6 +59,8 @@ export default function RecorderPage() {
     const [recordedBlob, setRecordedBlob] = useState(null);
     const [recordedClicks, setRecordedClicks] = useState([]);
     const [recordedMoves, setRecordedMoves] = useState([]);
+    const [focusSegments, setFocusSegments] = useState([]);
+    const [selectedSegmentId, setSelectedSegmentId] = useState(null);
     const recDurationRef = useRef(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
@@ -224,6 +226,7 @@ export default function RecorderPage() {
                             const d = recDurationRef.current || studioRef.current?.videoDuration || 10;
                             setDuration(d);
                             setTrimEnd(d);
+                            setFocusSegments(studioRef.current.getFocusSegments() || []);
                         }
                     }, 500);
                 }, 100);
@@ -383,7 +386,8 @@ export default function RecorderPage() {
         if (!studioRef.current || !videoRef.current) return;
         const ct = videoRef.current.currentTime;
         studioRef.current.addZoom(ct, 0.5, 0.5, zoomLevel);
-        setRecordedClicks(prev => [...prev, { time: ct * 1000, x: 0.5, y: 0.5 }]);
+        setRecordedClicks([...(studioRef.current.clicks || [])]);
+        setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
     };
 
     const handleCanvasClick = (e) => {
@@ -394,15 +398,27 @@ export default function RecorderPage() {
         const ct = videoRef.current.currentTime;
         const { x, y } = studioRef.current.resolveClick(canvasX, canvasY);
         studioRef.current.addZoom(ct, x, y, zoomLevel);
-        setRecordedClicks(prev => [...prev, { time: ct * 1000, x, y }]);
+        setRecordedClicks([...(studioRef.current.clicks || [])]);
+        setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
     };
 
     const clearManualZooms = () => {
         if (!studioRef.current) return;
         studioRef.current.clicks = [];
-        studioRef.current.activeZoom = null;
-        studioRef.current.lastClickIdx = -1;
+        studioRef.current.setFocusSegments([]);
         setRecordedClicks([]);
+        setFocusSegments([]);
+    };
+
+    const handleDeleteSegment = (id) => {
+        if (studioRef.current) {
+            studioRef.current.deleteFocusSegment(id);
+            setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
+        }
+    };
+
+    const handleSelectSegment = (seg) => {
+        setSelectedSegmentId(seg.id);
     };
 
     // Export Logic
@@ -602,6 +618,10 @@ export default function RecorderPage() {
                                 duration={duration}
                                 onSeek={handleSeek}
                                 clicks={recordedClicks}
+                                focusSegments={focusSegments}
+                                selectedSegmentId={selectedSegmentId}
+                                onSelectSegment={handleSelectSegment}
+                                onDeleteSegment={handleDeleteSegment}
                                 onAddZoom={addManualZoom}
                                 onClearZooms={clearManualZooms}
                             />

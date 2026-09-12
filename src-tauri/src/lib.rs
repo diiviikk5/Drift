@@ -36,6 +36,7 @@ pub fn run() {
             commands::capture::capture_screenshot,
             commands::input::start_global_listener,
             commands::input::stop_global_listener,
+            commands::input::get_session_telemetry,
             commands::hotkeys::get_hotkeys,
             commands::hotkeys::set_hotkeys,
             commands::ai::ai_completion,

@@ -3,6 +3,8 @@
 // Falls back to simple playback for browser mode
 
 import { isTauri } from './tauri-bridge';
+import { InteractionAnalyzer } from './zoom/InteractionAnalyzer';
+import { renderFrame } from './rendering/renderFrame';
 
 const FRAME_SCALE = 0.82;
 const TITLE_BAR_HEIGHT = 36;
@@ -23,6 +25,14 @@ export class StudioEngine {
         this.clicks = clicks;
         this.explicitDuration = duration;
         this.mouseMoves = mouseMoves;
+
+        // Semantic Interaction Analyzer & Focus Track
+        this.interactionAnalyzer = new InteractionAnalyzer();
+        this.focusSegments = this.interactionAnalyzer.analyze(
+            this.clicks,
+            this.mouseMoves,
+            this.explicitDuration || 10
+        );
 
         // Camera state — starts FULLY panned out (scale 1.0)
         this.camera = { x: 0.5, y: 0.5, scale: 1 };
@@ -154,15 +164,39 @@ export class StudioEngine {
         this.cursorState = { x: 0.5, y: 0.5, opacity: 0.0, click_progress: 0.0, motion: 0.0 };
     }
 
-    async addZoom(timeSec, x = 0.5, y = 0.5, scale = 1.5) {
+    getFocusSegments() {
+        return this.focusSegments || [];
+    }
+
+    setFocusSegments(segments) {
+        this.focusSegments = segments;
+        this.drawFrame();
+    }
+
+    deleteFocusSegment(id) {
+        this.focusSegments = (this.focusSegments || []).filter(s => s.id !== id);
+        this.drawFrame();
+    }
+
+    addFocusSegment(segment) {
+        if (!this.focusSegments) this.focusSegments = [];
+        this.focusSegments.push(segment);
+        this.focusSegments.sort((a, b) => a.startTime - b.startTime);
+        this.drawFrame();
+    }
+
+    async addZoom(timeSec, x = 0.5, y = 0.5, scale = 1.8) {
         this.clicks.push({ time: timeSec * 1000, x, y, scale });
         this.clicks.sort((a, b) => a.time - b.time);
 
-        // Regenerate segments in Rust
-        await this._generateSegments();
+        // Regenerate focus segments
+        this.focusSegments = this.interactionAnalyzer.analyze(
+            this.clicks,
+            this.mouseMoves,
+            this.videoDuration || 10
+        );
 
         if (!this.isPlaying) {
-            await this.updateCamera();
             this.drawFrame();
         }
     }
@@ -356,106 +390,27 @@ export class StudioEngine {
     }
 
     drawFrame() {
-        const c = this.canvas;
         const ctx = this.ctx;
         const v = this.video;
-        const cam = this.camera;
+        const curTimeSec = v?.currentTime || 0;
 
-        ctx.fillStyle = this._getBackgroundGradient();
-        ctx.fillRect(0, 0, c.width, c.height);
-
-        if (v.readyState >= 2) {
-            ctx.save();
-
-            const titleBarHeight = TITLE_BAR_HEIGHT;
-            const vw = c.width * FRAME_SCALE;
-            const vh = (v.videoHeight / v.videoWidth) * vw;
-            const totalHeight = vh + titleBarHeight;
-
-            const cx = c.width / 2;
-            const cy = c.height / 2;
-
-            // Apply Camera Transform
-            ctx.translate(cx, cy);
-            ctx.scale(cam.scale, cam.scale);
-
-            const panX = (cam.x - 0.5) * vw;
-            const panY = (cam.y - 0.5) * totalHeight;
-            ctx.translate(-panX, -panY);
-
-            const r = 12;
-            const x = -vw / 2;
-            const y = -totalHeight / 2;
-            const w = vw;
-            const h = totalHeight;
-
-            // Shadow
-            ctx.shadowColor = 'rgba(0,0,0,0.6)';
-            ctx.shadowBlur = 60;
-            ctx.shadowOffsetY = 25;
-
-            ctx.fillStyle = '#1a1a1a';
-            this.roundRect(ctx, x, y, w, h, r);
-            ctx.fill();
-
-            ctx.shadowColor = 'transparent';
-
-            // Title Bar
-            ctx.save();
-            this.roundRect(ctx, x, y, w, titleBarHeight, { tl: r, tr: r, bl: 0, br: 0 });
-            ctx.clip();
-
-            ctx.fillStyle = '#2d2d2d';
-            ctx.fillRect(x, y, w, titleBarHeight);
-
-            const bx = x + 18;
-            const by = y + titleBarHeight / 2;
-            const gap = 20;
-            const dotRadius = 6;
-
-            ctx.fillStyle = '#FF5F57';
-            ctx.beginPath(); ctx.arc(bx, by, dotRadius, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = '#FFBD2E';
-            ctx.beginPath(); ctx.arc(bx + gap, by, dotRadius, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = '#28C840';
-            ctx.beginPath(); ctx.arc(bx + gap * 2, by, dotRadius, 0, Math.PI * 2); ctx.fill();
-
-            ctx.restore();
-
-            // Video Area
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(x, y + titleBarHeight, w, vh);
-            ctx.clip();
-
-            ctx.drawImage(v, x, y + titleBarHeight, w, vh);
-
-            // Always draw click ripple rings if active
-            if (this.cursorState.click_progress > 0.01) {
-                const cursorX = x + this.cursorState.x * w;
-                const cursorY = y + titleBarHeight + this.cursorState.y * vh;
-                this.drawClickRing(ctx, cursorX, cursorY, this.cursorState.click_progress);
+        renderFrame(
+            ctx,
+            curTimeSec,
+            v && v.readyState >= 2 ? v : null,
+            {
+                focusSegments: this.focusSegments || [],
+                mouseSamples: this.mouseMoves || [],
+                clicks: this.clicks || [],
+            },
+            {
+                background: this.background,
+                windowChrome: true,
+                showCursor: this.showCursor,
+                zoomMagnification: (this.zoomLevel || 2.0) / 2.0,
+                clickRipples: true,
             }
-
-            // Only draw synthetic cursor overlay if explicitly enabled (prevents double cursor)
-            if (this.showCursor && this.cursorState.opacity > 0.01) {
-                const cursorX = x + this.cursorState.x * w;
-                const cursorY = y + titleBarHeight + this.cursorState.y * vh;
-                ctx.globalAlpha = this.cursorState.opacity;
-                this.drawCursor(ctx, cursorX, cursorY, this.cursorState.motion, this.cursorState.click_progress);
-                ctx.globalAlpha = 1;
-            }
-
-            ctx.restore();
-
-            // Border
-            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-            ctx.lineWidth = 1;
-            this.roundRect(ctx, x, y, w, h, r);
-            ctx.stroke();
-
-            ctx.restore();
-        }
+        );
     }
 
     drawClickRing(ctx, x, y, progress) {

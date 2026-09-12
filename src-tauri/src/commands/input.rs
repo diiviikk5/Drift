@@ -20,15 +20,25 @@ pub struct GlobalMoveEvent {
     pub time: f64,
 }
 
-/// State to control the global input listener
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CursorSample {
+    pub t: f64,
+    pub x: f64,
+    pub y: f64,
+    pub click: Option<String>,
+}
+
+/// State to control the global input listener and buffer session telemetry
 pub struct InputListenerState {
     pub is_listening: Arc<Mutex<bool>>,
+    pub session_samples: Arc<Mutex<Vec<CursorSample>>>,
 }
 
 impl Default for InputListenerState {
     fn default() -> Self {
         Self {
             is_listening: Arc::new(Mutex::new(false)),
+            session_samples: Arc::new(Mutex::new(Vec::with_capacity(16384))),
         }
     }
 }
@@ -43,14 +53,17 @@ pub fn start_global_listener(app: AppHandle) {
         return; // Already listening
     }
     *listening = true;
+    state.session_samples.lock().clear();
     drop(listening);
 
     let is_listening = state.is_listening.clone();
+    let session_samples = state.session_samples.clone();
     let app_handle = app.clone();
 
     thread::spawn(move || {
         let start_time = std::time::Instant::now();
         let mut last_move_time: f64 = 0.0;
+        let mut last_sample_time: f64 = 0.0;
 
         listen(move |event: Event| {
             if !*is_listening.lock() {
@@ -75,12 +88,32 @@ pub fn start_global_listener(app: AppHandle) {
                             time: elapsed,
                             button: btn_name.to_string(),
                         };
+                        
+                        // Record click directly into telemetry session
+                        session_samples.lock().push(CursorSample {
+                            t: elapsed,
+                            x: pos.0,
+                            y: pos.1,
+                            click: Some(btn_name.to_string()),
+                        });
+
                         let _ = app_handle.emit("global-click", &click);
                     }
                 }
                 EventType::MouseMove { x, y } => {
-                    // Throttle mouse move events to ~30fps
-                    if elapsed - last_move_time > 33.0 {
+                    // Buffer high-frequency telemetry at up to 240Hz (>= 4ms between samples)
+                    if elapsed - last_sample_time >= 4.0 {
+                        last_sample_time = elapsed;
+                        session_samples.lock().push(CursorSample {
+                            t: elapsed,
+                            x,
+                            y,
+                            click: None,
+                        });
+                    }
+
+                    // Throttle webview IPC event to ~60fps (16ms) to keep UI thread responsive
+                    if elapsed - last_move_time > 16.0 {
                         last_move_time = elapsed;
                         let move_evt = GlobalMoveEvent {
                             x,
@@ -101,17 +134,20 @@ pub fn start_global_listener(app: AppHandle) {
 
 /// Stop listening for global events
 #[tauri::command]
-pub fn stop_global_listener(app: AppHandle) {
-    let state = app.state::<InputListenerState>();
+pub fn stop_global_listener(state: tauri::State<'_, InputListenerState>) {
     let mut listening = state.is_listening.lock();
     *listening = false;
+}
+
+/// Retrieve the high-frequency telemetry buffer recorded during the session
+#[tauri::command]
+pub fn get_session_telemetry(state: tauri::State<'_, InputListenerState>) -> Vec<CursorSample> {
+    state.session_samples.lock().clone()
 }
 
 fn get_mouse_position(event: &Event) -> Option<(f64, f64)> {
     match event.event_type {
         EventType::ButtonPress(_) | EventType::ButtonRelease(_) => {
-            // rdev doesn't include position in button events on all platforms
-            // Use a fallback — on Windows we can get cursor pos
             #[cfg(target_os = "windows")]
             {
                 use std::mem::MaybeUninit;

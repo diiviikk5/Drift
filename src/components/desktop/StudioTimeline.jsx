@@ -10,6 +10,10 @@ export default function StudioTimeline({
     duration,
     onSeek,
     clicks = [],
+    focusSegments = [],
+    onDeleteSegment,
+    onSelectSegment,
+    selectedSegmentId,
     onAddZoom,
     onClearZooms
 }) {
@@ -58,8 +62,8 @@ export default function StudioTimeline({
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1.5 text-xs text-[var(--text-app-muted)] bg-[var(--bg-card-subtle)] px-2.5 py-1 rounded-lg border border-[var(--border-app)]">
                         <ZoomIn className="w-3.5 h-3.5 text-[var(--accent-app)]" />
-                        <span className="font-mono font-bold text-[var(--text-app)]">{clicks.length}</span>
-                        <span>Zooms</span>
+                        <span className="font-mono font-bold text-[var(--text-app)]">{focusSegments?.length || clicks.length}</span>
+                        <span>{focusSegments?.length ? 'Focus Tracks' : 'Zooms'}</span>
                     </div>
 
                     <button
@@ -103,8 +107,49 @@ export default function StudioTimeline({
                     style={{ width: `${progressPct}%` }}
                 />
 
-                {/* Zoom Keyframe Pins */}
-                {duration > 0 && clicks.map((click, idx) => {
+                {/* Focus Segment Blocks (Screen Studio / OpenScreen style) */}
+                {duration > 0 && focusSegments && focusSegments.length > 0 && focusSegments.map((seg, idx) => {
+                    const leftPct = (seg.startTime / duration) * 100;
+                    const widthPct = Math.max(3, ((seg.endTime - seg.startTime) / duration) * 100);
+                    const isSelected = selectedSegmentId === seg.id;
+
+                    return (
+                        <div
+                            key={seg.id || idx}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (onSelectSegment) onSelectSegment(seg);
+                                onSeek(seg.startTime);
+                            }}
+                            style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
+                            className={`absolute top-1.5 bottom-1.5 rounded-lg flex items-center justify-between px-2 cursor-pointer z-10 transition-all border ${
+                                isSelected
+                                    ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] border-[var(--accent-app)] shadow-md'
+                                    : 'bg-[var(--accent-app)]/20 text-[var(--text-app)] border-[var(--accent-app)]/50 hover:bg-[var(--accent-app)]/35'
+                            }`}
+                            title={`Focus Region: ${formatTime(seg.startTime)} - ${formatTime(seg.endTime)} (${seg.zoomScale}x)`}
+                        >
+                            <span className="text-[9px] font-mono font-bold truncate select-none">
+                                {seg.reason === 'dwell' ? '👁 Dwell' : '⚡ Focus'} {seg.zoomScale}x
+                            </span>
+                            {onDeleteSegment && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onDeleteSegment(seg.id);
+                                    }}
+                                    className="opacity-60 hover:opacity-100 hover:text-red-400 text-xs font-bold ml-1 px-1 transition-opacity"
+                                    title="Delete focus segment"
+                                >
+                                    ×
+                                </button>
+                            )}
+                        </div>
+                    );
+                })}
+
+                {/* Individual Click Keyframe Pins (if no focusSegments or complementary) */}
+                {duration > 0 && (!focusSegments || focusSegments.length === 0) && clicks.map((click, idx) => {
                     const clickTime = click.time / 1000;
                     const posPct = (clickTime / duration) * 100;
 
@@ -124,7 +169,7 @@ export default function StudioTimeline({
 
                 {/* Playhead Marker */}
                 <div
-                    className="absolute top-0 bottom-0 w-0.5 bg-[var(--text-app)] shadow-sm pointer-events-none"
+                    className="absolute top-0 bottom-0 w-0.5 bg-[var(--text-app)] shadow-sm pointer-events-none z-20"
                     style={{ left: `${progressPct}%` }}
                 >
                     <div className="w-2.5 h-2.5 rounded-full bg-[var(--text-app)] -ml-[4px] -mt-1 shadow-md" />

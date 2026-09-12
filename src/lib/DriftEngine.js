@@ -387,7 +387,22 @@ export class DriftEngine {
         this.isRecording = false;
         clearInterval(this.timerInt);
 
-        this.mediaRecorder.onstop = () => {
+        this.mediaRecorder.onstop = async () => {
+            if (this._isTauri) {
+                try {
+                    const nativeSamples = await drift.getSessionTelemetry();
+                    if (nativeSamples && nativeSamples.length > 0) {
+                        this.mouseMoves = nativeSamples.map(s => ({
+                            time: s.t,
+                            x: s.x > 1 ? s.x / this._sourceWidth : s.x,
+                            y: s.y > 1 ? s.y / this._sourceHeight : s.y,
+                            click: s.click,
+                        }));
+                    }
+                } catch (e) {
+                    console.warn('[Drift] Native telemetry retrieval failed:', e);
+                }
+            }
             const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
             const duration = (Date.now() - this.startTime) / 1000;
             if (this.onStopCallback) this.onStopCallback(blob, this.clicks, duration);

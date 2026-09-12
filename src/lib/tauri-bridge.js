@@ -123,6 +123,17 @@ export async function stopGlobalListener() {
 }
 
 /**
+ * Retrieve high-frequency session telemetry (up to 240Hz samples + clicks)
+ */
+export async function getSessionTelemetry() {
+    if (isTauri()) {
+        const api = await getTauriApi();
+        return api.invoke('get_session_telemetry');
+    }
+    return [];
+}
+
+/**
  * Get hotkey configuration
  */
 export async function getHotkeys() {
@@ -454,6 +465,7 @@ export const drift = {
     onGlobalClick,
     onGlobalMouseMove,
     stopGlobalListener,
+    getSessionTelemetry,
     getHotkeys,
     setHotkeys,
     aiCompletion,
