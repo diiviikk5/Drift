@@ -614,6 +614,64 @@ export default function RecorderPage() {
         setSelectedSegmentId(seg.id);
     };
 
+    const handleUpdateSegment = (id, updates) => {
+        if (studioRef.current) {
+            studioRef.current.updateFocusSegment(id, updates);
+            setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
+        }
+    };
+
+    const handleAddAnnotation = (type) => {
+        const ct = videoRef.current?.currentTime || 0;
+        const curMs = ct * 1000;
+        let newAnn;
+
+        if (type === 'rect') {
+            newAnn = {
+                id: 'ann-' + Date.now(),
+                type: 'rect',
+                x: 0.3,
+                y: 0.25,
+                w: 0.4,
+                h: 0.35,
+                startTime: curMs,
+                endTime: curMs + 3500,
+                color: '#DCFE50',
+            };
+        } else if (type === 'arrow') {
+            newAnn = {
+                id: 'ann-' + Date.now(),
+                type: 'arrow',
+                startX: 0.25,
+                startY: 0.25,
+                endX: 0.45,
+                endY: 0.45,
+                startTime: curMs,
+                endTime: curMs + 3500,
+                color: '#DCFE50',
+            };
+        } else if (type === 'text') {
+            newAnn = {
+                id: 'ann-' + Date.now(),
+                type: 'text',
+                x: 0.5,
+                y: 0.5,
+                text: 'Highlight Point',
+                startTime: curMs,
+                endTime: curMs + 3500,
+                color: '#DCFE50',
+            };
+        }
+
+        if (newAnn) {
+            const nextAnns = [...annotations, newAnn];
+            setAnnotations(nextAnns);
+            if (studioRef.current) {
+                studioRef.current.setAnnotations(nextAnns);
+            }
+        }
+    };
+
     // Export Logic
     const executeExport = async (format = 'mp4', resolution = '1080p') => {
         if (!studioRef.current) return;
@@ -626,7 +684,7 @@ export default function RecorderPage() {
 
             const videoBlob = await studioRef.current.exportVideo((pct) => {
                 setExportProgress(Math.round(Math.min(Math.max(pct || 0, 0), 1) * 92));
-            });
+            }, { format, resolution });
 
             const ext = format === 'gif' ? 'gif' : (videoBlob.type === 'video/mp4' ? 'mp4' : 'webm');
 

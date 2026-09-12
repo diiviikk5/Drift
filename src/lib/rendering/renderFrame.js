@@ -259,6 +259,16 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
     // 5. Calculate Camera Zoom & Position
     const camera = evaluateCameraAtTime(timeSec, focusSegments, mouseSamples, { zoomMultiplier: zoomMagnification });
 
+    // Optional Cinema Motion Blur (180-degree shutter interval)
+    let blurPrevCam = null;
+    let motionVelocity = 0;
+    if (options.motionBlur !== false && timeSec > 0.016) {
+        blurPrevCam = evaluateCameraAtTime(timeSec - 0.016, focusSegments, mouseSamples, { zoomMultiplier: zoomMagnification });
+        const moveDist = Math.hypot(camera.x - blurPrevCam.x, camera.y - blurPrevCam.y);
+        const scaleDist = Math.abs(camera.scale - blurPrevCam.scale);
+        motionVelocity = moveDist * 12 + scaleDist * 2.5;
+    }
+
     // 6. Draw Video Frame with Camera Transformation inside video area
     if (videoSource) {
         ctx.save();
@@ -266,6 +276,20 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         ctx.beginPath();
         ctx.rect(padX, padY + headerH, frameW, videoH);
         ctx.clip();
+
+        // Cinematic shutter motion blur blend
+        if (motionVelocity > 0.04 && blurPrevCam) {
+            ctx.save();
+            ctx.globalAlpha = Math.min(0.28, motionVelocity * 0.35);
+            ctx.translate(padX + frameW * 0.5, padY + headerH + videoH * 0.5);
+            const midScale = (camera.scale + blurPrevCam.scale) * 0.5;
+            const midX = (camera.x + blurPrevCam.x) * 0.5;
+            const midY = (camera.y + blurPrevCam.y) * 0.5;
+            ctx.scale(midScale, midScale);
+            ctx.translate(-midX * frameW, -midY * videoH);
+            ctx.drawImage(videoSource, 0, 0, frameW, videoH);
+            ctx.restore();
+        }
 
         // Translate origin to center of video area
         ctx.translate(padX + frameW * 0.5, padY + headerH + videoH * 0.5);

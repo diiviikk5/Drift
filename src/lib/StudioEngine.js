@@ -543,21 +543,27 @@ export class StudioEngine {
     }
 
     // --- EXPORT FUNCTION (MP4 via WebCodecs, WebM fallback) ---
-    async exportVideo(onProgress) {
+    async exportVideo(onProgress, options = {}) {
+        const { format = 'mp4', resolution = '1080p' } = options;
+
+        if (format === 'webm') {
+            return await this._exportWebM(onProgress, resolution);
+        }
+
         // Try WebCodecs MP4 first (no ffmpeg, hardware-accelerated)
         if (typeof VideoEncoder !== 'undefined') {
             try {
-                return await this._exportMP4(onProgress);
+                return await this._exportMP4(onProgress, resolution);
             } catch (e) {
                 console.warn('[Studio] WebCodecs MP4 export failed, falling back to WebM:', e.message);
             }
         }
         // Fallback: WebM via MediaRecorder
-        return await this._exportWebM(onProgress);
+        return await this._exportWebM(onProgress, resolution);
     }
 
     // --- WebCodecs + mp4-muxer → direct MP4 blob (no ffmpeg) ---
-    async _exportMP4(onProgress) {
+    async _exportMP4(onProgress, resolution = '1080p') {
         const { Muxer, ArrayBufferTarget } = await import('mp4-muxer');
 
         this.video.pause();
@@ -568,8 +574,21 @@ export class StudioEngine {
 
         const exportDuration = (this.trimEnd || this.videoDuration) - (this.trimStart || 0);
         const fps = 60;
-        const width = this.canvas.width;
-        const height = this.canvas.height;
+
+        let width = 1920;
+        let height = 1080;
+        if (resolution === '4k') {
+            width = 3840;
+            height = 2160;
+        } else if (resolution === '720p') {
+            width = 1280;
+            height = 720;
+        }
+
+        const origW = this.canvas.width;
+        const origH = this.canvas.height;
+        this.canvas.width = width;
+        this.canvas.height = height;
 
         // Precompute frames in Rust
         if (this.isTauri && this.tauriReady) {
@@ -706,6 +725,10 @@ export class StudioEngine {
                     resolve(mp4Blob);
                 } catch (e) {
                     reject(e);
+                } finally {
+                    this.canvas.width = origW;
+                    this.canvas.height = origH;
+                    this.drawFrame();
                 }
             };
 
@@ -714,7 +737,7 @@ export class StudioEngine {
     }
 
     // --- WebM fallback via MediaRecorder ---
-    async _exportWebM(onProgress) {
+    async _exportWebM(onProgress, resolution = '1080p') {
         this.video.pause();
         this.video.currentTime = this.trimStart || 0;
         this.camera = { x: 0.5, y: 0.5, scale: 1 };
@@ -723,6 +746,21 @@ export class StudioEngine {
 
         const exportDuration = (this.trimEnd || this.videoDuration) - (this.trimStart || 0);
         const fps = 60;
+
+        let width = 1920;
+        let height = 1080;
+        if (resolution === '4k') {
+            width = 3840;
+            height = 2160;
+        } else if (resolution === '720p') {
+            width = 1280;
+            height = 720;
+        }
+
+        const origW = this.canvas.width;
+        const origH = this.canvas.height;
+        this.canvas.width = width;
+        this.canvas.height = height;
 
         // Precompute frames in Rust
         if (this.isTauri && this.tauriReady) {
@@ -763,6 +801,9 @@ export class StudioEngine {
             rec.onstop = () => {
                 const blob = new Blob(chunks, { type: 'video/webm' });
                 this.precomputedFrames = null;
+                this.canvas.width = origW;
+                this.canvas.height = origH;
+                this.drawFrame();
                 resolve(blob);
             };
 
