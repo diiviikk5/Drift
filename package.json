@@ -6,6 +6,7 @@
   "author": "Drift Team",
   "main": "electron/main.js",
   "scripts": {
+    "test": "node --test tests/*.test.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

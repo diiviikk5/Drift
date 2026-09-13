@@ -34,7 +34,7 @@ export class InteractionAnalyzer {
     analyze(clicks = [], mouseSamples = [], totalDurationSec = 10) {
         // Normalize click timestamps to seconds and coordinates to 0-1
         const normalizedClicks = (clicks || []).map(c => ({
-            time: c.time > 1000 ? c.time / 1000 : c.time,
+            time: c.time / 1000,
             x: Math.max(0, Math.min(1, c.x > 1 ? c.x / (typeof window !== 'undefined' ? window.screen.width : 1920) : c.x)),
             y: Math.max(0, Math.min(1, c.y > 1 ? c.y / (typeof window !== 'undefined' ? window.screen.height : 1080) : c.y)),
         })).sort((a, b) => a.time - b.time);
@@ -124,8 +124,8 @@ export class InteractionAnalyzer {
             const startSample = samples[windowStart];
             const currSample = samples[i];
 
-            const tStart = startSample.t > 1000 ? startSample.t / 1000 : startSample.t;
-            const tCurr = currSample.t > 1000 ? currSample.t / 1000 : currSample.t;
+            const tStart = (startSample.time ?? startSample.t) / 1000;
+            const tCurr = (currSample.time ?? currSample.t) / 1000;
             const dt = tCurr - tStart;
 
             const dist = Math.hypot(currSample.x - startSample.x, currSample.y - startSample.y);

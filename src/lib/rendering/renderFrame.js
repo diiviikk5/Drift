@@ -134,7 +134,9 @@ export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples =
         const segB = sorted[i + 1];
         const gap = segB.startTime - segA.endTime;
 
-        if (gap >= 0 && gap <= CHAINED_PAN_GAP_SEC) {
+        if (options.connectedZooms !== false && gap >= 0 && gap <= CHAINED_PAN_GAP_SEC &&
+            !['overview', 'spotlight', 'full-camera'].includes(segA.sceneMode) &&
+            !['overview', 'spotlight', 'full-camera'].includes(segB.sceneMode)) {
             if (timeSec >= segA.endTime && timeSec <= segB.startTime) {
                 // Inside connected pan gap! Stay zoomed in and glide between targets
                 const panProgress = gap <= 0.001 ? 1 : Math.max(0, Math.min(1, (timeSec - segA.endTime) / gap));
@@ -179,22 +181,28 @@ export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples =
     for (let i = 0; i < sorted.length; i++) {
         const seg = sorted[i];
         const nextSeg = sorted[i + 1];
-        const hasConnectedNext = nextSeg && (nextSeg.startTime - seg.endTime) <= CHAINED_PAN_GAP_SEC;
+        const canConnect = (a, b) => options.connectedZooms !== false && a && b &&
+            b.startTime >= a.endTime && b.startTime - a.endTime <= CHAINED_PAN_GAP_SEC &&
+            !['overview', 'spotlight', 'full-camera'].includes(a.sceneMode) &&
+            !['overview', 'spotlight', 'full-camera'].includes(b.sceneMode);
+        const hasConnectedNext = canConnect(seg, nextSeg);
+        const hasConnectedPrevious = canConnect(sorted[i - 1], seg);
+        const rampDuration = Math.min(transitionDuration, (seg.endTime - seg.startTime) / 2);
 
         const leadIn = seg.startTime;
-        const rampUpEnd = seg.startTime + transitionDuration;
-        const rampDownStart = Math.max(rampUpEnd, seg.endTime - transitionDuration);
+        const rampUpEnd = seg.startTime + rampDuration;
+        const rampDownStart = seg.endTime - rampDuration;
         const leadOut = seg.endTime;
 
         if (timeSec >= leadIn && timeSec <= leadOut) {
             activeSeg = seg;
-            if (timeSec < rampUpEnd) {
+            if (timeSec < rampUpEnd && !hasConnectedPrevious) {
                 // Zooming in with Screen Studio cubic bezier easing
-                const progress = Math.max(0, Math.min(1, (timeSec - leadIn) / transitionDuration));
+                const progress = Math.max(0, Math.min(1, (timeSec - leadIn) / rampDuration));
                 blendWeight = easeOutScreenStudio(progress);
             } else if (timeSec > rampDownStart && !hasConnectedNext) {
                 // Zooming out (only if not chained into next segment)
-                const progress = Math.max(0, Math.min(1, (leadOut - timeSec) / transitionDuration));
+                const progress = Math.max(0, Math.min(1, (leadOut - timeSec) / rampDuration));
                 blendWeight = easeOutScreenStudio(progress);
             } else {
                 // Fully zoomed in or chained
@@ -221,7 +229,7 @@ export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples =
     }
 
     // Target zoom scale
-    const targetScale = 1.0 + (activeSeg.zoomScale * zoomMultiplier - 1.0) * blendWeight;
+    const targetScale = 1.0 + (Math.max(1, (activeSeg.zoomScale ?? 1.8) * zoomMultiplier) - 1.0) * blendWeight;
     const halfW = 0.5 / targetScale;
     const halfH = 0.5 / targetScale;
 
@@ -290,18 +298,18 @@ export function getInterpolatedCursor(timeSec, mouseSamples = []) {
     let low = 0;
     let high = mouseSamples.length - 1;
 
-    if (timeMs <= (mouseSamples[0].t || 0)) {
+    if (timeMs <= (mouseSamples[0].time ?? mouseSamples[0].t ?? 0)) {
         const s = mouseSamples[0];
         return { x: s.x > 1 ? s.x / 1920 : s.x, y: s.y > 1 ? s.y / 1080 : s.y };
     }
-    if (timeMs >= (mouseSamples[high].t || 0)) {
+    if (timeMs >= (mouseSamples[high].time ?? mouseSamples[high].t ?? 0)) {
         const s = mouseSamples[high];
         return { x: s.x > 1 ? s.x / 1920 : s.x, y: s.y > 1 ? s.y / 1080 : s.y };
     }
 
     while (low <= high) {
         const mid = (low + high) >> 1;
-        const tMid = mouseSamples[mid].t || 0;
+        const tMid = mouseSamples[mid].time ?? mouseSamples[mid].t ?? 0;
 
         if (tMid < timeMs) {
             low = mid + 1;
@@ -313,8 +321,8 @@ export function getInterpolatedCursor(timeSec, mouseSamples = []) {
     const prev = mouseSamples[Math.max(0, low - 1)];
     const next = mouseSamples[Math.min(mouseSamples.length - 1, low)];
 
-    const tPrev = prev.t || 0;
-    const tNext = next.t || 0;
+    const tPrev = prev.time ?? prev.t ?? 0;
+    const tNext = next.time ?? next.t ?? 0;
     const alpha = tNext === tPrev ? 0 : Math.max(0, Math.min(1, (timeMs - tPrev) / (tNext - tPrev)));
 
     const pX = prev.x > 1 ? prev.x / 1920 : prev.x;
@@ -434,13 +442,14 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
     }
 
     // 5. Calculate Camera Zoom & Position
-    const camera = evaluateCameraAtTime(timeSec, focusSegments, mouseSamples, { zoomMultiplier: zoomMagnification });
+    const cameraOptions = { zoomMultiplier: zoomMagnification, connectedZooms: renderSettings.connectedZooms, tiltAngle: renderSettings.tiltAngle };
+    const camera = evaluateCameraAtTime(timeSec, focusSegments, mouseSamples, cameraOptions);
 
     // Optional Cinema Motion Blur (180-degree shutter interval)
     let blurPrevCam = null;
     let motionVelocity = 0;
-    if (options.motionBlur !== false && timeSec > 0.016) {
-        blurPrevCam = evaluateCameraAtTime(timeSec - 0.016, focusSegments, mouseSamples, { zoomMultiplier: zoomMagnification });
+    if (renderSettings.motionBlur !== false && timeSec > 0.016) {
+        blurPrevCam = evaluateCameraAtTime(timeSec - 0.016, focusSegments, mouseSamples, cameraOptions);
         const moveDist = Math.hypot(camera.x - blurPrevCam.x, camera.y - blurPrevCam.y);
         const scaleDist = Math.abs(camera.scale - blurPrevCam.scale);
         motionVelocity = moveDist * 12 + scaleDist * 2.5;
@@ -490,7 +499,7 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         if (clickRipples && clicks && clicks.length > 0) {
             const curMs = timeSec * 1000;
             for (const click of clicks) {
-                const cTimeMs = click.time > 1000 ? click.time : click.time * 1000;
+                const cTimeMs = click.time;
                 const dt = curMs - cTimeMs;
                 if (dt >= 0 && dt <= 450) {
                     const progress = dt / 450;
