@@ -82,7 +82,7 @@ export class StudioEngine {
         this.startPosition = 'center';
         this.trimStart = 0;
         this.trimEnd = 0;
-        this.showCursor = false;
+        this.showCursor = options.showCursor ?? ((this.mouseMoves && this.mouseMoves.length > 0) || (this.clicks && this.clicks.length > 0));
         this.zoomLevel = 2.0;
 
         // Precomputed frames for export (array of FrameState from Rust)

@@ -55,6 +55,8 @@ export default function RecorderPage() {
     const countdownTimerRef = useRef(null);
     const savedSegmentsRef = useRef(null);
     const projectInputRef = useRef(null);
+    const isRecordingRef = useRef(false);
+    const viewModeRef = useRef('recorder');
     const [projectRevision, setProjectRevision] = useState(0);
     const [notice, setNotice] = useState('');
     const [hasActiveStream, setHasActiveStream] = useState(false);
@@ -62,8 +64,6 @@ export default function RecorderPage() {
     // --- State ---
     const [viewMode, setViewMode] = useState('recorder'); // 'recorder' | 'studio'
     const [platform, setPlatform] = useState('browser'); // 'tauri' | 'electron' | 'browser'
-    const isDesktop = platform === 'tauri' || platform === 'electron';
-
     // Theme state ('dark' | 'light' | 'midnight' | 'drift')
     const [theme, setTheme] = useState('dark');
 
@@ -139,6 +139,11 @@ export default function RecorderPage() {
         toggle_pause: 'CmdOrCtrl+Shift+P',
         toggle_zoom: 'CmdOrCtrl+Shift+Z',
     });
+
+    const isDesktop = platform === 'tauri' || platform === 'electron';
+
+    useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
+    useEffect(() => { viewModeRef.current = viewMode; }, [viewMode]);
 
     // Load saved theme
     useEffect(() => {
@@ -220,6 +225,9 @@ export default function RecorderPage() {
                 savedSegmentsRef.current = null;
                 setIsRecording(false);
                 setHasActiveStream(false);
+                if (drift.isTauri() && typeof drift.restoreWindow === 'function') {
+                    drift.restoreWindow();
+                }
                 if (engineRef.current?.screenStream) {
                     engineRef.current.screenStream.getTracks().forEach(t => t.stop());
                 }
@@ -229,9 +237,14 @@ export default function RecorderPage() {
                 if (engineRef.current?.webcamStream) {
                     engineRef.current.webcamStream.getTracks().forEach(t => t.stop());
                 }
+                const moves = engineRef.current?.mouseMoves || [];
+                const clickList = clicks || [];
                 setRecordedBlob(blob);
-                setRecordedClicks(clicks);
-                setRecordedMoves(engineRef.current?.mouseMoves || []);
+                setRecordedClicks(clickList);
+                setRecordedMoves(moves);
+                if (moves.length > 0 || clickList.length > 0) {
+                    setShowCursor(true);
+                }
                 if (meta.webcamBlob) {
                     setRecordedWebcamBlob(meta.webcamBlob);
                 }
@@ -290,12 +303,17 @@ export default function RecorderPage() {
                         customBackgroundImage: customImage,
                         cursorTheme,
                         focusSegments: savedSegmentsRef.current,
+                        showCursor: showCursor || ((recordedMoves && recordedMoves.length > 0) || (recordedClicks && recordedClicks.length > 0)),
                     }
                 );
+                const hasTelemetry = (recordedMoves && recordedMoves.length > 0) || (recordedClicks && recordedClicks.length > 0);
+                const effectiveShowCursor = showCursor || hasTelemetry;
                 studioRef.current.background = background;
                 studioRef.current.zoomLevel = zoomLevel;
-                // showCursor defaults to FALSE to prevent double cursor
-                studioRef.current.showCursor = showCursor;
+                studioRef.current.showCursor = effectiveShowCursor;
+                if (effectiveShowCursor && !showCursor) {
+                    setShowCursor(true);
+                }
                 studioRef.current.cursorTheme = cursorTheme;
                 Object.assign(studioRef.current, { cursorScale, tiltAngle, connectedZooms, reactiveWebcam, captionsEnabled });
                 studioRef.current.setAspectRatio(aspectRatio);
@@ -552,6 +570,15 @@ export default function RecorderPage() {
                 setTimer(`${m}:${sec}`);
             });
             setIsRecording(true);
+
+            // Cinema Recorder: auto-minimize Drift window so user records their clean screen/apps
+            if (drift.isTauri() && typeof drift.minimizeWindow === 'function') {
+                try {
+                    await drift.minimizeWindow();
+                } catch (minErr) {
+                    console.warn('[Drift] Window auto-minimize notice:', minErr);
+                }
+            }
         } catch (e) {
             console.error('[Drift] Recording launch error:', e);
         }
@@ -566,14 +593,33 @@ export default function RecorderPage() {
     };
 
     const toggleRecord = async () => {
-        if (isRecording) {
+        if (isRecordingRef.current) {
             engineRef.current?.stopRecording();
             setIsRecording(false);
             setTimer('00:00');
+            if (drift.isTauri() && typeof drift.restoreWindow === 'function') {
+                try {
+                    await drift.restoreWindow();
+                } catch (e) {}
+            }
         } else {
             if (activeCountdown > 0) {
                 cancelCountdown();
                 return;
+            }
+
+            // If stream is not active yet, acquire it BEFORE starting the countdown
+            // so the system screen picker doesn't interrupt the 3, 2, 1 flow!
+            if (!engineRef.current?.screenStream?.active) {
+                let ok = false;
+                if (platform === 'electron' && selectedSource) {
+                    ok = await engineRef.current?.selectSource(selectedSource, micEnabled);
+                } else {
+                    ok = await engineRef.current?.selectSourceBrowser();
+                    if (ok) setSelectedSource('browser-source');
+                }
+                if (!ok) return;
+                setHasActiveStream(true);
             }
 
             if (countdownSeconds > 0) {
@@ -598,7 +644,7 @@ export default function RecorderPage() {
 
     useEffect(() => { toggleRecordRef.current = toggleRecord; }, [toggleRecord]);
 
-    // Hotkey listener
+    // Permanent hotkey listener — stays active through recording without unregistering
     useEffect(() => {
         const handler = (e) => {
             const { action } = e.detail || {};
@@ -607,13 +653,16 @@ export default function RecorderPage() {
                     if (toggleRecordRef.current) toggleRecordRef.current();
                     break;
                 case 'stop_recording':
-                    if (isRecording && engineRef.current) {
+                    if (isRecordingRef.current && engineRef.current) {
                         engineRef.current.stopRecording();
                         setIsRecording(false);
+                        if (drift.isTauri() && typeof drift.restoreWindow === 'function') {
+                            drift.restoreWindow();
+                        }
                     }
                     break;
                 case 'toggle_pause':
-                    if (viewMode === 'studio') togglePlayback();
+                    if (viewModeRef.current === 'studio') togglePlayback();
                     break;
                 case 'toggle_zoom':
                     addManualZoom();
@@ -625,7 +674,7 @@ export default function RecorderPage() {
             window.removeEventListener('drift-hotkey', handler);
             drift.unregisterAllShortcuts();
         };
-    }, [isRecording, viewMode]);
+    }, []);
 
     // Studio controls
     const togglePlayback = () => {

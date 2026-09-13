@@ -54,3 +54,28 @@ test('compositor can render beyond the first frame without undefined settings', 
     });
     assert.doesNotThrow(() => renderFrame(context, 1, null));
 });
+
+test('sub-pixel cursor interpolation handles high-frequency telemetry starting at 0ms', () => {
+    const highFreqSamples = [
+        { time: 0, x: 0.1, y: 0.1 },
+        { time: 4, x: 0.12, y: 0.12 },
+        { time: 8, x: 0.14, y: 0.14 },
+        { time: 100, x: 0.5, y: 0.5 },
+    ];
+    const cur = getInterpolatedCursor(0.004, highFreqSamples);
+    assert.ok(cur !== null);
+    assert.ok(Math.abs(cur.x - 0.12) < 0.01);
+    assert.ok(Math.abs(cur.y - 0.12) < 0.01);
+});
+
+test('interaction analyzer converts synchronized session clicks to zoom targets', () => {
+    const analyzer = new InteractionAnalyzer();
+    const clicks = [
+        { time: 1200, x: 0.35, y: 0.42 },
+        { time: 4500, x: 0.75, y: 0.82 },
+    ];
+    const segments = analyzer.analyze(clicks, [], 8);
+    assert.ok(segments.length >= 2);
+    assert.ok(Math.abs(segments[0].targetX - 0.35) < 0.05);
+    assert.ok(Math.abs(segments[0].targetY - 0.42) < 0.05);
+});

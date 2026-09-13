@@ -31,6 +31,8 @@ pub struct CursorSample {
 /// State to control the global input listener and buffer session telemetry
 pub struct InputListenerState {
     pub is_listening: Arc<Mutex<bool>>,
+    pub is_recording: Arc<Mutex<bool>>,
+    pub recording_start: Arc<Mutex<Option<std::time::Instant>>>,
     pub session_samples: Arc<Mutex<Vec<CursorSample>>>,
 }
 
@@ -38,6 +40,8 @@ impl Default for InputListenerState {
     fn default() -> Self {
         Self {
             is_listening: Arc::new(Mutex::new(false)),
+            is_recording: Arc::new(Mutex::new(false)),
+            recording_start: Arc::new(Mutex::new(None)),
             session_samples: Arc::new(Mutex::new(Vec::with_capacity(16384))),
         }
     }
@@ -57,11 +61,13 @@ pub fn start_global_listener(app: AppHandle) {
     drop(listening);
 
     let is_listening = state.is_listening.clone();
+    let is_recording = state.is_recording.clone();
+    let recording_start = state.recording_start.clone();
     let session_samples = state.session_samples.clone();
     let app_handle = app.clone();
 
     thread::spawn(move || {
-        let start_time = std::time::Instant::now();
+        let listener_start = std::time::Instant::now();
         let mut last_move_time: f64 = 0.0;
         let mut last_sample_time: f64 = 0.0;
 
@@ -70,7 +76,15 @@ pub fn start_global_listener(app: AppHandle) {
                 return;
             }
 
-            let elapsed = start_time.elapsed().as_secs_f64() * 1000.0;
+            let rec_start = *recording_start.lock();
+            let recording = *is_recording.lock();
+
+            // When actively recording, elapsed is relative to recording start (starts at 0.0 ms)
+            // When idle, elapsed is relative to listener start for live indicator events
+            let (elapsed, is_rec) = match (recording, rec_start) {
+                (true, Some(start_inst)) => (start_inst.elapsed().as_secs_f64() * 1000.0, true),
+                _ => (listener_start.elapsed().as_secs_f64() * 1000.0, false),
+            };
 
             match event.event_type {
                 EventType::ButtonPress(button) => {
@@ -88,28 +102,31 @@ pub fn start_global_listener(app: AppHandle) {
                             time: elapsed,
                             button: btn_name.to_string(),
                         };
-                        
-                        // Record click directly into telemetry session
-                        session_samples.lock().push(CursorSample {
-                            t: elapsed,
-                            x: pos.0,
-                            y: pos.1,
-                            click: Some(btn_name.to_string()),
-                        });
+
+                        if is_rec {
+                            session_samples.lock().push(CursorSample {
+                                t: elapsed,
+                                x: pos.0,
+                                y: pos.1,
+                                click: Some(btn_name.to_string()),
+                            });
+                        }
 
                         let _ = app_handle.emit("global-click", &click);
                     }
                 }
                 EventType::MouseMove { x, y } => {
-                    // Buffer high-frequency telemetry at up to 240Hz (>= 4ms between samples)
-                    if elapsed - last_sample_time >= 4.0 {
-                        last_sample_time = elapsed;
-                        session_samples.lock().push(CursorSample {
-                            t: elapsed,
-                            x,
-                            y,
-                            click: None,
-                        });
+                    if is_rec {
+                        // Buffer high-frequency telemetry at up to 240Hz (>= 4ms between samples)
+                        if elapsed - last_sample_time >= 4.0 {
+                            last_sample_time = elapsed;
+                            session_samples.lock().push(CursorSample {
+                                t: elapsed,
+                                x,
+                                y,
+                                click: None,
+                            });
+                        }
                     }
 
                     // Throttle webview IPC event to ~60fps (16ms) to keep UI thread responsive
@@ -139,10 +156,44 @@ pub fn stop_global_listener(state: tauri::State<'_, InputListenerState>) {
     *listening = false;
 }
 
+/// Start buffering high-frequency synchronized telemetry for the active recording session
+#[tauri::command]
+pub fn start_session_telemetry(state: tauri::State<'_, InputListenerState>) {
+    *state.is_recording.lock() = true;
+    *state.recording_start.lock() = Some(std::time::Instant::now());
+    state.session_samples.lock().clear();
+}
+
+/// Stop session telemetry buffering and retrieve recorded samples
+#[tauri::command]
+pub fn stop_session_telemetry(state: tauri::State<'_, InputListenerState>) -> Vec<CursorSample> {
+    *state.is_recording.lock() = false;
+    *state.recording_start.lock() = None;
+    state.session_samples.lock().clone()
+}
+
 /// Retrieve the high-frequency telemetry buffer recorded during the session
 #[tauri::command]
 pub fn get_session_telemetry(state: tauri::State<'_, InputListenerState>) -> Vec<CursorSample> {
     state.session_samples.lock().clone()
+}
+
+/// Minimize the main application window during active desktop recording
+#[tauri::command]
+pub fn minimize_window(app: AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.minimize();
+    }
+}
+
+/// Restore and focus the main application window when recording concludes
+#[tauri::command]
+pub fn restore_window(app: AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
 }
 
 fn get_mouse_position(event: &Event) -> Option<(f64, f64)> {

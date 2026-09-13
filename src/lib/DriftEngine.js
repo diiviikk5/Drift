@@ -460,6 +460,35 @@ export class DriftEngine {
         this.webcamOffsetMs = 0;
         this.isRecording = true;
 
+        if (this._isTauri) {
+            try {
+                await drift.startSessionTelemetry();
+            } catch (err) {
+                console.warn('[Drift] startSessionTelemetry notice:', err);
+            }
+        } else {
+            // Browser / Electron DOM fallback listener
+            this._browserClickHandler = (e) => {
+                if (!this.isRecording) return;
+                const t = Date.now() - this.startTime;
+                const nx = e.clientX / (this._sourceWidth || window.innerWidth || 1920);
+                const ny = e.clientY / (this._sourceHeight || window.innerHeight || 1080);
+                this.clicks.push({ time: t, x: nx, y: ny, button: 'left' });
+                this.cursorEngine.addClick(t, e.clientX, e.clientY);
+                if (this.onclickCallback) this.onclickCallback(this.clicks.length);
+            };
+            this._browserMoveHandler = (e) => {
+                if (!this.isRecording) return;
+                const t = Date.now() - this.startTime;
+                const nx = e.clientX / (this._sourceWidth || window.innerWidth || 1920);
+                const ny = e.clientY / (this._sourceHeight || window.innerHeight || 1080);
+                this.mouseMoves.push({ time: t, x: nx, y: ny });
+                this.cursorEngine.addMove(t, e.clientX, e.clientY);
+            };
+            window.addEventListener('click', this._browserClickHandler);
+            window.addEventListener('mousemove', this._browserMoveHandler);
+        }
+
         this.mediaRecorder.start(1000);
         if (this.webcamRecorder) {
             this.webcamRecorder.start(1000);
@@ -474,6 +503,15 @@ export class DriftEngine {
 
     stopRecording() {
         if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') return;
+
+        if (this._browserClickHandler) {
+            window.removeEventListener('click', this._browserClickHandler);
+            this._browserClickHandler = null;
+        }
+        if (this._browserMoveHandler) {
+            window.removeEventListener('mousemove', this._browserMoveHandler);
+            this._browserMoveHandler = null;
+        }
 
         this.mediaRecorder.stop();
         if (this.webcamRecorder && this.webcamRecorder.state !== 'inactive') {
@@ -492,7 +530,10 @@ export class DriftEngine {
 
             if (this._isTauri) {
                 try {
-                    const nativeSamples = await drift.getSessionTelemetry();
+                    const nativeSamples = typeof drift.stopSessionTelemetry === 'function'
+                        ? await drift.stopSessionTelemetry()
+                        : await drift.getSessionTelemetry();
+
                     if (nativeSamples && nativeSamples.length > 0) {
                         this.mouseMoves = nativeSamples.map(s => ({
                             time: s.t,
@@ -500,6 +541,16 @@ export class DriftEngine {
                             y: s.y > 1 ? s.y / this._sourceHeight : s.y,
                             click: s.click,
                         }));
+
+                        const clickSamples = nativeSamples.filter(s => Boolean(s.click));
+                        if (clickSamples.length > 0) {
+                            this.clicks = clickSamples.map(s => ({
+                                time: s.t,
+                                x: s.x > 1 ? s.x / this._sourceWidth : s.x,
+                                y: s.y > 1 ? s.y / this._sourceHeight : s.y,
+                                button: s.click,
+                            }));
+                        }
                     }
                 } catch (e) {
                     console.warn('[Drift] Native telemetry retrieval failed:', e);

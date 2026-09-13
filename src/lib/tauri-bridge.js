@@ -123,6 +123,27 @@ export async function stopGlobalListener() {
 }
 
 /**
+ * Start high-frequency synchronized session telemetry (stamps t=0.0 at recording start)
+ */
+export async function startSessionTelemetry() {
+    if (isTauri()) {
+        const api = await getTauriApi();
+        return api.invoke('start_session_telemetry');
+    }
+}
+
+/**
+ * Stop session telemetry buffering and retrieve recorded samples
+ */
+export async function stopSessionTelemetry() {
+    if (isTauri()) {
+        const api = await getTauriApi();
+        return api.invoke('stop_session_telemetry');
+    }
+    return [];
+}
+
+/**
  * Retrieve high-frequency session telemetry (up to 240Hz samples + clicks)
  */
 export async function getSessionTelemetry() {
@@ -131,6 +152,26 @@ export async function getSessionTelemetry() {
         return api.invoke('get_session_telemetry');
     }
     return [];
+}
+
+/**
+ * Minimize app window during active recording
+ */
+export async function minimizeWindow() {
+    if (isTauri()) {
+        const api = await getTauriApi();
+        return api.invoke('minimize_window');
+    }
+}
+
+/**
+ * Restore and focus app window after recording
+ */
+export async function restoreWindow() {
+    if (isTauri()) {
+        const api = await getTauriApi();
+        return api.invoke('restore_window');
+    }
 }
 
 /**
@@ -465,7 +506,11 @@ export const drift = {
     onGlobalClick,
     onGlobalMouseMove,
     stopGlobalListener,
+    startSessionTelemetry,
+    stopSessionTelemetry,
     getSessionTelemetry,
+    minimizeWindow,
+    restoreWindow,
     getHotkeys,
     setHotkeys,
     aiCompletion,
