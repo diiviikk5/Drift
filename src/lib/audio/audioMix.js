@@ -35,6 +35,9 @@ export function mixAudioTracks({
     }
 
     const context = new AudioContextClass();
+    if (context.state === 'suspended') {
+        context.resume().catch(() => {});
+    }
     const destination = context.createMediaStreamDestination();
 
     // 1. Connect system audio at unity gain (if present)
@@ -87,6 +90,9 @@ export function createAudioLevelMeter(
 
     try {
         const ctx = new AudioContextClass();
+        if (ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+        }
         const source = ctx.createMediaStreamSource(new MediaStream([tracks[0]]));
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 256;

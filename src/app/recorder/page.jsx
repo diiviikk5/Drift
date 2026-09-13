@@ -87,6 +87,11 @@ export default function RecorderPage() {
     const [countdownSeconds, setCountdownSeconds] = useState(0); // 0 (instant), 3, 5
     const [activeCountdown, setActiveCountdown] = useState(0);
     const [sourceThumbnails, setSourceThumbnails] = useState({});
+    const [audioDevices, setAudioDevices] = useState([]);
+    const [selectedMicId, setSelectedMicId] = useState('');
+    const [videoDevices, setVideoDevices] = useState([]);
+    const [selectedWebcamId, setSelectedWebcamId] = useState('');
+    const [autoMinimize, setAutoMinimize] = useState(true);
 
     // Studio State
     const [recordedBlob, setRecordedBlob] = useState(null);
@@ -145,13 +150,56 @@ export default function RecorderPage() {
     useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
     useEffect(() => { viewModeRef.current = viewMode; }, [viewMode]);
 
-    // Load saved theme
+    // Load media devices (microphones & webcams)
+    const loadMediaDevices = useCallback(async () => {
+        if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) return;
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const mics = devices.filter(d => d.kind === 'audioinput');
+            const cams = devices.filter(d => d.kind === 'videoinput');
+            setAudioDevices(mics);
+            setVideoDevices(cams);
+            if (mics.length > 0) setSelectedMicId(prev => prev || mics[0].deviceId);
+            if (cams.length > 0) setSelectedWebcamId(prev => prev || cams[0].deviceId);
+        } catch (e) {
+            console.warn('[Drift] Media device enumeration notice:', e);
+        }
+    }, []);
+
+    // Load saved settings
     useEffect(() => {
         try {
             const savedTheme = localStorage.getItem('drift_theme');
             if (savedTheme) setTheme(savedTheme);
+            const savedAutoMin = localStorage.getItem('drift_auto_minimize');
+            if (savedAutoMin !== null) setAutoMinimize(savedAutoMin === 'true');
         } catch (e) {}
-    }, []);
+        loadMediaDevices();
+    }, [loadMediaDevices]);
+
+    const handleToggleAutoMinimize = (val) => {
+        setAutoMinimize(val);
+        try {
+            localStorage.setItem('drift_auto_minimize', String(val));
+        } catch (e) {}
+    };
+
+    const handleSelectMic = async (deviceId) => {
+        setSelectedMicId(deviceId);
+        if (micEnabled && engineRef.current) {
+            const ok = await engineRef.current.enableMic(deviceId);
+            if (ok && engineRef.current.micStream) {
+                setMicStream(engineRef.current.micStream);
+            }
+        }
+    };
+
+    const handleSelectWebcam = async (deviceId) => {
+        setSelectedWebcamId(deviceId);
+        if (webcamEnabled && engineRef.current) {
+            await engineRef.current.enableWebcam(deviceId);
+        }
+    };
 
     const handleSelectTheme = (newTheme) => {
         setTheme(newTheme);
@@ -391,10 +439,11 @@ export default function RecorderPage() {
         if (engineRef.current) {
             engineRef.current.micEnabled = next;
             if (next) {
-                const ok = await engineRef.current.enableMic();
+                const ok = await engineRef.current.enableMic(selectedMicId || null);
                 if (ok && engineRef.current.micStream) {
                     setMicStream(engineRef.current.micStream);
                 }
+                loadMediaDevices();
             } else {
                 engineRef.current.disableMic();
                 setMicStream(null);
@@ -409,10 +458,11 @@ export default function RecorderPage() {
             setWebcamEnabled(false);
             setWebcamSettings(prev => ({ ...prev, enabled: false }));
         } else {
-            const ok = await engineRef.current.enableWebcam();
+            const ok = await engineRef.current.enableWebcam(selectedWebcamId || null);
             if (ok) {
                 setWebcamEnabled(true);
                 setWebcamSettings(prev => ({ ...prev, enabled: true }));
+                loadMediaDevices();
             }
         }
     };
@@ -572,7 +622,7 @@ export default function RecorderPage() {
             setIsRecording(true);
 
             // Cinema Recorder: auto-minimize Drift window so user records their clean screen/apps
-            if (drift.isTauri() && typeof drift.minimizeWindow === 'function') {
+            if (autoMinimize && drift.isTauri() && typeof drift.minimizeWindow === 'function') {
                 try {
                     await drift.minimizeWindow();
                 } catch (minErr) {
@@ -1022,10 +1072,18 @@ export default function RecorderPage() {
                             micEnabled={micEnabled}
                             micStream={micStream}
                             onToggleMic={toggleMic}
+                            audioDevices={audioDevices}
+                            selectedMicId={selectedMicId}
+                            onSelectMic={handleSelectMic}
                             webcamEnabled={webcamEnabled}
                             onToggleWebcam={toggleWebcam}
+                            videoDevices={videoDevices}
+                            selectedWebcamId={selectedWebcamId}
+                            onSelectWebcam={handleSelectWebcam}
                             countdownSeconds={countdownSeconds}
                             onChangeCountdown={setCountdownSeconds}
+                            autoMinimize={autoMinimize}
+                            onToggleAutoMinimize={handleToggleAutoMinimize}
                             hotkey={(typeof hotkeys.toggle_recording === 'string' ? hotkeys.toggle_recording : 'Ctrl+Shift+R').replace('CmdOrCtrl', 'Ctrl')}
                             previewCanvas={
                                 <canvas

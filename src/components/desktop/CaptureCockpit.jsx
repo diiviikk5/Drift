@@ -18,14 +18,22 @@ export default function CaptureCockpit({
     micEnabled,
     micStream = null,
     onToggleMic,
+    audioDevices = [],
+    selectedMicId = '',
+    onSelectMic = null,
     webcamEnabled,
     onToggleWebcam,
+    videoDevices = [],
+    selectedWebcamId = '',
+    onSelectWebcam = null,
     countdownSeconds,
     onChangeCountdown,
     hotkey,
     previewCanvas = null,
     hasActiveStream = false,
     onStartPreview = null,
+    autoMinimize = true,
+    onToggleAutoMinimize = null,
 }) {
     const [audioLevel, setAudioLevel] = useState(0);
 
@@ -219,6 +227,21 @@ export default function CaptureCockpit({
                             );
                         })}
                     </div>
+
+                    {/* Microphone Device Dropdown */}
+                    {micEnabled && audioDevices.length > 1 && (
+                        <select
+                            value={selectedMicId}
+                            onChange={(e) => onSelectMic && onSelectMic(e.target.value)}
+                            className="w-full text-[10px] bg-black/40 text-[var(--text-app)] border border-white/10 rounded-md px-1.5 py-1 truncate focus:outline-none cursor-pointer"
+                        >
+                            {audioDevices.map((d) => (
+                                <option key={d.deviceId} value={d.deviceId} className="bg-[#121420] text-white">
+                                    {d.label || `Microphone (${d.deviceId.slice(0, 6)})`}
+                                </option>
+                            ))}
+                        </select>
+                    )}
                 </div>
 
                 {/* Webcam PiP Card */}
@@ -244,9 +267,24 @@ export default function CaptureCockpit({
                         </span>
                     </div>
 
-                    <div className="text-[10px] font-mono text-[var(--text-app-muted)] truncate">
-                        {webcamEnabled ? 'Picture-in-Picture' : 'Click to enable camera'}
-                    </div>
+                    {/* Camera Device Dropdown */}
+                    {webcamEnabled && videoDevices.length > 1 ? (
+                        <select
+                            value={selectedWebcamId}
+                            onChange={(e) => onSelectWebcam && onSelectWebcam(e.target.value)}
+                            className="w-full text-[10px] bg-black/40 text-[var(--text-app)] border border-white/10 rounded-md px-1.5 py-1 truncate focus:outline-none cursor-pointer"
+                        >
+                            {videoDevices.map((d) => (
+                                <option key={d.deviceId} value={d.deviceId} className="bg-[#121420] text-white">
+                                    {d.label || `Camera (${d.deviceId.slice(0, 6)})`}
+                                </option>
+                            ))}
+                        </select>
+                    ) : (
+                        <div className="text-[10px] font-mono text-[var(--text-app-muted)] truncate">
+                            {webcamEnabled ? 'Picture-in-Picture' : 'Click to enable camera'}
+                        </div>
+                    )}
                 </div>
 
                 {/* Countdown Timer Card */}
@@ -279,6 +317,26 @@ export default function CaptureCockpit({
                             </button>
                         ))}
                     </div>
+                </div>
+            </div>
+
+            {/* Studio Recording Spec & Options Bar */}
+            <div className="flex items-center justify-between text-xs text-[var(--text-app-muted)] px-1">
+                <label className="flex items-center gap-2 cursor-pointer hover:text-[var(--text-app)] transition-colors select-none">
+                    <input
+                        type="checkbox"
+                        checked={autoMinimize}
+                        onChange={(e) => onToggleAutoMinimize && onToggleAutoMinimize(e.target.checked)}
+                        className="rounded border-[var(--border-app)] text-[var(--accent-app)] accent-[var(--accent-app)] cursor-pointer"
+                    />
+                    <span className="text-[11px] font-medium">Auto-minimize during recording</span>
+                </label>
+                <div className="flex items-center gap-2 font-mono text-[10px] text-[var(--text-app-muted)]">
+                    <span>48 kHz Voice Boost</span>
+                    <span>•</span>
+                    <span>VP9 60 FPS</span>
+                    <span>•</span>
+                    <span className="text-[var(--accent-app)] font-semibold">25 Mbps Lossless</span>
                 </div>
             </div>
 
