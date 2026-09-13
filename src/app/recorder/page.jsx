@@ -15,6 +15,7 @@ import InspectorPanel from '@/components/desktop/InspectorPanel';
 import ExportDialog from '@/components/desktop/ExportDialog';
 import HotkeyModal from '@/components/desktop/HotkeyModal';
 import AISettings from '@/app/components/settings/AISettings';
+import NotesTeleprompter from '@/components/desktop/NotesTeleprompter';
 
 // Studio Gradient Wallpapers
 const BACKGROUNDS = {
@@ -99,6 +100,12 @@ export default function RecorderPage() {
     const [cursorTheme, setCursorTheme] = useState('macos');
     const [cursorScale, setCursorScale] = useState(1.0);
     const [aspectRatio, setAspectRatio] = useState('16:9');
+
+    // OpenScreen & Recordly Features State
+    const [isTeleprompterOpen, setIsTeleprompterOpen] = useState(false);
+    const [tiltAngle, setTiltAngle] = useState(3.5);
+    const [connectedZooms, setConnectedZooms] = useState(true);
+    const [reactiveWebcam, setReactiveWebcam] = useState(true);
 
     // Captions & Annotations State
     const [captions, setCaptions] = useState([]);
@@ -800,6 +807,8 @@ export default function RecorderPage() {
                 clickCount={clickCount}
                 theme={theme}
                 onSelectTheme={handleSelectTheme}
+                isTeleprompterOpen={isTeleprompterOpen}
+                onToggleTeleprompter={() => setIsTeleprompterOpen(prev => !prev)}
             />
 
             {/* Main Stage */}
@@ -902,10 +911,32 @@ export default function RecorderPage() {
                             isExporting={isExporting}
                             aspectRatio={aspectRatio}
                             onChangeAspectRatio={setAspectRatio}
+                            tiltAngle={tiltAngle}
+                            onChangeTiltAngle={(angle) => {
+                                setTiltAngle(angle);
+                                if (studioRef.current) studioRef.current.setTiltAngle(angle);
+                            }}
+                            connectedZooms={connectedZooms}
+                            onToggleConnectedZooms={(enabled) => {
+                                setConnectedZooms(enabled);
+                                if (studioRef.current) studioRef.current.setConnectedZooms(enabled);
+                            }}
+                            reactiveWebcam={reactiveWebcam}
+                            onToggleReactiveWebcam={(enabled) => {
+                                setReactiveWebcam(enabled);
+                                if (studioRef.current) studioRef.current.setReactiveWebcam(enabled);
+                            }}
                         />
                     </div>
                 )}
             </div>
+
+            {/* Presenter Teleprompter Notes (OpenScreen) */}
+            <NotesTeleprompter
+                isOpen={isTeleprompterOpen}
+                onClose={() => setIsTeleprompterOpen(false)}
+                isRecording={isRecording}
+            />
 
             {/* Countdown Overlay */}
             <CountdownOverlay

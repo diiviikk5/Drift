@@ -470,13 +470,33 @@ export class StudioEngine {
                 cursorTheme: this.cursorTheme || 'macos',
                 zoomMagnification: (this.zoomLevel || 2.0) / 2.0,
                 clickRipples: true,
+                tiltAngle: this.tiltAngle ?? 3.5,
+                connectedZooms: this.connectedZooms !== false,
                 webcamSource: this.webcamVideo && this.webcamVideo.readyState >= 2 ? this.webcamVideo : null,
-                webcamSettings: this.webcamSettings,
+                webcamSettings: {
+                    ...this.webcamSettings,
+                    reactiveScale: this.reactiveWebcam !== false,
+                },
                 captions: this.captions || [],
                 captionsEnabled: this.captionsEnabled,
                 annotations: this.annotations || [],
             }
         );
+    }
+
+    setTiltAngle(angle) {
+        this.tiltAngle = angle;
+        this.drawFrame();
+    }
+
+    setConnectedZooms(enabled) {
+        this.connectedZooms = enabled;
+        this.drawFrame();
+    }
+
+    setReactiveWebcam(enabled) {
+        this.reactiveWebcam = enabled;
+        this.drawFrame();
     }
 
     setCaptions(captions) {

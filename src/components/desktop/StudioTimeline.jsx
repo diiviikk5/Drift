@@ -125,6 +125,7 @@ export default function StudioTimeline({
                             {[
                                 { id: 'focus', label: '⚡ Focus' },
                                 { id: 'spotlight', label: '🎙️ Spotlight' },
+                                { id: 'full-camera', label: '🎥 Full Camera' },
                                 { id: 'overview', label: '🖥️ Overview' },
                                 { id: 'speed', label: '⏩ Speed Ramp' },
                             ].map((mode) => (

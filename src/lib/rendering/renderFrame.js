@@ -50,6 +50,61 @@ export function capSpringEase(t, stiffness = 200, damping = 40, mass = 2.25) {
 }
 
 /**
+ * OpenScreen / Screen Studio Cubic Bezier easing (0.1, 0.0, 0.2, 1.0)
+ */
+export function cubicBezier(p1x, p1y, p2x, p2y, t) {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    const ax = 1 - 3 * p2x + 3 * p1x;
+    const bx = 3 * p2x - 6 * p1x;
+    const cx = 3 * p1x;
+    const sampleCurveX = (u) => ((ax * u + bx) * u + cx) * u;
+    const sampleCurveY = (u) => (((1 - 3 * p2y + 3 * p1y) * u + (3 * p2y - 6 * p1y)) * u + 3 * p1y) * u;
+
+    let u = t;
+    for (let i = 0; i < 6; i++) {
+        const x = sampleCurveX(u) - t;
+        if (Math.abs(x) < 1e-4) break;
+        const d = (3 * ax * u + 2 * bx) * u + cx;
+        if (Math.abs(d) < 1e-5) break;
+        u -= x / d;
+    }
+    return Math.max(0, Math.min(1, sampleCurveY(u)));
+}
+
+export function easeOutScreenStudio(t) {
+    return cubicBezier(0.1, 0.0, 0.2, 1.0, t);
+}
+
+export function easeConnectedPan(t) {
+    return cubicBezier(0.1, 0.0, 0.2, 1.0, t);
+}
+
+/**
+ * Reactive Webcam Scaling (from OpenScreen / Recordly)
+ * Inversely scales the webcam PiP so deep zoom keeps the camera out of the way.
+ */
+export function reactiveWebcamScale(zoomScale) {
+    const safe = Number.isFinite(zoomScale) && zoomScale > 0 ? zoomScale : 1;
+    return Math.max(0.35, Math.min(1.0, 1.0 / safe));
+}
+
+/**
+ * 3D Isometric Perspective Tilt
+ * Tilts canvas during pans toward screen corners for commercial demo finish
+ */
+export function calculate3DTilt(cameraX, cameraY, scale, maxTiltDeg = 3.5) {
+    if (!scale || scale <= 1.05) return { rotateX: 0, rotateY: 0 };
+    const offsetX = (cameraX ?? 0.5) - 0.5;
+    const offsetY = (cameraY ?? 0.5) - 0.5;
+    const zoomStrength = Math.min(1.0, (scale - 1.0) / 1.2);
+    return {
+        rotateX: -offsetY * maxTiltDeg * zoomStrength,
+        rotateY: offsetX * maxTiltDeg * zoomStrength,
+    };
+}
+
+/**
  * Smooth Hermite / Quintic interpolation fallback
  */
 function smoothstep(edge0, edge1, x) {
@@ -59,21 +114,73 @@ function smoothstep(edge0, edge1, x) {
 
 /**
  * Evaluate camera target and zoom at precise timestamp
- * Implements Cap's calculate_zoom_and_center_for_cursor & safe viewport lock
+ * Implements OpenScreen's connected zoom pans, Cap's spring solver, & safe viewport lock
  */
 export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples = [], options = {}) {
     const zoomMultiplier = options.zoomMultiplier ?? 1.0;
     const transitionDuration = options.transitionDuration ?? 0.7; // seconds for smooth zoom ramp
+    const CHAINED_PAN_GAP_SEC = 1.5; // OpenScreen chained pan threshold
 
     if (!focusSegments || focusSegments.length === 0) {
-        return { x: 0.5, y: 0.5, scale: 1.0 };
+        return { x: 0.5, y: 0.5, scale: 1.0, rotateX: 0, rotateY: 0 };
     }
 
-    // Find if we are inside or near any focus segment
+    // Sort segments chronologically
+    const sorted = [...focusSegments].sort((a, b) => a.startTime - b.startTime);
+
+    // 1. Check if we are inside a connected gap between two consecutive zoom regions
+    for (let i = 0; i < sorted.length - 1; i++) {
+        const segA = sorted[i];
+        const segB = sorted[i + 1];
+        const gap = segB.startTime - segA.endTime;
+
+        if (gap >= 0 && gap <= CHAINED_PAN_GAP_SEC) {
+            if (timeSec >= segA.endTime && timeSec <= segB.startTime) {
+                // Inside connected pan gap! Stay zoomed in and glide between targets
+                const panProgress = gap <= 0.001 ? 1 : Math.max(0, Math.min(1, (timeSec - segA.endTime) / gap));
+                const easedPan = easeConnectedPan(panProgress);
+
+                const scaleA = (segA.zoomScale ?? 1.8) * zoomMultiplier;
+                const scaleB = (segB.zoomScale ?? 1.8) * zoomMultiplier;
+                const connectedScale = scaleA + (scaleB - scaleA) * easedPan;
+
+                const startX = segA.targetX ?? 0.5;
+                const endX = segB.targetX ?? 0.5;
+                const startY = segA.targetY ?? 0.5;
+                const endY = segB.targetY ?? 0.5;
+
+                const panX = startX + (endX - startX) * easedPan;
+                const panY = startY + (endY - startY) * easedPan;
+
+                const halfW = 0.5 / connectedScale;
+                const halfH = 0.5 / connectedScale;
+                const clampedX = Math.max(halfW, Math.min(1.0 - halfW, panX));
+                const clampedY = Math.max(halfH, Math.min(1.0 - halfH, panY));
+
+                const tilt = calculate3DTilt(clampedX, clampedY, connectedScale, options.tiltAngle ?? 3.5);
+
+                return {
+                    x: clampedX,
+                    y: clampedY,
+                    scale: connectedScale,
+                    rotateX: tilt.rotateX,
+                    rotateY: tilt.rotateY,
+                    activeSeg: segA,
+                    isConnectedPan: true,
+                };
+            }
+        }
+    }
+
+    // 2. Find active focus segment
     let activeSeg = null;
     let blendWeight = 0;
 
-    for (const seg of focusSegments) {
+    for (let i = 0; i < sorted.length; i++) {
+        const seg = sorted[i];
+        const nextSeg = sorted[i + 1];
+        const hasConnectedNext = nextSeg && (nextSeg.startTime - seg.endTime) <= CHAINED_PAN_GAP_SEC;
+
         const leadIn = seg.startTime;
         const rampUpEnd = seg.startTime + transitionDuration;
         const rampDownStart = Math.max(rampUpEnd, seg.endTime - transitionDuration);
@@ -82,15 +189,15 @@ export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples =
         if (timeSec >= leadIn && timeSec <= leadOut) {
             activeSeg = seg;
             if (timeSec < rampUpEnd) {
-                // Zooming in with physical spring easing
+                // Zooming in with Screen Studio cubic bezier easing
                 const progress = Math.max(0, Math.min(1, (timeSec - leadIn) / transitionDuration));
-                blendWeight = capSpringEase(progress);
-            } else if (timeSec > rampDownStart) {
-                // Zooming out with physical spring easing
+                blendWeight = easeOutScreenStudio(progress);
+            } else if (timeSec > rampDownStart && !hasConnectedNext) {
+                // Zooming out (only if not chained into next segment)
                 const progress = Math.max(0, Math.min(1, (leadOut - timeSec) / transitionDuration));
-                blendWeight = capSpringEase(progress);
+                blendWeight = easeOutScreenStudio(progress);
             } else {
-                // Fully zoomed in
+                // Fully zoomed in or chained
                 blendWeight = 1.0;
             }
             break;
@@ -98,15 +205,17 @@ export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples =
     }
 
     if (!activeSeg || blendWeight <= 0.001) {
-        return { x: 0.5, y: 0.5, scale: 1.0, activeSeg: null };
+        return { x: 0.5, y: 0.5, scale: 1.0, rotateX: 0, rotateY: 0, activeSeg: null };
     }
 
     // Scene Mode: Spotlight and Overview keep screen framing unzoomed
-    if (activeSeg.sceneMode === 'spotlight' || activeSeg.sceneMode === 'overview') {
+    if (activeSeg.sceneMode === 'spotlight' || activeSeg.sceneMode === 'overview' || activeSeg.sceneMode === 'full-camera') {
         return {
             x: 0.5,
             y: 0.5,
             scale: 1.0,
+            rotateX: 0,
+            rotateY: 0,
             activeSeg,
         };
     }
@@ -158,10 +267,14 @@ export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples =
     const clampedX = Math.max(halfW, Math.min(1.0 - halfW, curX));
     const clampedY = Math.max(halfH, Math.min(1.0 - halfH, curY));
 
+    const tilt = calculate3DTilt(clampedX, clampedY, targetScale, options.tiltAngle ?? 3.5);
+
     return {
         x: clampedX,
         y: clampedY,
         scale: targetScale,
+        rotateX: tilt.rotateX,
+        rotateY: tilt.rotateY,
         activeSeg,
     };
 }
@@ -357,6 +470,14 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
 
         // Translate origin to center of video area
         ctx.translate(padX + frameW * 0.5, padY + headerH + videoH * 0.5);
+
+        // OpenScreen 3D Perspective Tilt (Subtle skew/scale along camera movement)
+        if (camera.rotateX || camera.rotateY) {
+            const radX = (camera.rotateX * Math.PI) / 180;
+            const radY = (camera.rotateY * Math.PI) / 180;
+            ctx.transform(Math.cos(radY), Math.sin(radX) * 0.28, Math.sin(radY) * 0.28, Math.cos(radX), 0, 0);
+        }
+
         // Scale by camera zoom
         ctx.scale(camera.scale, camera.scale);
         // Translate by negative camera position relative to center
@@ -451,11 +572,23 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         }
     }
 
-    // 11. Draw Webcam Picture-in-Picture (Pinned to User Corner, Not Zoomed)
+    // 11. Draw Webcam Picture-in-Picture (Pinned to User Corner, with Reactive Scale & Full Camera mode)
     if (webcamSettings?.enabled && webcamSource) {
+        const isFullCamera = camera.activeSeg?.sceneMode === 'full-camera' || webcamSettings.fullCamera;
         const isSpotlight = camera.activeSeg?.sceneMode === 'spotlight' || webcamSettings.position === 'center' || webcamSettings.spotlight;
-        const effectiveWebcamSettings = isSpotlight ? { ...webcamSettings, spotlight: true } : webcamSettings;
-        _drawWebcamPiP(ctx, webcamSource, effectiveWebcamSettings, { padX, padY: padY + headerH, frameW, videoH });
+        const effectiveWebcamSettings = {
+            ...webcamSettings,
+            spotlight: isSpotlight,
+            fullCamera: isFullCamera,
+        };
+        _drawWebcamPiP(ctx, webcamSource, effectiveWebcamSettings, { 
+            padX, 
+            padY: padY + headerH, 
+            frameW, 
+            videoH,
+            cameraScale: camera.scale,
+            borderRadius
+        });
     }
 
     // 12. Speed Ramp Cinema Indicator (if active segment is in speed mode)
@@ -541,14 +674,27 @@ function _drawWebcamPiP(ctx, webcamSource, settings, bounds) {
 
     let borderWidth = defaultBorderWidth;
     let borderColor = defaultBorderColor;
-    let size = Math.round(bounds.frameW * sizeRatio);
+
+    // OpenScreen Reactive Webcam Scaling
+    const reactiveFactor = settings?.reactiveScale !== false && bounds.cameraScale ? reactiveWebcamScale(bounds.cameraScale) : 1.0;
+    let size = Math.round(bounds.frameW * sizeRatio * reactiveFactor);
     const margin = Math.round(bounds.frameW * 0.025);
 
+    const isFullCamera = settings?.fullCamera;
     const isSpotlight = position === 'center' || settings?.spotlight;
     let x = bounds.padX + bounds.frameW - size - margin;
     let y = bounds.padY + bounds.videoH - size - margin;
+    let renderW = size;
+    let renderH = size;
 
-    if (isSpotlight) {
+    if (isFullCamera) {
+        // OpenScreen Full Camera Mode: presenter takes entire screen for intro/outro
+        x = bounds.padX;
+        y = bounds.padY;
+        renderW = bounds.frameW;
+        renderH = bounds.videoH;
+        borderWidth = 0;
+    } else if (isSpotlight) {
         // Dim the background screen demo so presenter takes center stage
         ctx.save();
         ctx.fillStyle = 'rgba(0, 0, 0, 0.62)';
@@ -557,6 +703,8 @@ function _drawWebcamPiP(ctx, webcamSource, settings, bounds) {
 
         // Cinema Spotlight scale
         size = Math.min(bounds.frameW * 0.44, bounds.videoH * 0.74);
+        renderW = size;
+        renderH = size;
         x = bounds.padX + (bounds.frameW - size) / 2;
         y = bounds.padY + (bounds.videoH - size) / 2;
         borderWidth = 3.5;
@@ -576,7 +724,9 @@ function _drawWebcamPiP(ctx, webcamSource, settings, bounds) {
     }
 
     const drawShape = () => {
-        if (shape === 'circle') {
+        if (isFullCamera) {
+            _drawRoundedRectPath(ctx, x, y, renderW, renderH, bounds.borderRadius || 18);
+        } else if (shape === 'circle') {
             ctx.beginPath();
             ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
             ctx.closePath();
@@ -608,33 +758,37 @@ function _drawWebcamPiP(ctx, webcamSource, settings, bounds) {
     ctx.clip();
 
     if (mirrored) {
-        ctx.translate(x + size, y);
+        ctx.translate(x + renderW, y);
         ctx.scale(-1, 1);
         ctx.translate(-x, -y);
     }
 
-    const vw = webcamSource.videoWidth || webcamSource.naturalWidth || webcamSource.width || size;
-    const vh = webcamSource.videoHeight || webcamSource.naturalHeight || webcamSource.height || size;
-    const minDim = Math.min(vw, vh);
-    const sx = (vw - minDim) / 2;
-    const sy = (vh - minDim) / 2;
+    const vw = webcamSource.videoWidth || webcamSource.naturalWidth || webcamSource.width || renderW;
+    const vh = webcamSource.videoHeight || webcamSource.naturalHeight || webcamSource.height || renderH;
+    const scale = Math.max(renderW / vw, renderH / vh);
+    const sw = renderW / scale;
+    const sh = renderH / scale;
+    const sx = (vw - sw) / 2;
+    const sy = (vh - sh) / 2;
 
     try {
-        ctx.drawImage(webcamSource, sx, sy, minDim, minDim, x, y, size, size);
+        ctx.drawImage(webcamSource, sx, sy, sw, sh, x, y, renderW, renderH);
     } catch (e) {
         // Fallback placeholder if webcam not yet providing frames
         ctx.fillStyle = '#1e1e24';
-        ctx.fillRect(x, y, size, size);
+        ctx.fillRect(x, y, renderW, renderH);
     }
     ctx.restore();
 
     // Outline border
-    ctx.save();
-    drawShape();
-    ctx.lineWidth = borderWidth;
-    ctx.strokeStyle = borderColor;
-    ctx.stroke();
-    ctx.restore();
+    if (borderWidth > 0) {
+        ctx.save();
+        drawShape();
+        ctx.lineWidth = borderWidth;
+        ctx.strokeStyle = borderColor;
+        ctx.stroke();
+        ctx.restore();
+    }
 }
 
 /**

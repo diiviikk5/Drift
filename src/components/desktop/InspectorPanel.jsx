@@ -51,7 +51,13 @@ export default function InspectorPanel({
     onTriggerExport,
     isExporting = false,
     aspectRatio = '16:9',
-    onChangeAspectRatio
+    onChangeAspectRatio,
+    tiltAngle = 3.5,
+    onChangeTiltAngle,
+    connectedZooms = true,
+    onToggleConnectedZooms,
+    reactiveWebcam = true,
+    onToggleReactiveWebcam
 }) {
     const [activeTab, setActiveTab] = useState('style');
     const fileInputRef = useRef(null);
@@ -258,6 +264,52 @@ export default function InspectorPanel({
                                 ))}
                             </div>
                         </div>
+
+                        {/* OpenScreen Connected Zooms */}
+                        <div className="pt-2 border-t border-[var(--border-app)] space-y-2">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <div className="text-xs font-semibold text-[var(--text-app)]">Connected Zooms</div>
+                                    <div className="text-[10px] text-[var(--text-app-muted)]">Glide camera between consecutive clicks without zooming out</div>
+                                </div>
+                                <button
+                                    onClick={() => onToggleConnectedZooms && onToggleConnectedZooms(!connectedZooms)}
+                                    className={`w-9 h-5 rounded-full transition-all relative ${
+                                        connectedZooms ? 'bg-[var(--accent-app)]' : 'bg-gray-600'
+                                    }`}
+                                >
+                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                                        connectedZooms ? 'left-[18px]' : 'left-0.5'
+                                    }`} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* 3D Isometric Perspective Tilt */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
+                                    3D Perspective Tilt
+                                </label>
+                                <span className="text-xs font-mono font-bold text-[var(--accent-app)]">
+                                    {tiltAngle}°
+                                </span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="8"
+                                step="0.5"
+                                value={tiltAngle}
+                                onChange={(e) => onChangeTiltAngle && onChangeTiltAngle(parseFloat(e.target.value))}
+                                className="w-full accent-[var(--accent-app)] cursor-pointer"
+                            />
+                            <div className="flex justify-between text-[10px] text-[var(--text-app-muted)] font-mono">
+                                <span>0° (Flat)</span>
+                                <span>3.5° (Cinema)</span>
+                                <span>8° (High Tilt)</span>
+                            </div>
+                        </div>
                     </>
                 )}
 
@@ -432,6 +484,42 @@ export default function InspectorPanel({
                             >
                                 <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
                                     webcamSettings?.mirrored ? 'left-[18px]' : 'left-0.5'
+                                }`} />
+                            </button>
+                        </div>
+
+                        {/* OpenScreen Reactive Webcam Scaling */}
+                        <div className="pt-2 border-t border-[var(--border-app)] flex items-center justify-between">
+                            <div>
+                                <div className="text-xs font-semibold text-[var(--text-app)]">Reactive Zoom Scaling</div>
+                                <div className="text-[10px] text-[var(--text-app-muted)]">Auto-shrink facecam during deep zooms so UI is visible</div>
+                            </div>
+                            <button
+                                onClick={() => onToggleReactiveWebcam && onToggleReactiveWebcam(!reactiveWebcam)}
+                                className={`w-9 h-5 rounded-full transition-all relative ${
+                                    reactiveWebcam ? 'bg-[var(--accent-app)]' : 'bg-gray-600'
+                                }`}
+                            >
+                                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                                    reactiveWebcam ? 'left-[18px]' : 'left-0.5'
+                                }`} />
+                            </button>
+                        </div>
+
+                        {/* OpenScreen Full Camera Mode Toggle */}
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <div className="text-xs font-semibold text-[var(--text-app)]">Full Camera Mode</div>
+                                <div className="text-[10px] text-[var(--text-app-muted)]">Presenter fills entire viewport (intro / outro speech)</div>
+                            </div>
+                            <button
+                                onClick={() => onChangeWebcamSettings && onChangeWebcamSettings({ fullCamera: !webcamSettings?.fullCamera })}
+                                className={`w-9 h-5 rounded-full transition-all relative ${
+                                    webcamSettings?.fullCamera ? 'bg-[var(--accent-app)]' : 'bg-gray-600'
+                                }`}
+                            >
+                                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                                    webcamSettings?.fullCamera ? 'left-[18px]' : 'left-0.5'
                                 }`} />
                             </button>
                         </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Monitor, Film, Keyboard, Sun, Moon, Sparkles, Palette, Check, Laptop } from 'lucide-react';
+import { Monitor, Film, Keyboard, Sun, Moon, Sparkles, Palette, Check, Laptop, FileText } from 'lucide-react';
 
 export default function DesktopHeader({
     viewMode,
@@ -15,7 +15,9 @@ export default function DesktopHeader({
     isRecording,
     clickCount,
     theme = 'dark',
-    onSelectTheme
+    onSelectTheme,
+    isTeleprompterOpen = false,
+    onToggleTeleprompter
 }) {
     const [showThemeMenu, setShowThemeMenu] = useState(false);
 
@@ -137,6 +139,20 @@ export default function DesktopHeader({
                         </>
                     )}
                 </div>
+
+                {/* Presenter Teleprompter Button */}
+                <button
+                    onClick={onToggleTeleprompter}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                        isTeleprompterOpen
+                            ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold shadow-xs'
+                            : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)] bg-[var(--bg-card)] border border-[var(--border-app)] hover:border-[var(--border-app-hover)]'
+                    }`}
+                    title="Toggle Presenter Script Teleprompter"
+                >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Script</span>
+                </button>
 
                 {/* Hotkeys Button */}
                 <button
