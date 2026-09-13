@@ -203,6 +203,7 @@ export class InteractionAnalyzer {
             targetY,
             zoomScale: scale,
             reason: seg.reason,
+            sceneMode: 'zoom',
             deadzoneRadius: this.options.deadzoneRadius,
         };
     }

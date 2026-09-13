@@ -28,6 +28,7 @@ export class StudioEngine {
 
         // Webcam PiP Video & Settings
         this.webcamBlob = options.webcamBlob || null;
+        this.webcamOffset = options.webcamOffset || 0;
         this.webcamVideo = null;
         this.webcamSettings = options.webcamSettings || {
             enabled: Boolean(options.webcamBlob),
@@ -57,7 +58,7 @@ export class StudioEngine {
 
         // Semantic Interaction Analyzer & Focus Track
         this.interactionAnalyzer = new InteractionAnalyzer();
-        this.focusSegments = this.interactionAnalyzer.analyze(
+        this.focusSegments = options.focusSegments ?? this.interactionAnalyzer.analyze(
             this.clicks,
             this.mouseMoves,
             this.explicitDuration || 10
@@ -152,8 +153,7 @@ export class StudioEngine {
 
         this.video.onloadedmetadata = () => {
             console.log('[Studio] Video metadata loaded, duration:', this.video.duration);
-            this.canvas.width = this.video.videoWidth || 1920;
-            this.canvas.height = this.video.videoHeight || 1080;
+            this.setAspectRatio(this.aspectRatio || '16:9');
 
             if (this.explicitDuration) {
                 this.videoDuration = this.explicitDuration;
@@ -178,12 +178,23 @@ export class StudioEngine {
         this.video.onended = () => {
             this.isPlaying = false;
         };
+        this.video.onseeked = () => {
+            if (this.webcamVideo) {
+                this.webcamVideo.currentTime = Math.max(0, this.video.currentTime + (this.webcamOffset || 0));
+            }
+            this.drawFrame();
+        };
+        this.video.ontimeupdate = () => {
+            if (this.webcamVideo && Math.abs(this.webcamVideo.currentTime - (this.video.currentTime + (this.webcamOffset || 0))) > 0.25) {
+                this.webcamVideo.currentTime = Math.max(0, this.video.currentTime + (this.webcamOffset || 0));
+            }
+        };
     }
 
     play() {
         this.video.play().catch(e => console.error('[Studio] Play failed:', e));
         if (this.webcamVideo) {
-            this.webcamVideo.currentTime = this.video.currentTime;
+            this.webcamVideo.currentTime = Math.max(0, this.video.currentTime + (this.webcamOffset || 0));
             this.webcamVideo.play().catch(() => {});
         }
     }
@@ -193,6 +204,36 @@ export class StudioEngine {
         if (this.webcamVideo) {
             this.webcamVideo.pause();
         }
+    }
+
+    seek(targetTime) {
+        if (this.video) {
+            this.video.currentTime = targetTime;
+        }
+        if (this.webcamVideo) {
+            this.webcamVideo.currentTime = Math.max(0, targetTime + (this.webcamOffset || 0));
+        }
+        this.resetCamera();
+        this.drawFrame();
+    }
+
+    setWebcamBlob(blob, offset = 0) {
+        if (this.webcamVideo) {
+            URL.revokeObjectURL(this.webcamVideo.src);
+            this.webcamVideo.removeAttribute('src');
+            this.webcamVideo.load();
+            this.webcamVideo = null;
+        }
+        this.webcamBlob = blob;
+        this.webcamOffset = offset;
+        if (this.webcamBlob) {
+            this.webcamVideo = document.createElement('video');
+            this.webcamVideo.src = URL.createObjectURL(this.webcamBlob);
+            this.webcamVideo.muted = true;
+            this.webcamVideo.playsInline = true;
+            this.webcamVideo.load();
+        }
+        this.drawFrame();
     }
 
     resetCamera() {
@@ -230,19 +271,18 @@ export class StudioEngine {
     }
 
     async addZoom(timeSec, x = 0.5, y = 0.5, scale = 1.8) {
-        this.clicks.push({ time: timeSec * 1000, x, y, scale });
-        this.clicks.sort((a, b) => a.time - b.time);
-
-        // Regenerate focus segments
-        this.focusSegments = this.interactionAnalyzer.analyze(
-            this.clicks,
-            this.mouseMoves,
-            this.videoDuration || 10
-        );
-
-        if (!this.isPlaying) {
-            this.drawFrame();
-        }
+        const duration = this.videoDuration || this.explicitDuration || 10;
+        const startTime = Math.max(0, Math.min(timeSec, duration - 0.1));
+        this.addFocusSegment({
+            id: crypto.randomUUID(),
+            startTime,
+            endTime: Math.min(duration, startTime + 2.5),
+            targetX: Math.max(0, Math.min(1, x)),
+            targetY: Math.max(0, Math.min(1, y)),
+            zoomScale: scale,
+            reason: 'manual',
+            sceneMode: 'zoom',
+        });
     }
 
     updateClick(index, updates) {
@@ -468,6 +508,7 @@ export class StudioEngine {
                 windowChrome: true,
                 showCursor: this.showCursor,
                 cursorTheme: this.cursorTheme || 'macos',
+                cursorScale: this.cursorScale ?? 1,
                 zoomMagnification: (this.zoomLevel || 2.0) / 2.0,
                 clickRipples: true,
                 tiltAngle: this.tiltAngle ?? 3.5,
@@ -482,6 +523,24 @@ export class StudioEngine {
                 annotations: this.annotations || [],
             }
         );
+    }
+
+    dispose() {
+        this.pause();
+        cancelAnimationFrame(this.animationFrame);
+        if (this.video?.src) URL.revokeObjectURL(this.video.src);
+        this.video.onloadedmetadata = null;
+        this.video.onplay = null;
+        this.video.onpause = null;
+        this.video.onended = null;
+        this.video.onseeked = null;
+        this.video.ontimeupdate = null;
+        if (this.webcamVideo) {
+            if (this.webcamVideo.src) URL.revokeObjectURL(this.webcamVideo.src);
+            this.webcamVideo.removeAttribute('src');
+            this.webcamVideo.load();
+            this.webcamVideo = null;
+        }
     }
 
     setTiltAngle(angle) {
@@ -699,12 +758,56 @@ export class StudioEngine {
 
         console.log('[Studio] Exporting MP4 via WebCodecs:', width, 'x', height, '@', fps, 'fps,', (targetBitrate / 1_000_000) + 'Mbps');
 
+        // Extract & decode audio track from recorded blob for MP4 audio muxing
+        let audioBuffer = null;
+        let audioEncoder = null;
+        let hasAacAudio = false;
+
+        if (typeof AudioEncoder !== 'undefined' && this.blob) {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) {
+                    const tempCtx = new AudioCtx();
+                    try {
+                        const arrayBuf = await this.blob.arrayBuffer();
+                        audioBuffer = await tempCtx.decodeAudioData(arrayBuf);
+                        if (audioBuffer && audioBuffer.length > 0) {
+                            const aacCheck = await AudioEncoder.isConfigSupported({
+                                codec: 'mp4a.40.2',
+                                sampleRate: audioBuffer.sampleRate,
+                                numberOfChannels: Math.min(2, audioBuffer.numberOfChannels),
+                                bitrate: 192_000,
+                            });
+                            hasAacAudio = Boolean(aacCheck && aacCheck.supported);
+                            console.log('[Studio] Decoded audio for export:', audioBuffer.duration.toFixed(2), 's, AAC supported:', hasAacAudio);
+                        }
+                    } catch (decodeErr) {
+                        console.log('[Studio] No decodable audio track in source media:', decodeErr.message);
+                    } finally {
+                        try { await tempCtx.close(); } catch (e) {}
+                    }
+                }
+            } catch (audioErr) {
+                console.warn('[Studio] Audio extraction notice:', audioErr);
+            }
+        }
+
         const target = new ArrayBufferTarget();
-        const muxer = new Muxer({
+        const muxerOptions = {
             target,
             video: { codec: 'avc', width, height },
             fastStart: 'in-memory',
-        });
+        };
+
+        if (hasAacAudio && audioBuffer) {
+            muxerOptions.audio = {
+                codec: 'aac',
+                numberOfChannels: Math.min(2, audioBuffer.numberOfChannels),
+                sampleRate: audioBuffer.sampleRate,
+            };
+        }
+
+        const muxer = new Muxer(muxerOptions);
 
         return new Promise((resolve, reject) => {
             const encoder = new VideoEncoder({
@@ -718,6 +821,62 @@ export class StudioEngine {
                 bitrateMode: 'constant',
                 bitrate: targetBitrate,
             });
+
+            // If AAC audio is available, initialize AudioEncoder and encode all audio packets
+            if (hasAacAudio && audioBuffer) {
+                try {
+                    const numChannels = Math.min(2, audioBuffer.numberOfChannels);
+                    const sampleRate = audioBuffer.sampleRate;
+
+                    audioEncoder = new AudioEncoder({
+                        output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+                        error: (e) => console.error('[Studio] Audio encoder error:', e),
+                    });
+                    audioEncoder.configure({
+                        codec: 'mp4a.40.2',
+                        sampleRate,
+                        numberOfChannels: numChannels,
+                        bitrate: 192_000,
+                    });
+
+                    // Sliced trimmed audio
+                    const startSample = Math.max(0, Math.floor((this.trimStart || 0) * sampleRate));
+                    const endSample = Math.min(audioBuffer.length, Math.ceil((this.trimEnd || this.videoDuration) * sampleRate));
+
+                    if (endSample > startSample) {
+                        const ch0 = audioBuffer.getChannelData(0);
+                        const ch1 = numChannels > 1 ? audioBuffer.getChannelData(1) : ch0;
+                        const CHUNK_SIZE = 1024;
+                        let offset = startSample;
+
+                        while (offset < endSample) {
+                            const frames = Math.min(CHUNK_SIZE, endSample - offset);
+                            const planar = new Float32Array(frames * numChannels);
+                            planar.set(ch0.subarray(offset, offset + frames), 0);
+                            if (numChannels > 1) {
+                                planar.set(ch1.subarray(offset, offset + frames), frames);
+                            }
+
+                            const timestampUs = Math.round(((offset - startSample) / sampleRate) * 1_000_000);
+                            const audioData = new AudioData({
+                                format: 'f32-planar',
+                                sampleRate,
+                                numberOfFrames: frames,
+                                numberOfChannels: numChannels,
+                                timestamp: timestampUs,
+                                data: planar,
+                            });
+                            audioEncoder.encode(audioData);
+                            audioData.close();
+
+                            offset += frames;
+                        }
+                    }
+                } catch (audioEncErr) {
+                    console.warn('[Studio] Audio encoding failed, exporting video-only:', audioEncErr);
+                    audioEncoder = null;
+                }
+            }
 
             let frameIndex = 0;
             this.video.currentTime = this.trimStart || 0;
@@ -777,6 +936,16 @@ export class StudioEngine {
 
                     await encoder.flush();
                     encoder.close();
+
+                    if (audioEncoder) {
+                        try {
+                            await audioEncoder.flush();
+                            audioEncoder.close();
+                        } catch (aeFlushErr) {
+                            console.warn('[Studio] AudioEncoder flush notice:', aeFlushErr);
+                        }
+                    }
+
                     muxer.finalize();
 
                     this.precomputedFrames = null;
@@ -858,8 +1027,15 @@ export class StudioEngine {
         rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
 
         return new Promise(async (resolve) => {
-            rec.onstop = () => {
-                const blob = new Blob(chunks, { type: 'video/webm' });
+            rec.onstop = async () => {
+                let blob = new Blob(chunks, { type: 'video/webm' });
+                try {
+                    const { fixWebmDuration } = await import('@fix-webm-duration/fix');
+                    const fixed = await fixWebmDuration(blob, exportDuration * 1000);
+                    if (fixed && fixed.size > 0) blob = fixed;
+                } catch (e) {
+                    console.warn('[Studio] WebM export duration fix notice:', e);
+                }
                 this.precomputedFrames = null;
                 this.canvas.width = origW;
                 this.canvas.height = origH;

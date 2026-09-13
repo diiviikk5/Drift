@@ -69,6 +69,7 @@
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
+    "@fix-webm-duration/fix": "^1.0.1",
     "@radix-ui/react-slot": "^1.2.4",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2.6.0",

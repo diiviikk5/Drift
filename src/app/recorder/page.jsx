@@ -5,6 +5,7 @@ import { DriftEngine } from '@/lib/DriftEngine';
 import { StudioEngine } from '@/lib/StudioEngine';
 import drift from '@/lib/tauri-bridge';
 import { transcribeWithSpeechAPI } from '@/lib/ai/captions';
+import { encodeProject, decodeProject } from '@/lib/project-file';
 
 // Modular Shadcn Desktop Components
 import DesktopHeader from '@/components/desktop/DesktopHeader';
@@ -50,6 +51,10 @@ export default function RecorderPage() {
     const studioRef = useRef(null);
     const toggleRecordRef = useRef(null);
     const countdownTimerRef = useRef(null);
+    const savedSegmentsRef = useRef(null);
+    const projectInputRef = useRef(null);
+    const [projectRevision, setProjectRevision] = useState(0);
+    const [notice, setNotice] = useState('');
 
     // --- State ---
     const [viewMode, setViewMode] = useState('recorder'); // 'recorder' | 'studio'
@@ -67,6 +72,7 @@ export default function RecorderPage() {
     const [clickCount, setClickCount] = useState(0);
     const [loadingSources, setLoadingSources] = useState(true);
     const [micEnabled, setMicEnabled] = useState(false);
+    const [micStream, setMicStream] = useState(null);
     const [webcamEnabled, setWebcamEnabled] = useState(false);
     const [webcamSettings, setWebcamSettings] = useState({
         enabled: false,
@@ -195,6 +201,11 @@ export default function RecorderPage() {
     // Init Engines
     useEffect(() => {
         if (viewMode === 'recorder') {
+            if (studioRef.current) {
+                savedSegmentsRef.current = studioRef.current.getFocusSegments();
+                studioRef.current.dispose();
+                studioRef.current = null;
+            }
             engineRef.current = new DriftEngine(canvasRef.current, videoRef.current);
             engineRef.current.onclickCallback = (c) => setClickCount(c);
             engineRef.current.micEnabled = micEnabled;
@@ -203,6 +214,8 @@ export default function RecorderPage() {
             };
 
             engineRef.current.onStopCallback = (blob, clicks, dur, meta = {}) => {
+                savedSegmentsRef.current = null;
+                setIsRecording(false);
                 if (engineRef.current?.screenStream) {
                     engineRef.current.screenStream.getTracks().forEach(t => t.stop());
                 }
@@ -261,9 +274,11 @@ export default function RecorderPage() {
                             webcamBlob: recordedWebcamBlob,
                             webcamSettings,
                             captions,
+                            annotations,
                             captionsEnabled,
                             customBackgroundImage: customImage,
                             cursorTheme,
+                            focusSegments: savedSegmentsRef.current,
                         }
                     );
                     studioRef.current.background = background;
@@ -271,6 +286,8 @@ export default function RecorderPage() {
                     // showCursor defaults to FALSE to prevent double cursor
                     studioRef.current.showCursor = showCursor;
                     studioRef.current.cursorTheme = cursorTheme;
+                    Object.assign(studioRef.current, { cursorScale, tiltAngle, connectedZooms, reactiveWebcam, captionsEnabled });
+                    studioRef.current.setAspectRatio(aspectRatio);
 
                     if (videoRef.current) {
                         videoRef.current.ontimeupdate = () => {
@@ -291,19 +308,25 @@ export default function RecorderPage() {
                 }, 100);
             }
         }
-    }, [viewMode, platform]);
+    }, [viewMode, platform, projectRevision]);
 
     useEffect(() => {
-        if (studioRef.current) studioRef.current.background = background;
+        if (studioRef.current) studioRef.current.setBackground(background);
     }, [background]);
 
     useEffect(() => {
-        if (studioRef.current) studioRef.current.zoomLevel = zoomLevel;
+        if (studioRef.current) {
+            studioRef.current.zoomLevel = zoomLevel;
+            studioRef.current.drawFrame();
+        }
     }, [zoomLevel]);
 
     useEffect(() => {
-        if (studioRef.current) studioRef.current.showCursor = showCursor;
-    }, [showCursor]);
+        if (studioRef.current) {
+            Object.assign(studioRef.current, { showCursor, cursorScale, cursorTheme, captionsEnabled });
+            studioRef.current.drawFrame();
+        }
+    }, [showCursor, cursorScale, cursorTheme, captionsEnabled]);
 
     useEffect(() => {
         if (studioRef.current && studioRef.current.setAspectRatio) {
@@ -326,10 +349,21 @@ export default function RecorderPage() {
         if (ok) setSelectedSource('browser-source');
     };
 
-    const toggleMic = () => {
+    const toggleMic = async () => {
         const next = !micEnabled;
         setMicEnabled(next);
-        if (engineRef.current) engineRef.current.micEnabled = next;
+        if (engineRef.current) {
+            engineRef.current.micEnabled = next;
+            if (next) {
+                const ok = await engineRef.current.enableMic();
+                if (ok && engineRef.current.micStream) {
+                    setMicStream(engineRef.current.micStream);
+                }
+            } else {
+                engineRef.current.disableMic();
+                setMicStream(null);
+            }
+        }
     };
 
     const toggleWebcam = async () => {
@@ -411,12 +445,7 @@ export default function RecorderPage() {
             }
         } catch (err) {
             console.warn('[Captions] Speech recognition notice:', err);
-            const fallbackCaptions = [
-                { start: 500, end: 3500, text: "Cinema-grade screen recording with Drift" },
-                { start: 3600, end: 7200, text: "Auto-zoom intelligently tracks your clicks and dwell" },
-            ];
-            setCaptions(fallbackCaptions);
-            if (studioRef.current) studioRef.current.setCaptions(fallbackCaptions);
+            setNotice(`Captions could not be generated: ${err.message}`);
         } finally {
             setIsTranscribing(false);
         }
@@ -590,10 +619,9 @@ export default function RecorderPage() {
     };
 
     const handleSeek = (targetTime) => {
-        if (!studioRef.current || !videoRef.current) return;
-        videoRef.current.currentTime = targetTime;
+        if (!studioRef.current) return;
+        studioRef.current.seek(targetTime);
         setCurrentTime(targetTime);
-        studioRef.current.resetCamera();
     };
 
     const addManualZoom = () => {
@@ -772,6 +800,88 @@ export default function RecorderPage() {
         setViewMode('recorder');
     };
 
+    const saveProject = async () => {
+        try {
+            const project = await encodeProject({
+                recording: recordedBlob, webcam: recordedWebcamBlob, duration,
+                clicks: recordedClicks, moves: recordedMoves,
+                focusSegments: studioRef.current?.getFocusSegments() ?? focusSegments,
+                annotations, captions, captionsEnabled, background,
+                customBackground: customImage?.src ?? null,
+                zoomLevel, showCursor, cursorTheme, cursorScale, aspectRatio,
+                tiltAngle, connectedZooms, reactiveWebcam, webcamSettings, trimStart, trimEnd,
+            });
+            triggerBlobDownload(project, 'drift');
+            setNotice('Project saved.');
+        } catch (error) { setNotice(error.message); }
+    };
+
+    const openProject = async (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+        try {
+            let project;
+            if (file.name.toLowerCase().endsWith('.drift')) {
+                project = await decodeProject(file);
+            } else {
+                const media = document.createElement('video');
+                const url = URL.createObjectURL(file);
+                try {
+                    const mediaDuration = await new Promise((resolve, reject) => {
+                        const timer = setTimeout(() => reject(new Error('Video metadata timed out.')), 15000);
+                        media.onloadedmetadata = () => {
+                            clearTimeout(timer);
+                            Number.isFinite(media.duration) && media.duration > 0
+                                ? resolve(media.duration) : reject(new Error('This video has no readable duration.'));
+                        };
+                        media.onerror = () => { clearTimeout(timer); reject(new Error('This video format cannot be opened.')); };
+                        media.src = url;
+                    });
+                    project = { recording: file, duration: mediaDuration };
+                } finally { media.removeAttribute('src'); media.load(); URL.revokeObjectURL(url); }
+            }
+            let image = null;
+            if (project.customBackground) {
+                image = new Image();
+                image.src = project.customBackground;
+                await image.decode();
+            }
+            studioRef.current?.dispose();
+            studioRef.current = null;
+            engineRef.current?.stop();
+            setRecordedBlob(project.recording);
+            setRecordedWebcamBlob(project.webcam ?? null);
+            setRecordedClicks(project.clicks ?? []);
+            setRecordedMoves(project.moves ?? []);
+            savedSegmentsRef.current = project.focusSegments ?? [];
+            setFocusSegments(savedSegmentsRef.current);
+            recDurationRef.current = project.duration;
+            setDuration(project.duration);
+            setCurrentTime(0);
+            setIsPlaying(false);
+            setAnnotations(project.annotations ?? []);
+            setCaptions(project.captions ?? []);
+            setCaptionsEnabled(project.captionsEnabled ?? true);
+            setBackground(project.background ?? 'midnight');
+            setCustomImage(image);
+            setZoomLevel(project.zoomLevel ?? 1.8);
+            setShowCursor(project.showCursor ?? false);
+            setCursorTheme(project.cursorTheme ?? 'macos');
+            setCursorScale(project.cursorScale ?? 1);
+            setAspectRatio(project.aspectRatio ?? '16:9');
+            setTiltAngle(project.tiltAngle ?? 0);
+            setConnectedZooms(project.connectedZooms ?? true);
+            setReactiveWebcam(project.reactiveWebcam ?? true);
+            setWebcamSettings(project.webcamSettings ?? { enabled: false, size: 0.22, shape: 'circle', position: 'bottom-right' });
+            setTrimStart(project.trimStart ?? 0);
+            setTrimEnd(project.trimEnd ?? project.duration);
+            setViewMode('studio');
+            setProjectRevision(revision => revision + 1);
+            setNotice(`Opened ${file.name}`);
+        } catch (error) { setNotice(error.message); }
+    };
+
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (viewMode === 'studio' && e.code === 'Space' && !e.target.matches('input, textarea, button')) {
@@ -801,6 +911,8 @@ export default function RecorderPage() {
                 hookStatus={hookStatus}
                 onOpenHotkeys={() => setShowHotkeySettings(true)}
                 onNewRecording={handleNewRecording}
+                onOpenProject={() => projectInputRef.current?.click()}
+                onSaveProject={saveProject}
                 hasRecording={Boolean(recordedBlob)}
                 recordingTime={timer}
                 isRecording={isRecording}
@@ -811,6 +923,10 @@ export default function RecorderPage() {
                 onToggleTeleprompter={() => setIsTeleprompterOpen(prev => !prev)}
             />
 
+            <input ref={projectInputRef} type="file" accept=".drift,video/*" onChange={openProject} className="hidden" />
+            {notice && <div role="status" className="flex items-center justify-between px-5 py-2 text-sm border-b border-[var(--border-app)]">
+                <span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss notification">Dismiss</button>
+            </div>}
             {/* Main Stage */}
             <div className="flex-1 min-h-0 flex flex-col relative overflow-hidden">
                 {viewMode === 'recorder' ? (
@@ -830,6 +946,7 @@ export default function RecorderPage() {
                             onToggleRecord={toggleRecord}
                             timer={timer}
                             micEnabled={micEnabled}
+                            micStream={micStream}
                             onToggleMic={toggleMic}
                             webcamEnabled={webcamEnabled}
                             onToggleWebcam={toggleWebcam}
@@ -845,7 +962,8 @@ export default function RecorderPage() {
                         <main className="flex-1 flex flex-col min-w-0 bg-black/10 relative">
                             <div className="flex-1 flex items-center justify-center p-6 relative overflow-hidden">
                                 <div
-                                    className="relative w-full max-w-5xl aspect-video rounded-2xl overflow-hidden border border-[var(--border-app)] shadow-2xl cursor-crosshair group bg-black"
+                                    className="relative max-w-full max-h-full overflow-hidden cursor-crosshair group bg-black"
+                                    style={{ aspectRatio: aspectRatio.replace(':', '/'), height: '100%', width: 'auto' }}
                                     onClick={handleCanvasClick}
                                     title="Click anywhere to add an auto-zoom point"
                                 >

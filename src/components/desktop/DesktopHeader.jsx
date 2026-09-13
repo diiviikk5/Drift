@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Monitor, Film, Keyboard, Sun, Moon, Sparkles, Palette, Check, Laptop, FileText } from 'lucide-react';
+import { Monitor, Film, Keyboard, Sun, Moon, Sparkles, Palette, Check, Laptop, FileText, FolderOpen, Save } from 'lucide-react';
 
 export default function DesktopHeader({
     viewMode,
@@ -10,6 +10,8 @@ export default function DesktopHeader({
     hookStatus,
     onOpenHotkeys,
     onNewRecording,
+    onOpenProject,
+    onSaveProject,
     hasRecording,
     recordingTime,
     isRecording,
@@ -67,7 +69,7 @@ export default function DesktopHeader({
                         onClick={() => {
                             if (hasRecording) setViewMode('studio');
                         }}
-                        disabled={!hasRecording}
+                        disabled={!hasRecording || isRecording}
                         className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all ${
                             viewMode === 'studio'
                                 ? 'bg-[var(--pill-active-bg)] text-[var(--pill-active-fg)] shadow-xs font-semibold'
@@ -93,6 +95,12 @@ export default function DesktopHeader({
 
             {/* Right: Theme Picker & Hotkeys */}
             <div className="flex items-center gap-2">
+                <button onClick={onOpenProject} disabled={isRecording} title="Open recording or Drift project" aria-label="Open recording or Drift project" className="p-2 disabled:opacity-40">
+                    <FolderOpen className="w-4 h-4" />
+                </button>
+                <button onClick={onSaveProject} disabled={!hasRecording || isRecording} title="Save Drift project" aria-label="Save Drift project" className="p-2 disabled:opacity-40">
+                    <Save className="w-4 h-4" />
+                </button>
                 {/* Theme Switcher Dropdown */}
                 <div className="relative">
                     <button

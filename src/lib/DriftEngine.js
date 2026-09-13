@@ -6,6 +6,8 @@
 import drift from './tauri-bridge';
 import { CinemaZoomEngine } from './zoom/CinemaZoomEngine.js';
 import { CinemaCursorEngine } from './zoom/CinemaCursorEngine.js';
+import { mixAudioTracks } from './audio/audioMix.js';
+import { fixWebmDuration } from '@fix-webm-duration/fix';
 
 export class DriftEngine {
     constructor(canvas, videoElement) {
@@ -31,6 +33,8 @@ export class DriftEngine {
         this.recordedChunks = [];
         this.clicks = [];
         this.mouseMoves = [];
+        this.mixingContext = null;
+        this.webcamOffsetMs = 0;
 
         this.startTime = null;
         this.isRecording = false;
@@ -297,11 +301,42 @@ export class DriftEngine {
         }
     }
 
-    async enableMic() {
+    async enableMic(deviceId = null) {
         try {
-            this.micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            if (this.micStream) {
+                this.micStream.getTracks().forEach(t => t.stop());
+            }
+            const constraints = {
+                audio: deviceId
+                    ? {
+                        deviceId: { exact: deviceId },
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                    }
+                    : {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                    },
+                video: false,
+            };
+            this.micStream = await navigator.mediaDevices.getUserMedia(constraints);
+            this.micEnabled = true;
             return true;
-        } catch (e) { return false; }
+        } catch (e) {
+            console.warn('[Drift] Enable mic failed:', e);
+            this.micEnabled = false;
+            return false;
+        }
+    }
+
+    disableMic() {
+        if (this.micStream) {
+            this.micStream.getTracks().forEach(t => t.stop());
+            this.micStream = null;
+        }
+        this.micEnabled = false;
     }
 
     async enableWebcam(deviceId = null) {
@@ -353,87 +388,58 @@ export class DriftEngine {
     async startRecording(onTimer) {
         if (!this.screenStream) throw new Error("No screen selected");
 
+        // Acquire mic before recording start timestamp to eliminate audio-vs-video desync
+        if (this.micEnabled && !this.micStream) {
+            try {
+                await this.enableMic();
+            } catch (e) {
+                console.warn('[Drift] Mic acquisition before start failed:', e);
+            }
+        } else if (!this.micEnabled && this.micStream) {
+            this.disableMic();
+        }
+
         this.timerCallback = onTimer;
         this.clicks = [];
         this.mouseMoves = [];
         this.recordedChunks = [];
-        this.startTime = Date.now();
-        this.isRecording = true;
+        this.webcamChunks = [];
 
-        // Ensure Mic is active if enabled
-        if (this.micEnabled && !this.micStream) {
-            try {
-                // Request mic with better constraints for headphone mics
-                this.micStream = await navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true,
-                        // Don't specify deviceId to use default mic (usually headphone mic)
-                    }
-                });
-                console.log('[Drift] Mic stream acquired:', this.micStream.getAudioTracks()[0]?.label);
-            } catch (e) {
-                console.error("Failed to get mic stream:", e);
-            }
-        } else if (!this.micEnabled && this.micStream) {
-            // Cleanup if disabled
-            this.micStream.getTracks().forEach(t => t.stop());
-            this.micStream = null;
-        }
+        // Mix System Audio and Microphone with anti-pop gain ramp & 1.4x voice boost
+        const systemAudioTrack = this.screenStream.getAudioTracks()[0] || null;
+        const micAudioTrack = (this.micEnabled && this.micStream) ? (this.micStream.getAudioTracks()[0] || null) : null;
 
-        // Audio Mixing (System + Mic)
-        const ctx = new AudioContext();
-        const dest = ctx.createMediaStreamDestination();
+        const { context: mixingCtx, track: mixedAudioTrack } = mixAudioTracks({
+            systemAudioTrack,
+            micAudioTrack,
+        });
+        this.mixingContext = mixingCtx;
 
-        let hasAudio = false;
-
-        // 1. System Audio
-        const sysTracks = this.screenStream.getAudioTracks();
-        if (sysTracks.length > 0) {
-            const src = ctx.createMediaStreamSource(new MediaStream([sysTracks[0]]));
-            // Add slight gain?
-            src.connect(dest);
-            hasAudio = true;
-        }
-
-        // 2. Mic Audio
-        if (this.micStream) {
-            const micTracks = this.micStream.getAudioTracks();
-            if (micTracks.length > 0) {
-                const src = ctx.createMediaStreamSource(new MediaStream([micTracks[0]]));
-                const gain = ctx.createGain();
-                gain.gain.value = 1.0; // Adjustable?
-                src.connect(gain);
-                gain.connect(dest);
-                hasAudio = true;
-            }
-        }
-
-        const outputTracks = hasAudio ? dest.stream.getAudioTracks() : [];
-
-        const combinedStream = new MediaStream([
+        const combinedTracks = [
             ...this.screenStream.getVideoTracks(),
-            ...outputTracks
-        ]);
+            ...(mixedAudioTrack ? [mixedAudioTrack] : [])
+        ];
+        const combinedStream = new MediaStream(combinedTracks);
 
-        // Higher quality recording settings for polished output
+        // Studio-grade 25 Mbps lossless capture
         const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
             ? 'video/webm;codecs=vp9,opus'
             : MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
                 ? 'video/webm;codecs=vp9'
                 : 'video/webm';
+
         this.mediaRecorder = new MediaRecorder(combinedStream, {
             mimeType: mime,
-            videoBitsPerSecond: 25_000_000, // 25 Mbps — lossless-quality source
+            videoBitsPerSecond: 25_000_000,
+            ...(mixedAudioTrack ? { audioBitsPerSecond: systemAudioTrack ? 192_000 : 128_000 } : {}),
         });
 
-        this.mediaRecorder.ondataavailable = e => { if (e.data.size > 0) this.recordedChunks.push(e.data); };
-        this.mediaRecorder.start(1000); // 1s timeslice — less overhead, still fast stop
+        this.mediaRecorder.ondataavailable = e => {
+            if (e.data.size > 0) this.recordedChunks.push(e.data);
+        };
 
-        // Start secondary webcam stream recorder for lossless Studio post-production
+        // Parallel webcam recorder for synchronized studio PiP and presenter scenes
         if (this.webcamEnabled && this.webcamStream) {
-            this.webcamChunks = [];
             try {
                 this.webcamRecorder = new MediaRecorder(this.webcamStream, {
                     mimeType: mime,
@@ -442,10 +448,21 @@ export class DriftEngine {
                 this.webcamRecorder.ondataavailable = e => {
                     if (e.data.size > 0) this.webcamChunks.push(e.data);
                 };
-                this.webcamRecorder.start(1000);
             } catch (err) {
-                console.warn('[Drift] Webcam recording init error:', err);
+                console.warn('[Drift] Webcam recorder setup notice:', err);
+                this.webcamRecorder = null;
             }
+        } else {
+            this.webcamRecorder = null;
+        }
+
+        this.startTime = Date.now();
+        this.webcamOffsetMs = 0;
+        this.isRecording = true;
+
+        this.mediaRecorder.start(1000);
+        if (this.webcamRecorder) {
+            this.webcamRecorder.start(1000);
         }
 
         // Timer Loop
@@ -466,6 +483,13 @@ export class DriftEngine {
         clearInterval(this.timerInt);
 
         this.mediaRecorder.onstop = async () => {
+            if (this.mixingContext) {
+                try {
+                    this.mixingContext.close();
+                } catch (e) {}
+                this.mixingContext = null;
+            }
+
             if (this._isTauri) {
                 try {
                     const nativeSamples = await drift.getSessionTelemetry();
@@ -481,13 +505,37 @@ export class DriftEngine {
                     console.warn('[Drift] Native telemetry retrieval failed:', e);
                 }
             }
-            const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
-            const webcamBlob = this.webcamChunks.length > 0 ? new Blob(this.webcamChunks, { type: 'video/webm' }) : null;
-            const duration = (Date.now() - this.startTime) / 1000;
+
+            const durationMs = Math.max(100, Date.now() - this.startTime);
+            let blob = new Blob(this.recordedChunks, { type: 'video/webm' });
+            try {
+                const fixedBlob = await fixWebmDuration(blob, durationMs);
+                if (fixedBlob && fixedBlob.size > 0) {
+                    blob = fixedBlob;
+                }
+            } catch (err) {
+                console.warn('[Drift] Screen WebM duration patch notice:', err);
+            }
+
+            let webcamBlob = null;
+            if (this.webcamChunks.length > 0) {
+                webcamBlob = new Blob(this.webcamChunks, { type: 'video/webm' });
+                try {
+                    const fixedWebcamBlob = await fixWebmDuration(webcamBlob, durationMs);
+                    if (fixedWebcamBlob && fixedWebcamBlob.size > 0) {
+                        webcamBlob = fixedWebcamBlob;
+                    }
+                } catch (err) {
+                    console.warn('[Drift] Webcam WebM duration patch notice:', err);
+                }
+            }
+
+            const durationSec = durationMs / 1000;
             if (this.onStopCallback) {
-                this.onStopCallback(blob, this.clicks, duration, {
+                this.onStopCallback(blob, this.clicks, durationSec, {
                     webcamBlob,
                     webcamSettings: { ...this.webcamSettings },
+                    webcamOffsetMs: this.webcamOffsetMs || 0,
                 });
             }
         };
@@ -632,6 +680,34 @@ export class DriftEngine {
 
     stop() {
         this.isActive = false;
+        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+            try { this.mediaRecorder.stop(); } catch (e) {}
+        }
+        if (this.webcamRecorder && this.webcamRecorder.state !== 'inactive') {
+            try { this.webcamRecorder.stop(); } catch (e) {}
+        }
+        if (this.mixingContext) {
+            try { this.mixingContext.close(); } catch (e) {}
+            this.mixingContext = null;
+        }
+        if (this.screenStream) {
+            this.screenStream.getTracks().forEach(t => t.stop());
+            this.screenStream = null;
+        }
+        if (this.micStream) {
+            this.micStream.getTracks().forEach(t => t.stop());
+            this.micStream = null;
+        }
+        if (this.webcamStream) {
+            this.webcamStream.getTracks().forEach(t => t.stop());
+            this.webcamStream = null;
+        }
+        if (this.webcamVideo) {
+            this.webcamVideo.srcObject = null;
+        }
+        if (this.video) {
+            this.video.srcObject = null;
+        }
         // Clean up engines
         if (this.zoomEngine) this.zoomEngine.destroy();
         // Clean up Tauri global listeners

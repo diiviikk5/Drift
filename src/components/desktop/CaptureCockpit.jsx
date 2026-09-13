@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Monitor, Mic, MicOff, Timer, Camera, ExternalLink, Sparkles, Check, Play, Square } from 'lucide-react';
 import AudioLevelMeter from './AudioLevelMeter';
+import { createAudioLevelMeter } from '@/lib/audio/audioMix';
 
 export default function CaptureCockpit({
     sources = [],
@@ -15,6 +16,7 @@ export default function CaptureCockpit({
     onToggleRecord,
     timer,
     micEnabled,
+    micStream = null,
     onToggleMic,
     webcamEnabled,
     onToggleWebcam,
@@ -22,6 +24,26 @@ export default function CaptureCockpit({
     onChangeCountdown,
     hotkey
 }) {
+    const [audioLevel, setAudioLevel] = useState(0);
+
+    useEffect(() => {
+        if (!micEnabled) {
+            setAudioLevel(0);
+            return;
+        }
+        if (micStream) {
+            const cleanup = createAudioLevelMeter(micStream, (lvl) => setAudioLevel(lvl));
+            return cleanup;
+        }
+        let frame;
+        const tick = () => {
+            setAudioLevel(0.25 + Math.sin(Date.now() / 220) * 0.15);
+            frame = requestAnimationFrame(tick);
+        };
+        frame = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(frame);
+    }, [micEnabled, micStream]);
+
     const activeSource = sources.find(s => s.id === selectedSource) || sources[0] || {
         name: 'Primary Display',
         width: 1920,
@@ -139,15 +161,23 @@ export default function CaptureCockpit({
                     </div>
 
                     {/* Audio Level Indicator */}
-                    <div className="h-1.5 bg-black/20 rounded-full overflow-hidden flex gap-0.5 p-0.2">
-                        {[...Array(12)].map((_, i) => (
-                            <div
-                                key={i}
-                                className={`flex-1 h-full rounded-xs transition-opacity duration-75 ${
-                                    micEnabled ? 'bg-green-400 opacity-70' : 'bg-transparent'
-                                }`}
-                            />
-                        ))}
+                    <div className="h-1.5 bg-black/25 rounded-full overflow-hidden flex gap-0.5 p-0.5 border border-white/5">
+                        {[...Array(12)].map((_, i) => {
+                            const threshold = (i + 1) / 12;
+                            const isLit = micEnabled && audioLevel >= threshold;
+                            let barColor = 'bg-emerald-400';
+                            if (i >= 10) barColor = 'bg-rose-500';
+                            else if (i >= 8) barColor = 'bg-amber-400';
+
+                            return (
+                                <div
+                                    key={i}
+                                    className={`flex-1 h-full rounded-xs transition-all duration-75 ${
+                                        isLit ? `${barColor} opacity-100 shadow-[0_0_4px_currentColor]` : 'bg-white/10 opacity-30'
+                                    }`}
+                                />
+                            );
+                        })}
                     </div>
                 </div>
 
