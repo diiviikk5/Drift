@@ -149,7 +149,7 @@ export class StudioEngine {
     init() {
         console.log('[Studio] init() called');
         this.video.src = URL.createObjectURL(this.blob);
-        this.video.muted = false;
+        this.video.muted = true; // Essential: muted allows instant first-frame decoding without browser autoplay block
         try {
             this.video.load();
         } catch (e) {}
@@ -210,6 +210,7 @@ export class StudioEngine {
     }
 
     play() {
+        this.video.muted = false;
         this.video.play().catch(e => console.error('[Studio] Play failed:', e));
         if (this.webcamVideo) {
             this.webcamVideo.currentTime = Math.max(0, this.video.currentTime + (this.webcamOffset || 0));
@@ -511,7 +512,7 @@ export class StudioEngine {
         const v = this.video;
         const curTimeSec = v?.currentTime || 0;
 
-        const isVideoReady = v && (v.readyState >= 2 || (v.videoWidth > 0 && v.currentTime >= 0));
+        const isVideoReady = v && (v.readyState >= 1 || v.videoWidth > 0 || (v.duration > 0 && v.currentTime >= 0));
 
         renderFrame(
             ctx,

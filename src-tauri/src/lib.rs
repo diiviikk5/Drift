@@ -17,13 +17,11 @@ pub fn run() {
         .manage(NativeRecorderState::default())
         .setup(|app| {
             use tauri::Manager;
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
+            let _ = app.handle().plugin(
+                tauri_plugin_log::Builder::default()
+                    .level(log::LevelFilter::Info)
+                    .build(),
+            );
             if let Some(window) = app.get_webview_window("main") {
                 #[cfg(debug_assertions)]
                 {

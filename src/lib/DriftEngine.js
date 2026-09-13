@@ -249,13 +249,16 @@ export class DriftEngine {
     }
 
     async selectSourceBrowser() {
-        try {
-            if (this.screenStream) {
-                this.screenStream.getTracks().forEach(t => t.stop());
-            }
+        if (this.screenStream) {
+            this.screenStream.getTracks().forEach(t => t.stop());
+            this.screenStream = null;
+        }
 
-            // Standard browser/Tauri API - getDisplayMedia works in WebView2
-            const stream = await navigator.mediaDevices.getDisplayMedia({
+        let stream = null;
+
+        // Tier 1: Full cinema capture with system audio
+        try {
+            stream = await navigator.mediaDevices.getDisplayMedia({
                 video: {
                     width: { ideal: 1920 },
                     height: { ideal: 1080 },
@@ -263,42 +266,78 @@ export class DriftEngine {
                     cursor: 'never',
                 },
                 audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false,
                 },
                 systemAudio: "include",
                 selfBrowserSurface: "exclude",
             });
+        } catch (e1) {
+            console.warn('[Drift] getDisplayMedia with system audio notice, falling back to standard audio:', e1);
+            // Tier 2: Standard audio
+            try {
+                stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                        frameRate: { ideal: 60 },
+                        cursor: 'never',
+                    },
+                    audio: true,
+                });
+            } catch (e2) {
+                console.warn('[Drift] getDisplayMedia with audio failed, falling back to video only:', e2);
+                // Tier 3: Pure video only
+                try {
+                    stream = await navigator.mediaDevices.getDisplayMedia({
+                        video: {
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
+                            frameRate: { ideal: 60 },
+                            cursor: 'never',
+                        },
+                        audio: false,
+                    });
+                } catch (e3) {
+                    console.error('[Drift] All getDisplayMedia attempts failed or user cancelled picker:', e3);
+                    return false;
+                }
+            }
+        }
 
-            this.screenStream = stream;
+        if (!stream) return false;
 
-            // Handle external stop (browser UI stop button)
-            stream.getVideoTracks()[0].onended = () => {
-                console.log('[Drift] Stream ended by user');
+        this.screenStream = stream;
+
+        // Handle external stop (browser UI stop button)
+        const vTrack = stream.getVideoTracks()[0];
+        if (vTrack) {
+            vTrack.onended = () => {
+                console.log('[Drift] Screen capture stream ended by user');
                 if (this.isRecording) {
                     this.stopRecording();
                 }
             };
 
-            // Update source resolution from actual stream for accurate normalization
-            const vTrack = stream.getVideoTracks()[0];
-            const settings = vTrack?.getSettings?.();
+            const settings = vTrack.getSettings?.();
             if (settings?.width && settings?.height) {
                 this._sourceWidth = settings.width;
                 this._sourceHeight = settings.height;
                 console.log('[Drift] Source resolution:', this._sourceWidth, 'x', this._sourceHeight);
             }
-
-            if (this.video) {
-                this.video.srcObject = stream;
-                await this.video.play().catch(e => console.warn("Auto-play preview failed:", e));
-            }
-            return true;
-        } catch (e) {
-            console.error("[Drift] Source select failed:", e);
-            return false;
         }
+
+        if (this.video) {
+            this.video.srcObject = stream;
+            this.video.muted = true; // Essential: allows instantaneous unblocked preview decoding
+            try {
+                await this.video.play();
+            } catch (e) {
+                console.warn("[Drift] Preview auto-play notice:", e);
+            }
+        }
+        return true;
     }
 
     async enableMic(deviceId = null) {
@@ -612,7 +651,7 @@ export class DriftEngine {
             ctx.fillRect(0, 0, c.width, c.height);
 
             // Draw Video Preview
-            if (v && v.readyState >= 2 && v.videoWidth > 0) {
+            if (v && (v.readyState >= 1 || v.videoWidth > 0) && v.videoWidth > 0) {
                 // Calculate aspect-fit dimensions
                 const scale = 0.85;
                 const aspectRatio = v.videoWidth / v.videoHeight;

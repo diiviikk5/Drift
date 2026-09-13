@@ -1025,9 +1025,18 @@ export default function RecorderPage() {
 
     return (
         <div className={`h-screen font-sans select-none flex flex-col overflow-hidden theme-${theme} ${isDark ? 'dark' : ''} bg-[var(--bg-app)] text-[var(--text-app)] transition-colors duration-200`}>
-            {/* Hidden media elements */}
-            <video ref={recorderVideoRef} className="hidden" muted playsInline />
-            <video ref={studioVideoRef} className="hidden" playsInline />
+            {/* Offscreen media elements for Canvas pipeline - MUST NOT use display:none so Chromium decodes frames */}
+            <video
+                ref={recorderVideoRef}
+                style={{ position: 'fixed', top: -9999, left: -9999, width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+                muted
+                playsInline
+            />
+            <video
+                ref={studioVideoRef}
+                style={{ position: 'fixed', top: -9999, left: -9999, width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+                playsInline
+            />
 
             {/* Top Navigation Bar */}
             <DesktopHeader
