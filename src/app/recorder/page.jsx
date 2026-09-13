@@ -45,8 +45,10 @@ const BACKGROUNDS = {
 
 export default function RecorderPage() {
     // --- Refs ---
-    const canvasRef = useRef(null);
-    const videoRef = useRef(null);
+    const recorderCanvasRef = useRef(null);
+    const recorderVideoRef = useRef(null);
+    const studioCanvasRef = useRef(null);
+    const studioVideoRef = useRef(null);
     const engineRef = useRef(null);
     const studioRef = useRef(null);
     const toggleRecordRef = useRef(null);
@@ -55,6 +57,7 @@ export default function RecorderPage() {
     const projectInputRef = useRef(null);
     const [projectRevision, setProjectRevision] = useState(0);
     const [notice, setNotice] = useState('');
+    const [hasActiveStream, setHasActiveStream] = useState(false);
 
     // --- State ---
     const [viewMode, setViewMode] = useState('recorder'); // 'recorder' | 'studio'
@@ -206,7 +209,7 @@ export default function RecorderPage() {
                 studioRef.current.dispose();
                 studioRef.current = null;
             }
-            engineRef.current = new DriftEngine(canvasRef.current, videoRef.current);
+            engineRef.current = new DriftEngine(recorderCanvasRef.current, recorderVideoRef.current);
             engineRef.current.onclickCallback = (c) => setClickCount(c);
             engineRef.current.micEnabled = micEnabled;
             engineRef.current.onHotkeyStart = () => {
@@ -216,6 +219,7 @@ export default function RecorderPage() {
             engineRef.current.onStopCallback = (blob, clicks, dur, meta = {}) => {
                 savedSegmentsRef.current = null;
                 setIsRecording(false);
+                setHasActiveStream(false);
                 if (engineRef.current?.screenStream) {
                     engineRef.current.screenStream.getTracks().forEach(t => t.stop());
                 }
@@ -258,54 +262,63 @@ export default function RecorderPage() {
             }
             load();
         } else if (viewMode === 'studio') {
-            if (engineRef.current) engineRef.current.stop();
-            if (videoRef.current) videoRef.current.srcObject = null;
+            if (engineRef.current) {
+                engineRef.current.stop();
+                setHasActiveStream(false);
+            }
+            if (recorderVideoRef.current) recorderVideoRef.current.srcObject = null;
 
-            if (recordedBlob && canvasRef.current && videoRef.current) {
-                setTimeout(() => {
-                    studioRef.current = new StudioEngine(
-                        canvasRef.current,
-                        videoRef.current,
-                        recordedBlob,
-                        recordedClicks,
-                        recDurationRef.current,
-                        recordedMoves,
-                        {
-                            webcamBlob: recordedWebcamBlob,
-                            webcamSettings,
-                            captions,
-                            annotations,
-                            captionsEnabled,
-                            customBackgroundImage: customImage,
-                            cursorTheme,
-                            focusSegments: savedSegmentsRef.current,
-                        }
-                    );
-                    studioRef.current.background = background;
-                    studioRef.current.zoomLevel = zoomLevel;
-                    // showCursor defaults to FALSE to prevent double cursor
-                    studioRef.current.showCursor = showCursor;
-                    studioRef.current.cursorTheme = cursorTheme;
-                    Object.assign(studioRef.current, { cursorScale, tiltAngle, connectedZooms, reactiveWebcam, captionsEnabled });
-                    studioRef.current.setAspectRatio(aspectRatio);
+            if (recordedBlob && studioCanvasRef.current && studioVideoRef.current) {
+                if (studioRef.current) {
+                    studioRef.current.dispose();
+                    studioRef.current = null;
+                }
 
-                    if (videoRef.current) {
-                        videoRef.current.ontimeupdate = () => {
-                            if (videoRef.current) {
-                                setCurrentTime(videoRef.current.currentTime);
-                                setDuration(studioRef.current?.videoDuration || 0);
-                            }
-                        };
+                studioRef.current = new StudioEngine(
+                    studioCanvasRef.current,
+                    studioVideoRef.current,
+                    recordedBlob,
+                    recordedClicks,
+                    recDurationRef.current,
+                    recordedMoves,
+                    {
+                        webcamBlob: recordedWebcamBlob,
+                        webcamSettings,
+                        captions,
+                        annotations,
+                        captionsEnabled,
+                        customBackgroundImage: customImage,
+                        cursorTheme,
+                        focusSegments: savedSegmentsRef.current,
                     }
+                );
+                studioRef.current.background = background;
+                studioRef.current.zoomLevel = zoomLevel;
+                // showCursor defaults to FALSE to prevent double cursor
+                studioRef.current.showCursor = showCursor;
+                studioRef.current.cursorTheme = cursorTheme;
+                Object.assign(studioRef.current, { cursorScale, tiltAngle, connectedZooms, reactiveWebcam, captionsEnabled });
+                studioRef.current.setAspectRatio(aspectRatio);
+
+                if (studioVideoRef.current) {
+                    studioVideoRef.current.ontimeupdate = () => {
+                        if (studioVideoRef.current) {
+                            setCurrentTime(studioVideoRef.current.currentTime);
+                            setDuration(studioRef.current?.videoDuration || 0);
+                        }
+                    };
+                }
+                [40, 120, 300, 600].forEach(delay => {
                     setTimeout(() => {
                         if (studioRef.current) {
                             const d = recDurationRef.current || studioRef.current?.videoDuration || 10;
                             setDuration(d);
                             setTrimEnd(d);
                             setFocusSegments(studioRef.current.getFocusSegments() || []);
+                            studioRef.current.drawFrame();
                         }
-                    }, 500);
-                }, 100);
+                    }, delay);
+                });
             }
         }
     }, [viewMode, platform, projectRevision]);
@@ -338,15 +351,20 @@ export default function RecorderPage() {
     const selectSource = async (id) => {
         setSelectedSource(id);
         if (platform === 'tauri') {
-            await engineRef.current?.selectSourceBrowser();
+            const ok = await engineRef.current?.selectSourceBrowser();
+            if (ok) setHasActiveStream(true);
         } else if (platform === 'electron') {
-            await engineRef.current?.selectSource(id, micEnabled);
+            const ok = await engineRef.current?.selectSource(id, micEnabled);
+            if (ok) setHasActiveStream(true);
         }
     };
 
     const selectBrowserSource = async () => {
         const ok = await engineRef.current?.selectSourceBrowser();
-        if (ok) setSelectedSource('browser-source');
+        if (ok) {
+            setSelectedSource('browser-source');
+            setHasActiveStream(true);
+        }
     };
 
     const toggleMic = async () => {
@@ -495,7 +513,7 @@ export default function RecorderPage() {
 
         if (lower.includes('zoom at') || lower.includes('focus at')) {
             const m = lower.match(/(\d+)\s*s/);
-            const timeSec = m ? parseInt(m[1]) : (videoRef.current?.currentTime || 2);
+            const timeSec = m ? parseInt(m[1]) : (studioVideoRef.current?.currentTime || 2);
             studioRef.current.addZoom(timeSec, 0.5, 0.5, zoomLevel);
             setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
             return `Added zoom point at ${timeSec}s`;
@@ -517,12 +535,15 @@ export default function RecorderPage() {
                     const ok = await engineRef.current?.selectSourceBrowser();
                     if (!ok) return;
                     setSelectedSource('browser-source');
+                    setHasActiveStream(true);
                     await new Promise(r => setTimeout(r, 400));
                 }
             }
 
             const hasStream = engineRef.current?.screenStream?.active;
             if (!hasStream && !selectedSource) return;
+
+            setHasActiveStream(true);
 
             engineRef.current.micEnabled = micEnabled;
             await engineRef.current.startRecording((s) => {
@@ -609,7 +630,7 @@ export default function RecorderPage() {
     // Studio controls
     const togglePlayback = () => {
         if (!studioRef.current) return;
-        if (videoRef.current?.paused) {
+        if (studioVideoRef.current?.paused) {
             studioRef.current.play();
             setIsPlaying(true);
         } else {
@@ -625,19 +646,19 @@ export default function RecorderPage() {
     };
 
     const addManualZoom = () => {
-        if (!studioRef.current || !videoRef.current) return;
-        const ct = videoRef.current.currentTime;
+        if (!studioRef.current || !studioVideoRef.current) return;
+        const ct = studioVideoRef.current.currentTime;
         studioRef.current.addZoom(ct, 0.5, 0.5, zoomLevel);
         setRecordedClicks([...(studioRef.current.clicks || [])]);
         setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
     };
 
     const handleCanvasClick = (e) => {
-        if (viewMode !== 'studio' || !studioRef.current || !videoRef.current) return;
+        if (viewMode !== 'studio' || !studioRef.current || !studioVideoRef.current) return;
         const rect = e.currentTarget.getBoundingClientRect();
         const canvasX = (e.clientX - rect.left) / rect.width;
         const canvasY = (e.clientY - rect.top) / rect.height;
-        const ct = videoRef.current.currentTime;
+        const ct = studioVideoRef.current.currentTime;
         const { x, y } = studioRef.current.resolveClick(canvasX, canvasY);
         studioRef.current.addZoom(ct, x, y, zoomLevel);
         setRecordedClicks([...(studioRef.current.clicks || [])]);
@@ -671,7 +692,7 @@ export default function RecorderPage() {
     };
 
     const handleAddAnnotation = (type) => {
-        const ct = videoRef.current?.currentTime || 0;
+        const ct = studioVideoRef.current?.currentTime || 0;
         const curMs = ct * 1000;
         let newAnn;
 
@@ -792,6 +813,11 @@ export default function RecorderPage() {
             engineRef.current?.stopRecording();
             setIsRecording(false);
         }
+        if (studioRef.current) {
+            studioRef.current.dispose();
+            studioRef.current = null;
+        }
+        setHasActiveStream(false);
         setRecordedBlob(null);
         setRecordedClicks([]);
         setRecordedMoves([]);
@@ -901,7 +927,8 @@ export default function RecorderPage() {
     return (
         <div className={`h-screen font-sans select-none flex flex-col overflow-hidden theme-${theme} ${isDark ? 'dark' : ''} bg-[var(--bg-app)] text-[var(--text-app)] transition-colors duration-200`}>
             {/* Hidden media elements */}
-            <video ref={videoRef} className="hidden" muted={viewMode === 'recorder'} playsInline />
+            <video ref={recorderVideoRef} className="hidden" muted playsInline />
+            <video ref={studioVideoRef} className="hidden" playsInline />
 
             {/* Top Navigation Bar */}
             <DesktopHeader
@@ -932,8 +959,6 @@ export default function RecorderPage() {
                 {viewMode === 'recorder' ? (
                     /* ═══ CAPTURE COCKPIT ═══ */
                     <div className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-4xl mx-auto overflow-y-auto">
-                        <canvas ref={canvasRef} width={1280} height={720} className="hidden" />
-
                         {/* Centered Cockpit Card */}
                         <CaptureCockpit
                             sources={sources}
@@ -953,6 +978,16 @@ export default function RecorderPage() {
                             countdownSeconds={countdownSeconds}
                             onChangeCountdown={setCountdownSeconds}
                             hotkey={(typeof hotkeys.toggle_recording === 'string' ? hotkeys.toggle_recording : 'Ctrl+Shift+R').replace('CmdOrCtrl', 'Ctrl')}
+                            previewCanvas={
+                                <canvas
+                                    ref={recorderCanvasRef}
+                                    width={1280}
+                                    height={720}
+                                    className="w-full h-full object-contain"
+                                />
+                            }
+                            hasActiveStream={hasActiveStream || isRecording}
+                            onStartPreview={selectBrowserSource}
                         />
                     </div>
                 ) : (
@@ -961,24 +996,44 @@ export default function RecorderPage() {
                         {/* Center Video Stage */}
                         <main className="flex-1 flex flex-col min-w-0 bg-black/10 relative">
                             <div className="flex-1 flex items-center justify-center p-6 relative overflow-hidden">
-                                <div
-                                    className="relative max-w-full max-h-full overflow-hidden cursor-crosshair group bg-black"
-                                    style={{ aspectRatio: aspectRatio.replace(':', '/'), height: '100%', width: 'auto' }}
-                                    onClick={handleCanvasClick}
-                                    title="Click anywhere to add an auto-zoom point"
-                                >
-                                    <canvas
-                                        ref={canvasRef}
-                                        width={1280}
-                                        height={720}
-                                        className="w-full h-full"
-                                    />
+                                {recordedBlob ? (
+                                    <div
+                                        className="relative max-w-full max-h-full overflow-hidden cursor-crosshair group bg-black"
+                                        style={{ aspectRatio: aspectRatio.replace(':', '/'), height: '100%', width: 'auto' }}
+                                        onClick={handleCanvasClick}
+                                        title="Click anywhere to add an auto-zoom point"
+                                    >
+                                        <canvas
+                                            ref={studioCanvasRef}
+                                            width={1280}
+                                            height={720}
+                                            className="w-full h-full"
+                                        />
 
-                                    {/* Canvas Hint */}
-                                    <div className="absolute top-3 left-3 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity bg-black/75 backdrop-blur-md px-2.5 py-1 rounded-md text-[11px] font-mono text-white border border-white/10">
-                                        ✦ Click anywhere to add a zoom focal point
+                                        {/* Canvas Hint */}
+                                        <div className="absolute top-3 left-3 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity bg-black/75 backdrop-blur-md px-2.5 py-1 rounded-md text-[11px] font-mono text-white border border-white/10">
+                                            ✦ Click anywhere to add a zoom focal point
+                                        </div>
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center p-8 text-center text-[var(--text-app-muted)] gap-4">
+                                        <div className="w-16 h-16 rounded-2xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] flex items-center justify-center text-[var(--accent-app)] shadow-lg">
+                                            <span className="text-2xl">🎬</span>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-base font-semibold text-[var(--text-app)]">No Recording Loaded</h3>
+                                            <p className="text-xs text-[var(--text-app-muted)] mt-1 max-w-xs">
+                                                Record your screen in Capture Cockpit or open an existing .drift project to start editing.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => setViewMode('recorder')}
+                                            className="px-4 py-2 rounded-xl bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-semibold text-xs hover:brightness-110 active:scale-95 transition-all shadow-md cursor-pointer"
+                                        >
+                                            Go to Capture Cockpit
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Studio Timeline Scrubber */}

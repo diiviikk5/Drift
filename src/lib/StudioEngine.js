@@ -150,22 +150,36 @@ export class StudioEngine {
         console.log('[Studio] init() called');
         this.video.src = URL.createObjectURL(this.blob);
         this.video.muted = false;
+        try {
+            this.video.load();
+        } catch (e) {}
 
-        this.video.onloadedmetadata = () => {
-            console.log('[Studio] Video metadata loaded, duration:', this.video.duration);
+        const onFrameReady = () => {
+            console.log('[Studio] Video frame ready, readyState:', this.video.readyState, 'duration:', this.video.duration);
             this.setAspectRatio(this.aspectRatio || '16:9');
 
             if (this.explicitDuration) {
                 this.videoDuration = this.explicitDuration;
-            } else if (!isFinite(this.video.duration)) {
+            } else if (Number.isFinite(this.video.duration) && this.video.duration > 0) {
+                this.videoDuration = this.video.duration;
+            } else {
                 const lastClick = this.clicks[this.clicks.length - 1];
                 this.videoDuration = lastClick ? (lastClick.time / 1000 + 2) : 10;
-            } else {
-                this.videoDuration = this.video.duration;
             }
-            console.log('[Studio] Using duration:', this.videoDuration);
             this.drawFrame();
         };
+
+        this.video.onloadedmetadata = () => {
+            onFrameReady();
+            // Nudge decoder to decode frame 0
+            try {
+                if (this.video.currentTime === 0) {
+                    this.video.currentTime = 0.001;
+                }
+            } catch (e) {}
+        };
+        this.video.onloadeddata = onFrameReady;
+        this.video.oncanplay = onFrameReady;
 
         this.video.onplay = () => {
             this.isPlaying = true;
@@ -189,6 +203,10 @@ export class StudioEngine {
                 this.webcamVideo.currentTime = Math.max(0, this.video.currentTime + (this.webcamOffset || 0));
             }
         };
+
+        if (this.video.readyState >= 1) {
+            onFrameReady();
+        }
     }
 
     play() {
@@ -493,10 +511,12 @@ export class StudioEngine {
         const v = this.video;
         const curTimeSec = v?.currentTime || 0;
 
+        const isVideoReady = v && (v.readyState >= 2 || (v.videoWidth > 0 && v.currentTime >= 0));
+
         renderFrame(
             ctx,
             curTimeSec,
-            v && v.readyState >= 2 ? v : null,
+            isVideoReady ? v : null,
             {
                 focusSegments: this.focusSegments || [],
                 mouseSamples: this.mouseMoves || [],

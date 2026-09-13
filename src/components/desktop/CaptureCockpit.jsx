@@ -22,7 +22,10 @@ export default function CaptureCockpit({
     onToggleWebcam,
     countdownSeconds,
     onChangeCountdown,
-    hotkey
+    hotkey,
+    previewCanvas = null,
+    hasActiveStream = false,
+    onStartPreview = null,
 }) {
     const [audioLevel, setAudioLevel] = useState(0);
 
@@ -103,32 +106,69 @@ export default function CaptureCockpit({
                 )}
 
                 {/* Preview Card */}
-                <div className="relative aspect-video w-full rounded-xl overflow-hidden border border-[var(--border-app)] bg-black/40 shadow-inner group">
-                    {thumb ? (
-                        <img
-                            src={thumb}
-                            alt="Display Preview"
-                            className="w-full h-full object-cover"
-                        />
+                <div className="relative aspect-video w-full rounded-xl overflow-hidden border border-[var(--border-app)] bg-black/60 shadow-inner group flex items-center justify-center">
+                    {hasActiveStream && previewCanvas ? (
+                        <div className="w-full h-full flex items-center justify-center bg-black">
+                            {previewCanvas}
+                        </div>
+                    ) : thumb ? (
+                        <div className="relative w-full h-full group">
+                            <img
+                                src={thumb}
+                                alt="Display Preview"
+                                className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-xs">
+                                <button
+                                    type="button"
+                                    onClick={onStartPreview || onSelectBrowserSource}
+                                    className="px-3.5 py-1.5 rounded-lg bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-semibold text-xs flex items-center gap-1.5 shadow-lg hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                                >
+                                    <Play className="w-3.5 h-3.5 fill-current" />
+                                    <span>Preview Screen</span>
+                                </button>
+                            </div>
+                        </div>
                     ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-[var(--text-app-muted)] gap-2">
-                            <Monitor className="w-10 h-10 opacity-30" />
-                            <span className="text-xs font-mono">Ready for Screen Capture</span>
+                        <div className="w-full h-full flex flex-col items-center justify-center text-[var(--text-app-muted)] gap-3 p-6 text-center">
+                            <div className="w-12 h-12 rounded-2xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] flex items-center justify-center text-[var(--accent-app)] shadow-md">
+                                <Monitor className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <p className="text-xs font-semibold text-[var(--text-app)]">
+                                    {activeSource.name || 'Primary Display'}
+                                </p>
+                                <p className="text-[11px] text-[var(--text-app-muted)] font-mono mt-0.5">
+                                    {activeSource.width ? `${activeSource.width} × ${activeSource.height}` : '1920 × 1080'} • 60 FPS
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={onStartPreview || onSelectBrowserSource}
+                                className="px-3.5 py-1.5 rounded-lg bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-semibold text-xs flex items-center gap-1.5 shadow-lg hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                            >
+                                <Play className="w-3.5 h-3.5 fill-current" />
+                                <span>Preview Screen / Window</span>
+                            </button>
                         </div>
                     )}
 
                     {/* Overlay Badges */}
-                    <div className="absolute top-3 left-3 flex items-center gap-2">
+                    <div className="absolute top-3 left-3 flex items-center gap-2 pointer-events-none">
                         <span className="px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-white text-[10px] font-mono border border-white/10 font-semibold">
                             {activeSource.width ? `${activeSource.width} × ${activeSource.height}` : '1920 × 1080'}
                         </span>
-                        <span className="px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-[#22c55e] text-[10px] font-mono border border-white/10 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] animate-pulse" />
-                            60 FPS
+                        <span className={`px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-[10px] font-mono border border-white/10 flex items-center gap-1 ${
+                            hasActiveStream ? 'text-[#22c55e]' : 'text-zinc-400'
+                        }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                                hasActiveStream ? 'bg-[#22c55e] animate-pulse' : 'bg-zinc-400'
+                            }`} />
+                            {hasActiveStream ? (isRecording ? 'LIVE RECORDING' : 'LIVE PREVIEW') : 'READY'}
                         </span>
                     </div>
 
-                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between bg-black/75 backdrop-blur-md px-3 py-2 rounded-lg border border-white/10 text-xs text-white">
+                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between bg-black/75 backdrop-blur-md px-3 py-2 rounded-lg border border-white/10 text-xs text-white pointer-events-none">
                         <span className="truncate max-w-[300px] font-medium">{activeSource.name}</span>
                         <span className="text-[11px] text-gray-300 font-mono">Hardware Accelerated</span>
                     </div>

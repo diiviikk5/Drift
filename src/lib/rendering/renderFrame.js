@@ -456,116 +456,128 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
     }
 
     // 6. Draw Video Frame with Camera Transformation inside video area
-    if (videoSource) {
+    ctx.save();
+    // Clip specifically to content area below header
+    ctx.beginPath();
+    ctx.rect(padX, padY + headerH, frameW, videoH);
+    ctx.clip();
+
+    // Dark solid backdrop inside window frame so stage is never transparent
+    ctx.fillStyle = '#0a0d14';
+    ctx.fillRect(padX, padY + headerH, frameW, videoH);
+
+    // Cinematic shutter motion blur blend
+    if (videoSource && motionVelocity > 0.04 && blurPrevCam) {
         ctx.save();
-        // Clip specifically to content area below header
-        ctx.beginPath();
-        ctx.rect(padX, padY + headerH, frameW, videoH);
-        ctx.clip();
-
-        // Cinematic shutter motion blur blend
-        if (motionVelocity > 0.04 && blurPrevCam) {
-            ctx.save();
-            ctx.globalAlpha = Math.min(0.28, motionVelocity * 0.35);
-            ctx.translate(padX + frameW * 0.5, padY + headerH + videoH * 0.5);
-            const midScale = (camera.scale + blurPrevCam.scale) * 0.5;
-            const midX = (camera.x + blurPrevCam.x) * 0.5;
-            const midY = (camera.y + blurPrevCam.y) * 0.5;
-            ctx.scale(midScale, midScale);
-            ctx.translate(-midX * frameW, -midY * videoH);
-            ctx.drawImage(videoSource, 0, 0, frameW, videoH);
-            ctx.restore();
-        }
-
-        // Translate origin to center of video area
+        ctx.globalAlpha = Math.min(0.28, motionVelocity * 0.35);
         ctx.translate(padX + frameW * 0.5, padY + headerH + videoH * 0.5);
+        const midScale = (camera.scale + blurPrevCam.scale) * 0.5;
+        const midX = (camera.x + blurPrevCam.x) * 0.5;
+        const midY = (camera.y + blurPrevCam.y) * 0.5;
+        ctx.scale(midScale, midScale);
+        ctx.translate(-midX * frameW, -midY * videoH);
+        try {
+            ctx.drawImage(videoSource, 0, 0, frameW, videoH);
+        } catch (e) {}
+        ctx.restore();
+    }
 
-        // OpenScreen 3D Perspective Tilt (Subtle skew/scale along camera movement)
-        if (camera.rotateX || camera.rotateY) {
-            const radX = (camera.rotateX * Math.PI) / 180;
-            const radY = (camera.rotateY * Math.PI) / 180;
-            ctx.transform(Math.cos(radY), Math.sin(radX) * 0.28, Math.sin(radY) * 0.28, Math.cos(radX), 0, 0);
+    ctx.save();
+    // Translate origin to center of video area
+    ctx.translate(padX + frameW * 0.5, padY + headerH + videoH * 0.5);
+
+    // OpenScreen 3D Perspective Tilt (Subtle skew/scale along camera movement)
+    if (camera.rotateX || camera.rotateY) {
+        const radX = (camera.rotateX * Math.PI) / 180;
+        const radY = (camera.rotateY * Math.PI) / 180;
+        ctx.transform(Math.cos(radY), Math.sin(radX) * 0.28, Math.sin(radY) * 0.28, Math.cos(radX), 0, 0);
+    }
+
+    // Scale by camera zoom
+    ctx.scale(camera.scale, camera.scale);
+    // Translate by negative camera position relative to center
+    ctx.translate(-camera.x * frameW, -camera.y * videoH);
+
+    // Draw source video filling video area
+    if (videoSource) {
+        try {
+            ctx.drawImage(videoSource, 0, 0, frameW, videoH);
+        } catch (e) {
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, frameW, videoH);
         }
+    }
 
-        // Scale by camera zoom
-        ctx.scale(camera.scale, camera.scale);
-        // Translate by negative camera position relative to center
-        ctx.translate(-camera.x * frameW, -camera.y * videoH);
-
-        // Draw source video filling video area
-        ctx.drawImage(videoSource, 0, 0, frameW, videoH);
-
-        // 7. Draw Click Ripple Waves in Screen Space
-        if (clickRipples && clicks && clicks.length > 0) {
-            const curMs = timeSec * 1000;
-            for (const click of clicks) {
-                const cTimeMs = click.time;
-                const dt = curMs - cTimeMs;
-                if (dt >= 0 && dt <= 450) {
-                    const progress = dt / 450;
-                    const ringRadius = progress * 40 * (frameW / 1920);
-                    const ringAlpha = (1 - progress) * 0.75;
-                    const cx = (click.x > 1 ? click.x / 1920 : click.x) * frameW;
-                    const cy = (click.y > 1 ? click.y / 1080 : click.y) * videoH;
-
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.arc(cx, cy, ringRadius, 0, Math.PI * 2);
-                    ctx.strokeStyle = `rgba(220, 254, 80, ${ringAlpha})`;
-                    ctx.lineWidth = 3 * (1 - progress);
-                    ctx.stroke();
-
-                    // Inner ping
-                    ctx.beginPath();
-                    ctx.arc(cx, cy, ringRadius * 0.45, 0, Math.PI * 2);
-                    ctx.fillStyle = `rgba(220, 254, 80, ${ringAlpha * 0.4})`;
-                    ctx.fill();
-                    ctx.restore();
-                }
-            }
-        }
-
-        // 8. Draw Synthetic Pointer with Cap Click-Shrink & Idle-Fade Dynamics
-        if (showCursor && mouseSamples && mouseSamples.length > 0) {
-            const cursor = getInterpolatedCursor(timeSec, mouseSamples);
-            if (cursor) {
-                const curScreenX = cursor.x * frameW;
-                const curScreenY = cursor.y * videoH;
-
-                // Cap Click Shrink: 0.72x on click and bounce back within 220ms
-                let clickFactor = 1.0;
-                if (clicks && clicks.length > 0) {
-                    const curMs = timeSec * 1000;
-                    for (const c of clicks) {
-                        const dt = curMs - (c.time > 1000 ? c.time : c.time * 1000);
-                        if (dt >= 0 && dt <= 220) {
-                            clickFactor = 0.72 + 0.28 * (dt / 220);
-                            break;
-                        }
-                    }
-                }
-
-                // Cap Idle Auto-Fade: stationary mouse fades to 25% opacity so product UI is never obscured
-                let idleOpacity = 1.0;
-                if (mouseSamples.length > 5 && timeSec > 0.8) {
-                    const prevCursor = getInterpolatedCursor(timeSec - 0.7, mouseSamples);
-                    if (prevCursor) {
-                        const moveDist = Math.hypot(cursor.x - prevCursor.x, cursor.y - prevCursor.y);
-                        if (moveDist < 0.005) {
-                            idleOpacity = 0.25;
-                        }
-                    }
-                }
+    // 7. Draw Click Ripple Waves in Screen Space
+    if (clickRipples && clicks && clicks.length > 0) {
+        const curMs = timeSec * 1000;
+        for (const click of clicks) {
+            const cTimeMs = click.time;
+            const dt = curMs - cTimeMs;
+            if (dt >= 0 && dt <= 450) {
+                const progress = dt / 450;
+                const ringRadius = progress * 40 * (frameW / 1920);
+                const ringAlpha = (1 - progress) * 0.75;
+                const cx = (click.x > 1 ? click.x / 1920 : click.x) * frameW;
+                const cy = (click.y > 1 ? click.y / 1080 : click.y) * videoH;
 
                 ctx.save();
-                ctx.globalAlpha = idleOpacity;
-                _drawThemedCursor(ctx, curScreenX, curScreenY, cursorScale * clickFactor * (frameW / 1920), cursorTheme);
+                ctx.beginPath();
+                ctx.arc(cx, cy, ringRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(220, 254, 80, ${ringAlpha})`;
+                ctx.lineWidth = 3 * (1 - progress);
+                ctx.stroke();
+
+                // Inner ping
+                ctx.beginPath();
+                ctx.arc(cx, cy, ringRadius * 0.45, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(220, 254, 80, ${ringAlpha * 0.4})`;
+                ctx.fill();
                 ctx.restore();
             }
         }
-
-        ctx.restore(); // restore video camera transform
     }
+
+    // 8. Draw Synthetic Pointer with Cap Click-Shrink & Idle-Fade Dynamics
+    if (showCursor && mouseSamples && mouseSamples.length > 0) {
+        const cursor = getInterpolatedCursor(timeSec, mouseSamples);
+        if (cursor) {
+            const curScreenX = cursor.x * frameW;
+            const curScreenY = cursor.y * videoH;
+
+            // Cap Click Shrink: 0.72x on click and bounce back within 220ms
+            let clickFactor = 1.0;
+            if (clicks && clicks.length > 0) {
+                const curMs = timeSec * 1000;
+                for (const c of clicks) {
+                    const dt = curMs - (c.time > 1000 ? c.time : c.time * 1000);
+                    if (dt >= 0 && dt <= 220) {
+                        clickFactor = 0.72 + 0.28 * (dt / 220);
+                        break;
+                    }
+                }
+            }
+
+            // Cap Idle Auto-Fade: stationary mouse fades to 25% opacity so product UI is never obscured
+            let idleOpacity = 1.0;
+            if (mouseSamples.length > 5 && timeSec > 0.8) {
+                const prevCursor = getInterpolatedCursor(timeSec - 0.7, mouseSamples);
+                if (prevCursor) {
+                    const moveDist = Math.hypot(cursor.x - prevCursor.x, cursor.y - prevCursor.y);
+                    if (moveDist < 0.005) {
+                        idleOpacity = 0.25;
+                    }
+                }
+            }
+
+            ctx.save();
+            ctx.globalAlpha = idleOpacity;
+            _drawThemedCursor(ctx, curScreenX, curScreenY, cursorScale * clickFactor * (frameW / 1920), cursorTheme);
+            ctx.restore();
+        }
+    }
+
+    ctx.restore(); // restore video camera transform
 
     // 9. Draw Annotations Layer (Pinned to Frame Space)
     if (annotations && annotations.length > 0) {
