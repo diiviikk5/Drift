@@ -115,11 +115,12 @@ export default function CaptureCockpit({
 
                 {/* Preview Card */}
                 <div className="relative aspect-video w-full rounded-xl overflow-hidden border border-[var(--border-app)] bg-black/60 shadow-inner group flex items-center justify-center">
-                    {hasActiveStream && previewCanvas ? (
-                        <div className="w-full h-full flex items-center justify-center bg-black">
-                            {previewCanvas}
-                        </div>
-                    ) : thumb ? (
+                    {/* Permanently mounted preview canvas so recorderCanvasRef is never null */}
+                    <div className={`w-full h-full flex items-center justify-center bg-black ${hasActiveStream ? 'block' : 'hidden'}`}>
+                        {previewCanvas}
+                    </div>
+
+                    {!hasActiveStream && (thumb ? (
                         <div className="relative w-full h-full group">
                             <img
                                 src={thumb}
@@ -159,7 +160,7 @@ export default function CaptureCockpit({
                                 <span>Preview Screen / Window</span>
                             </button>
                         </div>
-                    )}
+                    ))}
 
                     {/* Overlay Badges */}
                     <div className="absolute top-3 left-3 flex items-center gap-2 pointer-events-none">

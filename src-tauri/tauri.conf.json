@@ -5,7 +5,7 @@
   "identifier": "com.drift.desktop",
   "build": {
     "frontendDist": "../out",
-    "devUrl": "http://localhost:3000/recorder",
+    "devUrl": "http://localhost:3000/recorder/",
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build:tauri"
   },

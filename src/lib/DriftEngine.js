@@ -11,9 +11,9 @@ import { fixWebmDuration } from '@fix-webm-duration/fix';
 
 export class DriftEngine {
     constructor(canvas, videoElement) {
-        this.canvas = canvas;
-        this.ctx = canvas.getContext('2d');
-        this.video = videoElement;
+        this.canvas = canvas || null;
+        this.ctx = canvas?.getContext ? canvas.getContext('2d') : null;
+        this.video = videoElement || null;
 
         this.screenStream = null;
         this.micStream = null;
@@ -43,8 +43,8 @@ export class DriftEngine {
 
         // Cinema Zoom Engine (live preview)
         this.zoomEngine = new CinemaZoomEngine({
-            width: canvas.width || 1920,
-            height: canvas.height || 1080,
+            width: canvas?.width || 1920,
+            height: canvas?.height || 1080,
             zoomLevel: 2.0,
         });
 
@@ -631,12 +631,22 @@ export class DriftEngine {
         };
     }
 
+    setCanvas(canvas) {
+        this.canvas = canvas || null;
+        this.ctx = canvas?.getContext ? canvas.getContext('2d') : null;
+    }
+
     // --- RENDER LOOP WITH CINEMA ZOOM ---
     renderLoop() {
         const loop = () => {
             const c = this.canvas;
             const ctx = this.ctx;
             const v = this.video;
+
+            if (!c || !ctx) {
+                if (this.isActive) requestAnimationFrame(loop);
+                return;
+            }
 
             // Update cinema zoom engine every frame while recording
             if (this.isRecording && this.zoomEnabled) {
