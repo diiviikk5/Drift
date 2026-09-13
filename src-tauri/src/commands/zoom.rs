@@ -366,7 +366,7 @@ pub fn interpolate_cursor_at_time(
         return CursorState { x: 0.5, y: 0.5, opacity: 0.0, click_progress: 0.0, motion: 0.0 };
     }
 
-    let time_secs = time_ms / 1000.0;
+    let _time_secs = time_ms / 1000.0;
 
     // --- Position interpolation with spring smoothing ---
     let (x, y, vx, vy) = interpolate_cursor_position(&moves, time_ms);

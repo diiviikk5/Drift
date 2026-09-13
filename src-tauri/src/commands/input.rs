@@ -159,8 +159,8 @@ pub fn stop_global_listener(state: tauri::State<'_, InputListenerState>) {
 /// Start buffering high-frequency synchronized telemetry for the active recording session
 #[tauri::command]
 pub fn start_session_telemetry(app: AppHandle) {
+    start_global_listener(app.clone());
     let state = app.state::<InputListenerState>();
-    start_global_listener(app);
     *state.is_recording.lock() = true;
     *state.recording_start.lock() = Some(std::time::Instant::now());
     state.session_samples.lock().clear();
