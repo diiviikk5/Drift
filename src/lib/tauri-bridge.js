@@ -495,6 +495,72 @@ export async function unregisterAllShortcuts() {
 }
 
 /**
+ * Check if native screen capture is supported on current OS
+ */
+export async function isNativeCaptureSupported() {
+    if (isTauri()) {
+        try {
+            const api = await getTauriApi();
+            return await api.invoke('is_native_capture_supported');
+        } catch {
+            return false;
+        }
+    }
+    return false;
+}
+
+/**
+ * Start a native screen capture session writing directly to disk
+ */
+export async function startNativeSession(config = {}) {
+    if (isTauri()) {
+        const api = await getTauriApi();
+        return await api.invoke('start_native_session', { config });
+    }
+    throw new Error('Native recording sessions are only available in the desktop app');
+}
+
+/**
+ * Stop active native capture session and finalize MP4, WAV, and telemetry
+ */
+export async function stopNativeSession() {
+    if (isTauri()) {
+        const api = await getTauriApi();
+        return await api.invoke('stop_native_session');
+    }
+    throw new Error('Native recording sessions are only available in the desktop app');
+}
+
+/**
+ * Get the live status of the native recording session
+ */
+export async function getNativeSessionStatus() {
+    if (isTauri()) {
+        const api = await getTauriApi();
+        return await api.invoke('get_native_session_status');
+    }
+    return { is_recording: false, session_id: null, duration_ms: 0, frames_captured: 0 };
+}
+
+/**
+ * Resolve local disk file path to Tauri asset:// URL for zero-decode webview playback
+ */
+export async function resolveAssetUrl(filePath) {
+    if (!filePath) return null;
+    if (isTauri()) {
+        try {
+            const api = await getTauriApi();
+            if (typeof api.convertFileSrc === 'function') {
+                return api.convertFileSrc(filePath);
+            }
+        } catch (e) {
+            console.warn('[drift] resolveAssetUrl fallback:', e);
+        }
+    }
+    return filePath;
+}
+
+/**
  * Get the platform bridge — unified API object
  * Use this as a drop-in replacement for window.electron
  */
@@ -534,6 +600,12 @@ export const drift = {
     // Global shortcuts
     registerGlobalShortcuts,
     unregisterAllShortcuts,
+    // Native Multi-Track Cinema Session Pipeline
+    isNativeCaptureSupported,
+    startNativeSession,
+    stopNativeSession,
+    getNativeSessionStatus,
+    resolveAssetUrl,
 };
 
 export default drift;

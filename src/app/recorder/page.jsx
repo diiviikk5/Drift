@@ -61,6 +61,12 @@ export default function RecorderPage() {
     const [notice, setNotice] = useState('');
     const [hasActiveStream, setHasActiveStream] = useState(false);
 
+    const isNativeRecordingRef = useRef(false);
+    const nativeTimerIntervalRef = useRef(null);
+    const nativeSessionStartRef = useRef(null);
+    const [isNativeSupported, setIsNativeSupported] = useState(false);
+    const [nativeAudioTracks, setNativeAudioTracks] = useState({ systemAudioUrl: null, micAudioUrl: null });
+
     // --- State ---
     const [viewMode, setViewMode] = useState('recorder'); // 'recorder' | 'studio'
     const [platform, setPlatform] = useState('browser'); // 'tauri' | 'electron' | 'browser'
@@ -215,6 +221,11 @@ export default function RecorderPage() {
         if (drift.isTauri()) {
             setPlatform('tauri');
             setHookStatus('Tauri IPC');
+            drift.isNativeCaptureSupported().then(supported => {
+                setIsNativeSupported(Boolean(supported));
+            }).catch(() => {
+                setIsNativeSupported(false);
+            });
             drift.getHotkeys().then(saved => {
                 if (saved) setHotkeys(saved);
                 drift.registerGlobalShortcuts(saved || hotkeys);
@@ -352,6 +363,8 @@ export default function RecorderPage() {
                         cursorTheme,
                         focusSegments: savedSegmentsRef.current,
                         showCursor: showCursor || ((recordedMoves && recordedMoves.length > 0) || (recordedClicks && recordedClicks.length > 0)),
+                        systemAudioUrl: nativeAudioTracks.systemAudioUrl,
+                        micAudioUrl: nativeAudioTracks.micAudioUrl,
                     }
                 );
                 const hasTelemetry = (recordedMoves && recordedMoves.length > 0) || (recordedClicks && recordedClicks.length > 0);
@@ -598,6 +611,42 @@ export default function RecorderPage() {
 
     const startRecordingActual = async () => {
         try {
+            if (isNativeSupported && drift.isTauri()) {
+                isNativeRecordingRef.current = true;
+                const monitorIndex = typeof selectedSource === 'number'
+                    ? selectedSource
+                    : (parseInt(selectedSource, 10) || 0);
+
+                await drift.startNativeSession({
+                    monitorIndex,
+                    fps: 60,
+                    withSystemAudio: true,
+                    withMic: micEnabled,
+                    withoutCursor: true,
+                });
+                await drift.startSessionTelemetry();
+
+                nativeSessionStartRef.current = Date.now();
+                nativeTimerIntervalRef.current = setInterval(() => {
+                    const s = (Date.now() - nativeSessionStartRef.current) / 1000;
+                    const m = Math.floor(s / 60).toString().padStart(2, '0');
+                    const sec = Math.floor(s % 60).toString().padStart(2, '0');
+                    setTimer(`${m}:${sec}`);
+                }, 1000);
+
+                setIsRecording(true);
+                setHasActiveStream(true);
+
+                if (autoMinimize && typeof drift.minimizeWindow === 'function') {
+                    try {
+                        await drift.minimizeWindow();
+                    } catch (minErr) {
+                        console.warn('[Drift] Window auto-minimize notice:', minErr);
+                    }
+                }
+                return;
+            }
+
             if (!selectedSource || platform !== 'electron') {
                 if (!engineRef.current?.screenStream?.active) {
                     const ok = await engineRef.current?.selectSourceBrowser();
@@ -631,6 +680,7 @@ export default function RecorderPage() {
             }
         } catch (e) {
             console.error('[Drift] Recording launch error:', e);
+            isNativeRecordingRef.current = false;
         }
     };
 
@@ -644,6 +694,61 @@ export default function RecorderPage() {
 
     const toggleRecord = async () => {
         if (isRecordingRef.current) {
+            if (isNativeRecordingRef.current) {
+                isNativeRecordingRef.current = false;
+                if (nativeTimerIntervalRef.current) {
+                    clearInterval(nativeTimerIntervalRef.current);
+                    nativeTimerIntervalRef.current = null;
+                }
+                setIsRecording(false);
+                setTimer('00:00');
+                setHasActiveStream(false);
+
+                if (drift.isTauri() && typeof drift.restoreWindow === 'function') {
+                    try { await drift.restoreWindow(); } catch (e) {}
+                }
+
+                try {
+                    const result = await drift.stopNativeSession();
+                    const nativeSamples = typeof drift.stopSessionTelemetry === 'function'
+                        ? await drift.stopSessionTelemetry()
+                        : await drift.getSessionTelemetry();
+
+                    const videoUrl = await drift.resolveAssetUrl(result.screen_video_path);
+                    const sysAudioUrl = result.system_audio_path ? await drift.resolveAssetUrl(result.system_audio_path) : null;
+                    const micAudioUrl = result.mic_audio_path ? await drift.resolveAssetUrl(result.mic_audio_path) : null;
+
+                    const activeSource = sources.find(s => s.id === selectedSource) || sources[0] || { width: 1920, height: 1080 };
+                    const srcW = activeSource.width || 1920;
+                    const srcH = activeSource.height || 1080;
+
+                    const moves = (nativeSamples || []).map(s => ({
+                        time: s.t,
+                        x: s.x > 1 ? s.x / srcW : s.x,
+                        y: s.y > 1 ? s.y / srcH : s.y,
+                        click: s.click,
+                    }));
+
+                    const clickList = (nativeSamples || []).filter(s => Boolean(s.click)).map(s => ({
+                        time: s.t,
+                        x: s.x > 1 ? s.x / srcW : s.x,
+                        y: s.y > 1 ? s.y / srcH : s.y,
+                        button: s.click,
+                    }));
+
+                    setNativeAudioTracks({ systemAudioUrl: sysAudioUrl, micAudioUrl });
+                    setRecordedBlob(videoUrl);
+                    setRecordedClicks(clickList);
+                    setRecordedMoves(moves);
+                    setShowCursor(true);
+                    recDurationRef.current = (result.duration_ms || (Date.now() - (nativeSessionStartRef.current || Date.now()))) / 1000;
+                    setViewMode('studio');
+                } catch (err) {
+                    console.error('[Drift] Stop native session error:', err);
+                }
+                return;
+            }
+
             engineRef.current?.stopRecording();
             setIsRecording(false);
             setTimer('00:00');
@@ -658,9 +763,9 @@ export default function RecorderPage() {
                 return;
             }
 
-            // If stream is not active yet, acquire it BEFORE starting the countdown
+            // If stream is not active yet and not native, acquire it BEFORE starting the countdown
             // so the system screen picker doesn't interrupt the 3, 2, 1 flow!
-            if (!engineRef.current?.screenStream?.active) {
+            if (!isNativeSupported && !engineRef.current?.screenStream?.active) {
                 let ok = false;
                 if (platform === 'electron' && selectedSource) {
                     ok = await engineRef.current?.selectSource(selectedSource, micEnabled);
@@ -703,12 +808,8 @@ export default function RecorderPage() {
                     if (toggleRecordRef.current) toggleRecordRef.current();
                     break;
                 case 'stop_recording':
-                    if (isRecordingRef.current && engineRef.current) {
-                        engineRef.current.stopRecording();
-                        setIsRecording(false);
-                        if (drift.isTauri() && typeof drift.restoreWindow === 'function') {
-                            drift.restoreWindow();
-                        }
+                    if (isRecordingRef.current) {
+                        if (toggleRecordRef.current) toggleRecordRef.current();
                     }
                     break;
                 case 'toggle_pause':
@@ -909,8 +1010,17 @@ export default function RecorderPage() {
 
     const handleNewRecording = () => {
         if (isRecording) {
-            engineRef.current?.stopRecording();
+            if (isNativeRecordingRef.current) {
+                drift.stopNativeSession().catch(() => {});
+                isNativeRecordingRef.current = false;
+            } else {
+                engineRef.current?.stopRecording();
+            }
             setIsRecording(false);
+        }
+        if (nativeTimerIntervalRef.current) {
+            clearInterval(nativeTimerIntervalRef.current);
+            nativeTimerIntervalRef.current = null;
         }
         if (studioRef.current) {
             studioRef.current.dispose();
@@ -918,6 +1028,7 @@ export default function RecorderPage() {
         }
         setHasActiveStream(false);
         setRecordedBlob(null);
+        setNativeAudioTracks({ systemAudioUrl: null, micAudioUrl: null });
         setRecordedClicks([]);
         setRecordedMoves([]);
         setDuration(0);
@@ -1104,6 +1215,7 @@ export default function RecorderPage() {
                             }
                             hasActiveStream={hasActiveStream || isRecording}
                             onStartPreview={selectBrowserSource}
+                            isNativeSupported={isNativeSupported}
                         />
                     </div>
                 ) : (

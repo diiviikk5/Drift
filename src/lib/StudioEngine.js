@@ -39,10 +39,24 @@ export class StudioEngine {
         };
         if (this.webcamBlob) {
             this.webcamVideo = document.createElement('video');
-            this.webcamVideo.src = URL.createObjectURL(this.webcamBlob);
+            this.webcamVideo.src = typeof this.webcamBlob === 'string' ? this.webcamBlob : URL.createObjectURL(this.webcamBlob);
             this.webcamVideo.muted = true;
             this.webcamVideo.playsInline = true;
             this.webcamVideo.load();
+        }
+
+        // Multi-Track Audio (WASAPI system loopback + mic)
+        this.systemAudioUrl = options.systemAudioUrl || null;
+        this.micAudioUrl = options.micAudioUrl || null;
+        this.systemAudio = null;
+        this.micAudio = null;
+        if (this.systemAudioUrl) {
+            this.systemAudio = new Audio(this.systemAudioUrl);
+            this.systemAudio.preload = 'auto';
+        }
+        if (this.micAudioUrl) {
+            this.micAudio = new Audio(this.micAudioUrl);
+            this.micAudio.preload = 'auto';
         }
 
         // Auto-Captions Subtitles
@@ -148,7 +162,11 @@ export class StudioEngine {
 
     init() {
         console.log('[Studio] init() called');
-        this.video.src = URL.createObjectURL(this.blob);
+        if (typeof this.blob === 'string') {
+            this.video.src = this.blob;
+        } else if (this.blob instanceof Blob) {
+            this.video.src = URL.createObjectURL(this.blob);
+        }
         this.video.muted = true; // Essential: muted allows instant first-frame decoding without browser autoplay block
         try {
             this.video.load();
@@ -216,12 +234,26 @@ export class StudioEngine {
             this.webcamVideo.currentTime = Math.max(0, this.video.currentTime + (this.webcamOffset || 0));
             this.webcamVideo.play().catch(() => {});
         }
+        if (this.systemAudio) {
+            this.systemAudio.currentTime = this.video.currentTime;
+            this.systemAudio.play().catch(() => {});
+        }
+        if (this.micAudio) {
+            this.micAudio.currentTime = this.video.currentTime;
+            this.micAudio.play().catch(() => {});
+        }
     }
 
     pause() {
         this.video.pause();
         if (this.webcamVideo) {
             this.webcamVideo.pause();
+        }
+        if (this.systemAudio) {
+            this.systemAudio.pause();
+        }
+        if (this.micAudio) {
+            this.micAudio.pause();
         }
     }
 
@@ -231,6 +263,12 @@ export class StudioEngine {
         }
         if (this.webcamVideo) {
             this.webcamVideo.currentTime = Math.max(0, targetTime + (this.webcamOffset || 0));
+        }
+        if (this.systemAudio) {
+            this.systemAudio.currentTime = targetTime;
+        }
+        if (this.micAudio) {
+            this.micAudio.currentTime = targetTime;
         }
         this.resetCamera();
         this.drawFrame();
@@ -367,6 +405,46 @@ export class StudioEngine {
             if (this.webcamVideo) {
                 this.webcamVideo.playbackRate = targetRate;
             }
+            if (this.systemAudio) {
+                this.systemAudio.playbackRate = targetRate;
+            }
+            if (this.micAudio) {
+                this.micAudio.playbackRate = targetRate;
+            }
+        }
+    }
+
+    dispose() {
+        this.isPlaying = false;
+        if (this.animationFrame) {
+            cancelAnimationFrame(this.animationFrame);
+            this.animationFrame = null;
+        }
+        if (this.video) {
+            this.video.pause();
+            this.video.onloadedmetadata = null;
+            this.video.onloadeddata = null;
+            this.video.oncanplay = null;
+            this.video.ontimeupdate = null;
+            this.video.onplay = null;
+            this.video.onpause = null;
+            this.video.onended = null;
+            this.video.onseeked = null;
+        }
+        if (this.webcamVideo) {
+            this.webcamVideo.pause();
+            this.webcamVideo.src = '';
+            this.webcamVideo = null;
+        }
+        if (this.systemAudio) {
+            this.systemAudio.pause();
+            this.systemAudio.src = '';
+            this.systemAudio = null;
+        }
+        if (this.micAudio) {
+            this.micAudio.pause();
+            this.micAudio.src = '';
+            this.micAudio = null;
         }
     }
 
@@ -784,14 +862,47 @@ export class StudioEngine {
         let audioEncoder = null;
         let hasAacAudio = false;
 
-        if (typeof AudioEncoder !== 'undefined' && this.blob) {
+        if (typeof AudioEncoder !== 'undefined' && (this.systemAudioUrl || this.micAudioUrl || this.blob)) {
             try {
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
                 if (AudioCtx) {
                     const tempCtx = new AudioCtx();
                     try {
-                        const arrayBuf = await this.blob.arrayBuffer();
-                        audioBuffer = await tempCtx.decodeAudioData(arrayBuf);
+                        const loadBuf = async (src) => {
+                            if (!src) return null;
+                            const buf = typeof src === 'string'
+                                ? await fetch(src).then(r => r.arrayBuffer())
+                                : await src.arrayBuffer();
+                            return await tempCtx.decodeAudioData(buf);
+                        };
+
+                        const sysBuf = await loadBuf(this.systemAudioUrl);
+                        const micBuf = await loadBuf(this.micAudioUrl);
+
+                        if (sysBuf && micBuf) {
+                            const numChannels = Math.max(sysBuf.numberOfChannels, micBuf.numberOfChannels, 2);
+                            const length = Math.max(sysBuf.length, micBuf.length);
+                            const sampleRate = sysBuf.sampleRate;
+                            audioBuffer = tempCtx.createBuffer(numChannels, length, sampleRate);
+
+                            for (let ch = 0; ch < numChannels; ch++) {
+                                const out = audioBuffer.getChannelData(ch);
+                                const s = ch < sysBuf.numberOfChannels ? sysBuf.getChannelData(ch) : sysBuf.getChannelData(0);
+                                const m = ch < micBuf.numberOfChannels ? micBuf.getChannelData(ch) : micBuf.getChannelData(0);
+                                for (let i = 0; i < length; i++) {
+                                    const sVal = i < s.length ? s[i] : 0;
+                                    const mVal = i < m.length ? m[i] * 1.3 : 0;
+                                    out[i] = Math.max(-1, Math.min(1, sVal + mVal));
+                                }
+                            }
+                        } else if (sysBuf) {
+                            audioBuffer = sysBuf;
+                        } else if (micBuf) {
+                            audioBuffer = micBuf;
+                        } else if (this.blob) {
+                            audioBuffer = await loadBuf(this.blob);
+                        }
+
                         if (audioBuffer && audioBuffer.length > 0) {
                             const aacCheck = await AudioEncoder.isConfigSupported({
                                 codec: 'mp4a.40.2',

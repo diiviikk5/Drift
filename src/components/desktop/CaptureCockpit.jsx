@@ -34,6 +34,7 @@ export default function CaptureCockpit({
     onStartPreview = null,
     autoMinimize = true,
     onToggleAutoMinimize = null,
+    isNativeSupported = false,
 }) {
     const [audioLevel, setAudioLevel] = useState(0);
 
@@ -179,7 +180,9 @@ export default function CaptureCockpit({
 
                     <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between bg-black/75 backdrop-blur-md px-3 py-2 rounded-lg border border-white/10 text-xs text-white pointer-events-none">
                         <span className="truncate max-w-[300px] font-medium">{activeSource.name}</span>
-                        <span className="text-[11px] text-gray-300 font-mono">Hardware Accelerated</span>
+                        <span className="text-[11px] text-gray-300 font-mono">
+                            {isNativeSupported ? 'DirectX WGC • 60 FPS H.264' : 'Hardware Accelerated'}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -333,11 +336,23 @@ export default function CaptureCockpit({
                     <span className="text-[11px] font-medium">Auto-minimize during recording</span>
                 </label>
                 <div className="flex items-center gap-2 font-mono text-[10px] text-[var(--text-app-muted)]">
-                    <span>48 kHz Voice Boost</span>
-                    <span>•</span>
-                    <span>VP9 60 FPS</span>
-                    <span>•</span>
-                    <span className="text-[var(--accent-app)] font-semibold">25 Mbps Lossless</span>
+                    {isNativeSupported ? (
+                        <>
+                            <span className="text-emerald-400 font-semibold">WASAPI Multi-Track</span>
+                            <span>•</span>
+                            <span>DirectX H.264</span>
+                            <span>•</span>
+                            <span className="text-[var(--accent-app)] font-semibold">Zero Dialogs</span>
+                        </>
+                    ) : (
+                        <>
+                            <span>48 kHz Voice Boost</span>
+                            <span>•</span>
+                            <span>VP9 60 FPS</span>
+                            <span>•</span>
+                            <span className="text-[var(--accent-app)] font-semibold">25 Mbps Lossless</span>
+                        </>
+                    )}
                 </div>
             </div>
 

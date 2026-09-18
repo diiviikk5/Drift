@@ -3,6 +3,7 @@ mod rendering;
 
 use commands::input::InputListenerState;
 use commands::native_capture::NativeRecorderState;
+use commands::native_recorder::NativeSessionManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -15,6 +16,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .manage(InputListenerState::default())
         .manage(NativeRecorderState::default())
+        .manage(NativeSessionManager::default())
         .setup(|app| {
             use tauri::Manager;
             let _ = app.handle().plugin(
@@ -61,6 +63,10 @@ pub fn run() {
             commands::zoom::interpolate_cursor_at_time,
             commands::zoom::evaluate_frame,
             commands::zoom::precompute_frames,
+            commands::native_recorder::start_native_session,
+            commands::native_recorder::stop_native_session,
+            commands::native_recorder::get_native_session_status,
+            commands::native_recorder::is_native_capture_supported,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Drift");
