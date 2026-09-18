@@ -74,7 +74,15 @@ export default function InspectorPanel({
     connectedZooms = true,
     onToggleConnectedZooms,
     reactiveWebcam = true,
-    onToggleReactiveWebcam
+    onToggleReactiveWebcam,
+    insetPadding = 0.08,
+    onChangeInsetPadding,
+    borderRadius = 18,
+    onChangeBorderRadius,
+    windowChrome = true,
+    onToggleWindowChrome,
+    springProfile = 'cinematic',
+    onChangeSpringProfile,
 }) {
     const [activeTab, setActiveTab] = useState('style');
     const fileInputRef = useRef(null);
@@ -87,7 +95,6 @@ export default function InspectorPanel({
         { id: '1:1', label: '1:1', desc: 'Square (LinkedIn, Feed)' },
         { id: '4:5', label: '4:5', desc: 'Portrait (Instagram)' },
     ];
-    const [springProfile, setSpringProfile] = useState('cinematic');
 
     const handleFileChange = (e) => {
         const file = e.target.files?.[0];
@@ -228,6 +235,71 @@ export default function InspectorPanel({
                                 </div>
                             )}
                         </div>
+
+                        {/* Canvas Inset / Padding */}
+                        <div className="space-y-2 pt-2 border-t border-[var(--border-app)]">
+                            <div className="flex items-center justify-between">
+                                <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
+                                    Canvas Margin (Padding)
+                                </label>
+                                <span className="text-xs font-mono font-bold text-[var(--accent-app)]">{Math.round(insetPadding * 100)}%</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="0.16"
+                                step="0.01"
+                                value={insetPadding}
+                                onChange={(e) => onChangeInsetPadding && onChangeInsetPadding(parseFloat(e.target.value))}
+                                className="w-full accent-[var(--accent-app)] cursor-pointer"
+                            />
+                            <div className="flex justify-between text-[10px] text-[var(--text-app-muted)] font-mono">
+                                <span>0% (Flush)</span>
+                                <span>8% (Studio)</span>
+                                <span>16% (Wide)</span>
+                            </div>
+                        </div>
+
+                        {/* Corner Radius & Window Header */}
+                        <div className="space-y-3 pt-2 border-t border-[var(--border-app)]">
+                            <div className="flex items-center justify-between">
+                                <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
+                                    Window Rounding
+                                </label>
+                                <span className="text-xs font-mono font-bold text-[var(--accent-app)]">{borderRadius}px</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="32"
+                                step="2"
+                                value={borderRadius}
+                                onChange={(e) => onChangeBorderRadius && onChangeBorderRadius(parseInt(e.target.value))}
+                                className="w-full accent-[var(--accent-app)] cursor-pointer"
+                            />
+                            <div className="flex justify-between text-[10px] text-[var(--text-app-muted)] font-mono">
+                                <span>0px (Sharp)</span>
+                                <span>18px (Modern)</span>
+                                <span>32px (Soft)</span>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-1">
+                                <div>
+                                    <div className="text-xs font-semibold text-[var(--text-app)]">Window Title Bar</div>
+                                    <div className="text-[10px] text-[var(--text-app-muted)]">Show macOS style header chrome with traffic lights</div>
+                                </div>
+                                <button
+                                    onClick={() => onToggleWindowChrome && onToggleWindowChrome(!windowChrome)}
+                                    className={`w-9 h-5 rounded-full transition-all relative ${
+                                        windowChrome ? 'bg-[var(--accent-app)]' : 'bg-gray-600'
+                                    }`}
+                                >
+                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                                        windowChrome ? 'left-[18px]' : 'left-0.5'
+                                    }`} />
+                                </button>
+                            </div>
+                        </div>
                     </>
                 )}
 
@@ -270,7 +342,7 @@ export default function InspectorPanel({
                                 ].map((p) => (
                                     <button
                                         key={p.id}
-                                        onClick={() => setSpringProfile(p.id)}
+                                        onClick={() => onChangeSpringProfile && onChangeSpringProfile(p.id)}
                                         className={`py-1.5 px-1 rounded-md border text-center text-xs transition-all ${
                                             springProfile === p.id
                                                 ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold'

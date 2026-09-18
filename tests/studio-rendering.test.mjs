@@ -119,3 +119,44 @@ test('compositor renders all vector cursor themes without throwing', () => {
         }, `Failed rendering cursor theme: ${theme}`);
     }
 });
+
+test('springProfile controls camera ramp speed between snappy and cinematic', () => {
+    const focusSeg = [{ startTime: 1.0, endTime: 4.0, targetX: 0.8, targetY: 0.2, zoomScale: 2.0 }];
+    // At t = 1.45s (0.45s after start):
+    // snappy (0.42s ramp) is already fully zoomed (scale = 2.0)
+    const snappyCam = evaluateCameraAtTime(1.45, focusSeg, [], { springProfile: 'snappy' });
+    // cinematic (0.85s ramp) is still easing in (scale < 2.0)
+    const cinemaCam = evaluateCameraAtTime(1.45, focusSeg, [], { springProfile: 'cinematic' });
+
+    assert.ok(snappyCam.scale > 1.95, 'Snappy should have reached zoom target');
+    assert.ok(cinemaCam.scale < 1.90, 'Cinematic should still be smoothly easing');
+    assert.ok(snappyCam.scale > cinemaCam.scale, 'Snappy camera should be further along ramp than cinematic');
+});
+
+test('renderFrame renders Cinema Spotlight scene mode with radial vignette', () => {
+    const noop = () => {};
+    let radialGradCreated = false;
+    const context = new Proxy({ canvas: { width: 1920, height: 1080 } }, {
+        get(target, key) {
+            if (key in target) return target[key];
+            if (key === 'createRadialGradient') {
+                radialGradCreated = true;
+                return () => ({ addColorStop: noop });
+            }
+            if (key === 'createLinearGradient') return () => ({ addColorStop: noop });
+            return noop;
+        },
+    });
+
+    assert.doesNotThrow(() => {
+        renderFrame(context, 2.0, null, {
+            focusSegments: [{ id: 'spot_1', startTime: 1.0, endTime: 3.0, targetX: 0.4, targetY: 0.6, sceneMode: 'spotlight' }],
+            mouseSamples: [{ time: 2000, x: 0.4, y: 0.6 }],
+        }, {
+            insetPadding: 0.12,
+            borderRadius: 24,
+            windowChrome: false,
+        });
+    });
+    assert.ok(radialGradCreated, 'Cinema Spotlight should create radial gradient vignette');
+});

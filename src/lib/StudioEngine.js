@@ -79,6 +79,10 @@ export class StudioEngine {
         this.cursorTheme = options.cursorTheme || 'macos';
         this.cursorScale = options.cursorScale ?? 1.0;
         this.splineSmoothing = options.splineSmoothing ?? true;
+        this.springProfile = options.springProfile || 'cinematic';
+        this.insetPadding = options.insetPadding ?? 0.08;
+        this.borderRadius = options.borderRadius ?? 18;
+        this.windowChrome = options.windowChrome !== false;
 
         // Semantic Interaction Analyzer & Focus Track
         this.interactionAnalyzer = new InteractionAnalyzer();
@@ -648,7 +652,10 @@ export class StudioEngine {
             {
                 background: this.background,
                 customBackgroundImage: this.customBackgroundImage,
-                windowChrome: true,
+                insetPadding: this.insetPadding ?? 0.08,
+                borderRadius: this.borderRadius ?? 18,
+                windowChrome: this.windowChrome !== false,
+                springProfile: this.springProfile || 'cinematic',
                 showCursor: this.showCursor,
                 cursorTheme: this.cursorTheme || 'macos',
                 cursorScale: this.cursorScale ?? 1,
@@ -699,6 +706,26 @@ export class StudioEngine {
 
     setSplineSmoothing(enabled) {
         this.splineSmoothing = Boolean(enabled);
+        this.drawFrame();
+    }
+
+    setSpringProfile(profile) {
+        this.springProfile = profile;
+        this.drawFrame();
+    }
+
+    setInsetPadding(padding) {
+        this.insetPadding = Math.max(0, Math.min(0.2, padding));
+        this.drawFrame();
+    }
+
+    setBorderRadius(radius) {
+        this.borderRadius = Math.max(0, Math.min(48, radius));
+        this.drawFrame();
+    }
+
+    setWindowChrome(enabled) {
+        this.windowChrome = Boolean(enabled);
         this.drawFrame();
     }
 

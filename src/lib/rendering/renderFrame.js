@@ -118,7 +118,10 @@ function smoothstep(edge0, edge1, x) {
  */
 export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples = [], options = {}) {
     const zoomMultiplier = options.zoomMultiplier ?? 1.0;
-    const transitionDuration = options.transitionDuration ?? 0.7; // seconds for smooth zoom ramp
+    let transitionDuration = options.transitionDuration ?? 0.7; // seconds for smooth zoom ramp
+    if (options.springProfile === 'snappy') transitionDuration = 0.42;
+    else if (options.springProfile === 'cinematic') transitionDuration = 0.85;
+    else if (options.springProfile === 'natural') transitionDuration = 0.65;
     const CHAINED_PAN_GAP_SEC = 1.5; // OpenScreen chained pan threshold
 
     if (!focusSegments || focusSegments.length === 0) {
@@ -477,7 +480,12 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
     }
 
     // 5. Calculate Camera Zoom & Position
-    const cameraOptions = { zoomMultiplier: zoomMagnification, connectedZooms: renderSettings.connectedZooms, tiltAngle: renderSettings.tiltAngle };
+    const cameraOptions = {
+        zoomMultiplier: zoomMagnification,
+        connectedZooms: renderSettings.connectedZooms,
+        tiltAngle: renderSettings.tiltAngle,
+        springProfile: renderSettings.springProfile,
+    };
     const camera = evaluateCameraAtTime(timeSec, focusSegments, mouseSamples, cameraOptions);
 
     // Optional Cinema Motion Blur (180-degree shutter interval)
@@ -613,6 +621,42 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
     }
 
     ctx.restore(); // restore video camera transform
+ 
+    // 8.5 Cinema Screen Spotlight (Dims background, illuminates focal target)
+    if (camera.activeSeg?.sceneMode === 'spotlight' && (!webcamSettings?.enabled || !webcamSource || webcamSettings?.position !== 'center')) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(padX, padY + headerH, frameW, videoH);
+        ctx.clip();
+
+        let spotX = padX + (camera.activeSeg.targetX ?? 0.5) * frameW;
+        let spotY = padY + headerH + (camera.activeSeg.targetY ?? 0.5) * videoH;
+        if (mouseSamples && mouseSamples.length > 0) {
+            const cursor = getInterpolatedCursor(timeSec, mouseSamples);
+            if (cursor) {
+                spotX = padX + cursor.x * frameW;
+                spotY = padY + headerH + cursor.y * videoH;
+            }
+        }
+
+        const spotRadius = Math.min(frameW, videoH) * 0.22;
+        const grad = ctx.createRadialGradient(spotX, spotY, spotRadius * 0.35, spotX, spotY, spotRadius * 1.35);
+        grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        grad.addColorStop(0.65, 'rgba(0, 0, 0, 0.42)');
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0.72)');
+
+        ctx.fillStyle = grad;
+        ctx.fillRect(padX, padY + headerH, frameW, videoH);
+
+        // Crisp glowing neon border around spotlight
+        ctx.beginPath();
+        ctx.arc(spotX, spotY, spotRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(220, 254, 80, 0.4)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.restore();
+    }
 
     // 9. Draw Annotations Layer (Pinned to Frame Space)
     if (annotations && annotations.length > 0) {

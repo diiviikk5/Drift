@@ -126,6 +126,10 @@ export default function RecorderPage() {
     const [isMicAudioMuted, setIsMicAudioMuted] = useState(false);
     const [autoDuck, setAutoDuck] = useState(true);
     const [aspectRatio, setAspectRatio] = useState('16:9');
+    const [insetPadding, setInsetPadding] = useState(0.08);
+    const [borderRadius, setBorderRadius] = useState(18);
+    const [windowChrome, setWindowChrome] = useState(true);
+    const [springProfile, setSpringProfile] = useState('cinematic');
 
     // OpenScreen & Recordly Features State
     const [isTeleprompterOpen, setIsTeleprompterOpen] = useState(false);
@@ -374,6 +378,10 @@ export default function RecorderPage() {
                         isSystemAudioMuted,
                         isMicAudioMuted,
                         autoDuck,
+                        insetPadding,
+                        borderRadius,
+                        windowChrome,
+                        springProfile,
                         focusSegments: savedSegmentsRef.current,
                         showCursor: showCursor || ((recordedMoves && recordedMoves.length > 0) || (recordedClicks && recordedClicks.length > 0)),
                         systemAudioUrl: nativeAudioTracks.systemAudioUrl,
@@ -397,6 +405,10 @@ export default function RecorderPage() {
                     isSystemAudioMuted,
                     isMicAudioMuted,
                     autoDuck,
+                    insetPadding,
+                    borderRadius,
+                    windowChrome,
+                    springProfile,
                     tiltAngle,
                     connectedZooms,
                     reactiveWebcam,
@@ -1071,6 +1083,7 @@ export default function RecorderPage() {
                 customBackground: customImage?.src ?? null,
                 zoomLevel, showCursor, cursorTheme, cursorScale, splineSmoothing, aspectRatio,
                 systemAudioVolume, micAudioVolume, isSystemAudioMuted, isMicAudioMuted, autoDuck,
+                insetPadding, borderRadius, windowChrome, springProfile,
                 tiltAngle, connectedZooms, reactiveWebcam, webcamSettings, trimStart, trimEnd,
             });
             triggerBlobDownload(project, 'drift');
@@ -1138,6 +1151,10 @@ export default function RecorderPage() {
             setIsMicAudioMuted(project.isMicAudioMuted ?? false);
             setAutoDuck(project.autoDuck ?? true);
             setAspectRatio(project.aspectRatio ?? '16:9');
+            setInsetPadding(project.insetPadding ?? 0.08);
+            setBorderRadius(project.borderRadius ?? 18);
+            setWindowChrome(project.windowChrome !== false);
+            setSpringProfile(project.springProfile ?? 'cinematic');
             setTiltAngle(project.tiltAngle ?? 0);
             setConnectedZooms(project.connectedZooms ?? true);
             setReactiveWebcam(project.reactiveWebcam ?? true);
@@ -1394,6 +1411,26 @@ export default function RecorderPage() {
                             onToggleReactiveWebcam={(enabled) => {
                                 setReactiveWebcam(enabled);
                                 if (studioRef.current) studioRef.current.setReactiveWebcam(enabled);
+                            }}
+                            insetPadding={insetPadding}
+                            onChangeInsetPadding={(pad) => {
+                                setInsetPadding(pad);
+                                if (studioRef.current) studioRef.current.setInsetPadding(pad);
+                            }}
+                            borderRadius={borderRadius}
+                            onChangeBorderRadius={(rad) => {
+                                setBorderRadius(rad);
+                                if (studioRef.current) studioRef.current.setBorderRadius(rad);
+                            }}
+                            windowChrome={windowChrome}
+                            onToggleWindowChrome={(chrome) => {
+                                setWindowChrome(chrome);
+                                if (studioRef.current) studioRef.current.setWindowChrome(chrome);
+                            }}
+                            springProfile={springProfile}
+                            onChangeSpringProfile={(profile) => {
+                                setSpringProfile(profile);
+                                if (studioRef.current) studioRef.current.setSpringProfile(profile);
                             }}
                         />
                     </div>
