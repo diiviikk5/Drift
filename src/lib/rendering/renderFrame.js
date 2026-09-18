@@ -720,9 +720,25 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
                 }
             }
 
+            // OpenScreen dynamic cursor sway rotation
+            let swayAngle = 0;
+            if (mouseSamples.length > 2 && timeSec > 0.03) {
+                const prev = getInterpolatedCursor(timeSec - 0.03, mouseSamples);
+                if (prev) {
+                    const dx = (cursor.x - prev.x) * frameW;
+                    const dy = (cursor.y - prev.y) * videoH;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > 1.5) {
+                        const speedFactor = Math.min(1, dist / 25);
+                        const dirBias = Math.max(-1, Math.min(1, (dx + dy * 0.5) / dist));
+                        swayAngle = dirBias * speedFactor * (Math.PI / 24); // organic ~7.5 deg tilt
+                    }
+                }
+            }
+
             ctx.save();
             ctx.globalAlpha = idleOpacity;
-            _drawThemedCursor(ctx, curScreenX, curScreenY, cursorScale * clickFactor * (frameW / 1920), cursorTheme);
+            _drawThemedCursor(ctx, curScreenX, curScreenY, cursorScale * clickFactor * (frameW / 1920), cursorTheme, swayAngle);
             ctx.restore();
         }
     }
@@ -1152,7 +1168,7 @@ function _drawAnnotations(ctx, annotations, timeSec, bounds) {
 /**
  * Draw Cursor according to theme
  */
-function _drawThemedCursor(ctx, x, y, scale = 1.0, theme = 'macos') {
+function _drawThemedCursor(ctx, x, y, scale = 1.0, theme = 'macos', swayAngle = 0) {
     if (theme === 'dot') {
         ctx.save();
         ctx.beginPath();
@@ -1189,6 +1205,7 @@ function _drawThemedCursor(ctx, x, y, scale = 1.0, theme = 'macos') {
     if (theme === 'cyber') {
         ctx.save();
         ctx.translate(x, y);
+        if (swayAngle) ctx.rotate(swayAngle);
         ctx.scale(scale * 1.3, scale * 1.3);
         ctx.shadowColor = '#DCFE50';
         ctx.shadowBlur = 18;
@@ -1213,6 +1230,7 @@ function _drawThemedCursor(ctx, x, y, scale = 1.0, theme = 'macos') {
     if (theme === 'windows') {
         ctx.save();
         ctx.translate(x, y);
+        if (swayAngle) ctx.rotate(swayAngle);
         ctx.scale(scale * 1.25, scale * 1.25);
         ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
         ctx.shadowBlur = 8;
@@ -1238,6 +1256,7 @@ function _drawThemedCursor(ctx, x, y, scale = 1.0, theme = 'macos') {
     if (theme === 'neon') {
         ctx.save();
         ctx.translate(x, y);
+        if (swayAngle) ctx.rotate(swayAngle);
         ctx.scale(scale * 1.2, scale * 1.2);
         ctx.shadowColor = '#00f0ff';
         ctx.shadowBlur = 14;
@@ -1262,15 +1281,16 @@ function _drawThemedCursor(ctx, x, y, scale = 1.0, theme = 'macos') {
     }
 
     // Default: macOS style
-    _drawSyntheticCursor(ctx, x, y, scale);
+    _drawSyntheticCursor(ctx, x, y, scale, swayAngle);
 }
 
 /**
  * Draw crisp modern macOS-style synthetic pointer (OpenScreen / Screen Studio aesthetic)
  */
-function _drawSyntheticCursor(ctx, x, y, scale = 1.0) {
+function _drawSyntheticCursor(ctx, x, y, scale = 1.0, swayAngle = 0) {
     ctx.save();
     ctx.translate(x, y);
+    if (swayAngle) ctx.rotate(swayAngle);
     ctx.scale(scale * 1.05, scale * 1.05);
 
     // Subtle ambient pointer shadow

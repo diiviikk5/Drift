@@ -720,43 +720,8 @@ export class DriftEngine {
 
                 ctx.restore(); // Restore camera transform
 
-                // Draw Live Webcam PiP Overlay if active
-                if (this.webcamEnabled && this.webcamVideo && this.webcamVideo.readyState >= 2) {
-                    const pipSize = Math.round(vw * (this.webcamSettings.size || 0.22));
-                    const pipMargin = Math.round(vw * 0.025);
-                    const pipX = frameX + vw - pipSize - pipMargin;
-                    const pipY = frameY + vh - pipSize - pipMargin;
-
-                    ctx.save();
-                    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-                    ctx.shadowBlur = 18;
-                    ctx.shadowOffsetY = 8;
-                    ctx.beginPath();
-                    ctx.arc(pipX + pipSize / 2, pipY + pipSize / 2, pipSize / 2, 0, Math.PI * 2);
-                    ctx.fillStyle = '#000000';
-                    ctx.fill();
-
-                    ctx.clip();
-                    if (this.webcamSettings.mirrored) {
-                        ctx.translate(pipX + pipSize, pipY);
-                        ctx.scale(-1, 1);
-                        ctx.translate(-pipX, -pipY);
-                    }
-                    const minD = Math.min(this.webcamVideo.videoWidth, this.webcamVideo.videoHeight);
-                    const sx = (this.webcamVideo.videoWidth - minD) / 2;
-                    const sy = (this.webcamVideo.videoHeight - minD) / 2;
-                    ctx.drawImage(this.webcamVideo, sx, sy, minD, minD, pipX, pipY, pipSize, pipSize);
-                    ctx.restore();
-
-                    // PiP Ring border
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.arc(pipX + pipSize / 2, pipY + pipSize / 2, pipSize / 2, 0, Math.PI * 2);
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-                    ctx.lineWidth = 2.5;
-                    ctx.stroke();
-                    ctx.restore();
-                }
+                // Note: Webcam is recorded as an independent parallel video stream (webcamBlob),
+                // matching OpenScreen architecture so the screen video remains clean and never has a duplicate camera burned into its pixels.
 
                 // Draw zoom state indicator
                 if (this.isRecording && this.camera.scale > 1.05) {
