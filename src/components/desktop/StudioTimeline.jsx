@@ -18,7 +18,11 @@ export default function StudioTimeline({
     onAddZoom,
     onClearZooms,
     annotations = [],
-    onAddAnnotation
+    onAddAnnotation,
+    trimStart = 0,
+    onChangeTrimStart,
+    trimEnd = 0,
+    onChangeTrimEnd,
 }) {
     const trackRef = useRef(null);
 
@@ -39,6 +43,7 @@ export default function StudioTimeline({
 
     const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
     const selectedSeg = focusSegments.find(s => s.id === selectedSegmentId);
+    const effectiveTrimEnd = (trimEnd > 0 && trimEnd <= duration) ? trimEnd : duration;
 
     return (
         <div className="bg-[var(--bg-card)] border-t border-[var(--border-app)] p-4 select-none flex-shrink-0 space-y-3 transition-colors">
@@ -59,6 +64,36 @@ export default function StudioTimeline({
                         <span className="font-bold text-[var(--text-app)]">{formatTime(currentTime)}</span>
                         <span className="text-[var(--text-app-muted)]">/</span>
                         <span className="text-[var(--text-app-muted)]">{formatTime(duration)}</span>
+                    </div>
+
+                    {/* Timeline Range In/Out Trim */}
+                    <div className="flex items-center bg-[var(--bg-card-subtle)] border border-[var(--border-app)] rounded-lg p-0.5 gap-1 text-[11px] font-mono">
+                        <button
+                            onClick={() => onChangeTrimStart && onChangeTrimStart(currentTime)}
+                            className="px-2 py-1 rounded-md text-[var(--text-app-muted)] hover:text-[var(--accent-app)] hover:bg-[var(--bg-card)] transition-all font-semibold"
+                            title="Set In-Point / Trim Start at current playhead"
+                        >
+                            [ In ({formatTime(trimStart)})
+                        </button>
+                        <button
+                            onClick={() => onChangeTrimEnd && onChangeTrimEnd(currentTime)}
+                            className="px-2 py-1 rounded-md text-[var(--text-app-muted)] hover:text-[var(--accent-app)] hover:bg-[var(--bg-card)] transition-all font-semibold"
+                            title="Set Out-Point / Trim End at current playhead"
+                        >
+                            ] Out ({formatTime(effectiveTrimEnd)})
+                        </button>
+                        {(trimStart > 0 || (trimEnd > 0 && trimEnd < duration)) && (
+                            <button
+                                onClick={() => {
+                                    if (onChangeTrimStart) onChangeTrimStart(0);
+                                    if (onChangeTrimEnd) onChangeTrimEnd(duration);
+                                }}
+                                className="px-1.5 py-1 text-red-400 hover:text-red-300 transition-colors"
+                                title="Reset Trim Range"
+                            >
+                                Reset
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -240,6 +275,20 @@ export default function StudioTimeline({
                     className="absolute top-0 bottom-0 left-0 bg-[var(--accent-app)]/20 border-r-2 border-[var(--accent-app)] pointer-events-none"
                     style={{ width: `${progressPct}%` }}
                 />
+
+                {/* Trim Out-of-bounds Shading */}
+                {duration > 0 && trimStart > 0 && (
+                    <div
+                        className="absolute top-0 bottom-0 left-0 bg-black/60 backdrop-blur-[1px] border-r-2 border-red-500/70 z-15 pointer-events-none"
+                        style={{ width: `${(trimStart / duration) * 100}%` }}
+                    />
+                )}
+                {duration > 0 && effectiveTrimEnd < duration && (
+                    <div
+                        className="absolute top-0 bottom-0 right-0 bg-black/60 backdrop-blur-[1px] border-l-2 border-red-500/70 z-15 pointer-events-none"
+                        style={{ width: `${((duration - effectiveTrimEnd) / duration) * 100}%` }}
+                    />
+                )}
 
                 {/* Focus Segment Blocks */}
                 {duration > 0 && focusSegments && focusSegments.length > 0 && focusSegments.map((seg, idx) => {

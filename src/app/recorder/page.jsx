@@ -1075,8 +1075,18 @@ export default function RecorderPage() {
 
     const saveProject = async () => {
         try {
+            let blobToSave = recordedBlob;
+            if (typeof blobToSave === 'string') {
+                const res = await fetch(blobToSave);
+                blobToSave = await res.blob();
+            }
+            let webcamToSave = recordedWebcamBlob;
+            if (typeof webcamToSave === 'string') {
+                const res = await fetch(webcamToSave);
+                webcamToSave = await res.blob();
+            }
             const project = await encodeProject({
-                recording: recordedBlob, webcam: recordedWebcamBlob, duration,
+                recording: blobToSave, webcam: webcamToSave, duration,
                 clicks: recordedClicks, moves: recordedMoves,
                 focusSegments: studioRef.current?.getFocusSegments() ?? focusSegments,
                 annotations, captions, captionsEnabled, background,
@@ -1330,6 +1340,16 @@ export default function RecorderPage() {
                                 onClearZooms={clearManualZooms}
                                 annotations={annotations}
                                 onAddAnnotation={handleAddAnnotation}
+                                trimStart={trimStart}
+                                onChangeTrimStart={(val) => {
+                                    setTrimStart(val);
+                                    if (studioRef.current) studioRef.current.trimStart = val;
+                                }}
+                                trimEnd={trimEnd}
+                                onChangeTrimEnd={(val) => {
+                                    setTrimEnd(val);
+                                    if (studioRef.current) studioRef.current.trimEnd = val;
+                                }}
                             />
                         </main>
 
