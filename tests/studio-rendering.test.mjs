@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateCameraAtTime, getInterpolatedCursor, renderFrame } from '../src/lib/rendering/renderFrame.js';
+import { evaluateCameraAtTime, getInterpolatedCursor, renderFrame, getFrameMetrics } from '../src/lib/rendering/renderFrame.js';
 import { InteractionAnalyzer } from '../src/lib/zoom/InteractionAnalyzer.js';
 
 const segments = [
@@ -158,5 +158,45 @@ test('renderFrame renders Cinema Spotlight scene mode with radial vignette', () 
             windowChrome: false,
         });
     });
-    assert.ok(radialGradCreated, 'Cinema Spotlight should create radial gradient vignette');
+    assert.ok(radialGradCreated, 'Radial gradient spotlight should have been created');
+});
+
+test('getFrameMetrics centers 16:9 content inside 9:16 vertical canvas without distortion', () => {
+    const mock16x9Video = { videoWidth: 1920, videoHeight: 1080 };
+    // In a 9:16 mobile canvas (1080 x 1920)
+    const metrics = getFrameMetrics(1080, 1920, mock16x9Video, { insetPadding: 0.08, windowChrome: false });
+
+    // Video aspect ratio must be strictly preserved
+    const computedAspect = metrics.frameW / metrics.videoH;
+    assert.ok(Math.abs(computedAspect - (16 / 9)) < 0.01, 'Computed frame aspect ratio must match 16:9');
+    // In 9:16 canvas, it must be centered vertically with padY > padX
+    assert.ok(metrics.padY > metrics.padX, 'Vertical padding should be larger to center the 16:9 window');
+    assert.ok(metrics.padX > 0, 'Horizontal inset padding should be respected');
+});
+
+test('renderFrame renders animated keystroke overlay without throwing', () => {
+    let textRendered = false;
+    const noop = () => {};
+    const context = new Proxy({ canvas: { width: 1920, height: 1080 } }, {
+        get(target, key) {
+            if (key in target) return target[key];
+            if (key === 'fillText') {
+                textRendered = true;
+                return noop;
+            }
+            if (key === 'measureText') return () => ({ width: 40 });
+            if (key === 'createLinearGradient' || key === 'createRadialGradient') return () => ({ addColorStop: noop });
+            return noop;
+        },
+    });
+
+    assert.doesNotThrow(() => {
+        renderFrame(context, 1.2, null, {
+            keystrokes: [{ time: 1.0, text: 'Cmd + K' }],
+        }, {
+            showKeystrokes: true,
+        });
+    });
+
+    assert.ok(textRendered, 'Keystroke text should be rendered');
 });

@@ -130,6 +130,12 @@ export default function RecorderPage() {
     const [borderRadius, setBorderRadius] = useState(18);
     const [windowChrome, setWindowChrome] = useState(true);
     const [springProfile, setSpringProfile] = useState('cinematic');
+    const [showKeystrokes, setShowKeystrokes] = useState(true);
+
+    // Interactive Drag-to-Zoom State
+    const [dragBox, setDragBox] = useState(null);
+    const isDraggingCanvasRef = useRef(false);
+    const dragStartPosRef = useRef({ clientX: 0, clientY: 0, canvasX: 0, canvasY: 0, rect: null });
 
     // OpenScreen & Recordly Features State
     const [isTeleprompterOpen, setIsTeleprompterOpen] = useState(false);
@@ -382,6 +388,7 @@ export default function RecorderPage() {
                         borderRadius,
                         windowChrome,
                         springProfile,
+                        showKeystrokes,
                         focusSegments: savedSegmentsRef.current,
                         showCursor: showCursor || ((recordedMoves && recordedMoves.length > 0) || (recordedClicks && recordedClicks.length > 0)),
                         systemAudioUrl: nativeAudioTracks.systemAudioUrl,
@@ -409,6 +416,7 @@ export default function RecorderPage() {
                     borderRadius,
                     windowChrome,
                     springProfile,
+                    showKeystrokes,
                     tiltAngle,
                     connectedZooms,
                     reactiveWebcam,
@@ -902,6 +910,120 @@ export default function RecorderPage() {
         setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
     };
 
+    const handleCanvasMouseDown = (e) => {
+        if (viewMode !== 'studio' || !studioRef.current || !studioVideoRef.current) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        isDraggingCanvasRef.current = true;
+        dragStartPosRef.current = {
+            clientX: e.clientX,
+            clientY: e.clientY,
+            canvasX: e.clientX - rect.left,
+            canvasY: e.clientY - rect.top,
+            rect,
+        };
+        setDragBox(null);
+    };
+
+    const handleCanvasMouseMove = (e) => {
+        if (!isDraggingCanvasRef.current) return;
+        const start = dragStartPosRef.current;
+        const rect = start.rect;
+        if (!rect) return;
+
+        const curCanvasX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+        const curCanvasY = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+
+        const dist = Math.hypot(e.clientX - start.clientX, e.clientY - start.clientY);
+        if (dist > 6) {
+            const left = Math.min(start.canvasX, curCanvasX);
+            const top = Math.min(start.canvasY, curCanvasY);
+            const width = Math.abs(curCanvasX - start.canvasX);
+            const height = Math.abs(curCanvasY - start.canvasY);
+
+            const normW = Math.max(0.04, width / rect.width);
+            const normH = Math.max(0.04, height / rect.height);
+            const previewScale = Math.min(3.5, Math.max(1.2, Math.min(1.0 / normW, 1.0 / normH))).toFixed(1);
+
+            setDragBox({
+                left,
+                top,
+                width,
+                height,
+                previewScale,
+            });
+        }
+    };
+
+    const handleCanvasMouseUp = (e) => {
+        if (!isDraggingCanvasRef.current) return;
+        isDraggingCanvasRef.current = false;
+        const start = dragStartPosRef.current;
+        const dist = Math.hypot(e.clientX - start.clientX, e.clientY - start.clientY);
+
+        if (dist <= 6) {
+            // Quick point click
+            handleCanvasClick(e);
+        } else if (dragBox && dragBox.width > 12 && dragBox.height > 12 && studioRef.current && studioVideoRef.current) {
+            // Drag box focal crop
+            const rect = start.rect;
+            const normX1 = dragBox.left / rect.width;
+            const normY1 = dragBox.top / rect.height;
+            const normX2 = (dragBox.left + dragBox.width) / rect.width;
+            const normY2 = (dragBox.top + dragBox.height) / rect.height;
+
+            const c1 = studioRef.current.resolveClick(normX1, normY1);
+            const c2 = studioRef.current.resolveClick(normX2, normY2);
+
+            const vidMinX = Math.min(c1.x, c2.x);
+            const vidMaxX = Math.max(c1.x, c2.x);
+            const vidMinY = Math.min(c1.y, c2.y);
+            const vidMaxY = Math.max(c1.y, c2.y);
+
+            const boxW = Math.max(0.04, vidMaxX - vidMinX);
+            const boxH = Math.max(0.04, vidMaxY - vidMinY);
+            const targetX = (vidMinX + vidMaxX) / 2;
+            const targetY = (vidMinY + vidMaxY) / 2;
+
+            const computedScale = Math.min(3.5, Math.max(1.2, Math.min(1.0 / boxW, 1.0 / boxH)));
+            const scale = Math.round(computedScale * 10) / 10;
+
+            const ct = studioVideoRef.current.currentTime;
+            studioRef.current.addZoom(ct, targetX, targetY, scale);
+            setRecordedClicks([...(studioRef.current.clicks || [])]);
+            setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
+        }
+
+        setDragBox(null);
+    };
+
+    const handleAddFocusSegment = (seg) => {
+        if (studioRef.current) {
+            studioRef.current.addFocusSegment(seg);
+            setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
+            setSelectedSegmentId(seg.id);
+        }
+    };
+
+    const handleSplitSegment = (segId, splitTime) => {
+        if (studioRef.current) {
+            const segs = studioRef.current.getFocusSegments() || [];
+            const seg = segs.find(s => s.id === segId);
+            if (seg && splitTime > seg.startTime + 0.1 && splitTime < seg.endTime - 0.1) {
+                const oldEnd = seg.endTime;
+                studioRef.current.updateFocusSegment(segId, { endTime: splitTime });
+                const newSeg = {
+                    ...seg,
+                    id: 'seg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+                    startTime: splitTime,
+                    endTime: oldEnd,
+                };
+                studioRef.current.addFocusSegment(newSeg);
+                setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
+                setSelectedSegmentId(newSeg.id);
+            }
+        }
+    };
+
     const clearManualZooms = () => {
         if (!studioRef.current) return;
         studioRef.current.clicks = [];
@@ -1093,7 +1215,7 @@ export default function RecorderPage() {
                 customBackground: customImage?.src ?? null,
                 zoomLevel, showCursor, cursorTheme, cursorScale, splineSmoothing, aspectRatio,
                 systemAudioVolume, micAudioVolume, isSystemAudioMuted, isMicAudioMuted, autoDuck,
-                insetPadding, borderRadius, windowChrome, springProfile,
+                insetPadding, borderRadius, windowChrome, springProfile, showKeystrokes,
                 tiltAngle, connectedZooms, reactiveWebcam, webcamSettings, trimStart, trimEnd,
             });
             triggerBlobDownload(project, 'drift');
@@ -1155,6 +1277,7 @@ export default function RecorderPage() {
             setCursorTheme(project.cursorTheme ?? 'macos');
             setCursorScale(project.cursorScale ?? 1);
             setSplineSmoothing(project.splineSmoothing ?? true);
+            setShowKeystrokes(project.showKeystrokes ?? true);
             setSystemAudioVolume(project.systemAudioVolume ?? 1.0);
             setMicAudioVolume(project.micAudioVolume ?? 1.2);
             setIsSystemAudioMuted(project.isSystemAudioMuted ?? false);
@@ -1285,21 +1408,47 @@ export default function RecorderPage() {
                             <div className="flex-1 flex items-center justify-center p-6 relative overflow-hidden">
                                 {recordedBlob ? (
                                     <div
-                                        className="relative max-w-full max-h-full overflow-hidden cursor-crosshair group bg-black"
+                                        className="relative max-w-full max-h-full overflow-hidden cursor-crosshair group bg-black select-none"
                                         style={{ aspectRatio: aspectRatio.replace(':', '/'), height: '100%', width: 'auto' }}
-                                        onClick={handleCanvasClick}
-                                        title="Click anywhere to add an auto-zoom point"
+                                        onMouseDown={handleCanvasMouseDown}
+                                        onMouseMove={handleCanvasMouseMove}
+                                        onMouseUp={handleCanvasMouseUp}
+                                        title="Click or drag a box to frame a zoom focus area"
                                     >
                                         <canvas
                                             ref={studioCanvasRef}
                                             width={1280}
                                             height={720}
-                                            className="w-full h-full"
+                                            className="w-full h-full pointer-events-none"
                                         />
+
+                                        {/* Live Glowing Drag-to-Zoom Selection Box */}
+                                        {dragBox && (
+                                            <div
+                                                className="absolute pointer-events-none border-2 border-[var(--accent-app)] bg-[var(--accent-app)]/15 rounded-lg shadow-[0_0_15px_rgba(220,254,80,0.45)] z-30 transition-none"
+                                                style={{
+                                                    left: dragBox.left,
+                                                    top: dragBox.top,
+                                                    width: dragBox.width,
+                                                    height: dragBox.height,
+                                                }}
+                                            >
+                                                {/* Corner bracket accents */}
+                                                <div className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-[var(--accent-app)]" />
+                                                <div className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-[var(--accent-app)]" />
+                                                <div className="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-[var(--accent-app)]" />
+                                                <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-[var(--accent-app)]" />
+
+                                                {/* Live Zoom Scale Badge */}
+                                                <div className="absolute -bottom-7 left-1/2 -translate-x-1/2 bg-black/90 text-[var(--accent-app)] border border-[var(--accent-app)]/60 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full shadow-lg whitespace-nowrap flex items-center gap-1">
+                                                    <span>🔍 Focus Crop ({dragBox.previewScale}x)</span>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {/* Canvas Hint */}
                                         <div className="absolute top-3 left-3 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity bg-black/75 backdrop-blur-md px-2.5 py-1 rounded-md text-[11px] font-mono text-white border border-white/10">
-                                            ✦ Click anywhere to add a zoom focal point
+                                            ✦ Drag a box or click to add a zoom focal point
                                         </div>
                                     </div>
                                 ) : (
@@ -1340,6 +1489,8 @@ export default function RecorderPage() {
                                 onClearZooms={clearManualZooms}
                                 annotations={annotations}
                                 onAddAnnotation={handleAddAnnotation}
+                                onAddFocusSegment={handleAddFocusSegment}
+                                onSplitSegment={handleSplitSegment}
                                 trimStart={trimStart}
                                 onChangeTrimStart={(val) => {
                                     setTrimStart(val);
@@ -1451,6 +1602,11 @@ export default function RecorderPage() {
                             onChangeSpringProfile={(profile) => {
                                 setSpringProfile(profile);
                                 if (studioRef.current) studioRef.current.setSpringProfile(profile);
+                            }}
+                            showKeystrokes={showKeystrokes}
+                            onToggleKeystrokes={(enabled) => {
+                                setShowKeystrokes(enabled);
+                                if (studioRef.current) studioRef.current.setShowKeystrokes(enabled);
                             }}
                         />
                     </div>

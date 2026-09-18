@@ -375,6 +375,46 @@ export function getInterpolatedCursor(timeSec, mouseSamples = [], options = {}) 
 }
 
 /**
+ * Computes window frame dimensions and offsets preserving video aspect ratio inside canvas
+ */
+export function getFrameMetrics(width, height, videoSource, renderSettings = {}) {
+    const {
+        insetPadding = 0.08,
+        windowChrome = true,
+        titleBarHeight = 34,
+    } = renderSettings;
+
+    const maxW = width * (1 - insetPadding * 2);
+    const maxH = height * (1 - insetPadding * 2);
+    const headerH = windowChrome ? titleBarHeight : 0;
+
+    const srcAspect = (videoSource && videoSource.videoWidth && videoSource.videoHeight)
+        ? (videoSource.videoWidth / videoSource.videoHeight)
+        : (16 / 9);
+
+    let frameW = maxW;
+    let videoH = frameW / srcAspect;
+    let frameH = videoH + headerH;
+    if (frameH > maxH) {
+        frameH = maxH;
+        videoH = Math.max(1, frameH - headerH);
+        frameW = videoH * srcAspect;
+    }
+
+    const padX = (width - frameW) / 2;
+    const padY = (height - frameH) / 2;
+
+    return {
+        padX,
+        padY,
+        frameW,
+        frameH,
+        headerH,
+        videoH,
+    };
+}
+
+/**
  * Pure Deterministic Frame Render
  */
 export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderSettings = {}) {
@@ -408,12 +448,14 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         captionsEnabled = true,
         // Annotations
         annotations = [],
+        showKeystrokes = true,
     } = renderSettings;
 
     const {
         focusSegments = [],
         mouseSamples = [],
         clicks = [],
+        keystrokes = [],
     } = sessionData;
 
     // 1. Draw Background (Custom Image or Gradient)
@@ -437,13 +479,12 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         ctx.restore();
     }
 
-    // 2. Compute Inset Screen Frame
-    const padX = width * insetPadding;
-    const padY = height * insetPadding;
-    const frameW = width - padX * 2;
-    const frameH = height - padY * 2;
-    const headerH = windowChrome ? titleBarHeight : 0;
-    const videoH = frameH - headerH;
+    // 2. Compute Inset Screen Frame with aspect ratio preservation
+    const { padX, padY, frameW, frameH, headerH, videoH } = getFrameMetrics(width, height, videoSource, {
+        insetPadding,
+        windowChrome,
+        titleBarHeight,
+    });
 
     // 3. Draw Ambient Drop Shadow
     ctx.save();
@@ -670,6 +711,11 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         if (currentCaption && currentCaption.text) {
             _drawCaptionPill(ctx, currentCaption.text, { padX, padY: padY + headerH, frameW, videoH });
         }
+    }
+
+    // 10.5 Draw Keystroke Badge Overlay (Screen Studio / Cap style KeyCast)
+    if (showKeystrokes !== false && keystrokes && keystrokes.length > 0) {
+        _drawKeystrokeOverlay(ctx, keystrokes, timeSec, { padX, padY: padY + headerH, frameW, videoH });
     }
 
     // 11. Draw Webcam Picture-in-Picture (Pinned to User Corner, with Reactive Scale & Full Camera mode)
@@ -1218,3 +1264,141 @@ function _getNoisePattern(ctx) {
         return null;
     }
 }
+
+/**
+ * Draw Screen Studio / Cap style animated floating Keystroke Overlay
+ */
+function _drawKeystrokeOverlay(ctx, keystrokes, timeSec, bounds) {
+    if (!keystrokes || keystrokes.length === 0) return;
+    const curSec = timeSec;
+
+    // Find the most recent active keystroke within 1.6s
+    let active = null;
+    for (let i = keystrokes.length - 1; i >= 0; i--) {
+        const k = keystrokes[i];
+        const t = (k.time > 1000 || k.t > 1000) ? (k.time || k.t) / 1000 : (k.time || k.t || 0);
+        const dt = curSec - t;
+        if (dt >= 0 && dt <= 1.6) {
+            active = k;
+            break;
+        }
+    }
+
+    if (!active) return;
+
+    const t = (active.time > 1000 || active.t > 1000) ? (active.time || active.t) / 1000 : (active.time || active.t || 0);
+    const dt = curSec - t;
+
+    // Opacity and entrance animation
+    let alpha = 1.0;
+    let slideY = 0;
+    if (dt < 0.15) {
+        const p = dt / 0.15;
+        alpha = p;
+        slideY = (1 - p) * 12;
+    } else if (dt > 1.25) {
+        const p = (dt - 1.25) / 0.35;
+        alpha = Math.max(0, 1 - p);
+        slideY = -p * 6;
+    }
+
+    if (alpha <= 0.01) return;
+
+    // Extract keys list
+    let keys = [];
+    if (Array.isArray(active.keys)) {
+        keys = active.keys;
+    } else if (typeof active.text === 'string') {
+        keys = active.text.split('+').map(s => s.trim());
+    } else if (typeof active.key === 'string') {
+        keys = [active.key];
+    }
+    if (keys.length === 0) return;
+
+    // Normalize key glyphs
+    const formatKey = (k) => {
+        const lower = k.toLowerCase();
+        if (lower === 'ctrl' || lower === 'control') return 'Ctrl';
+        if (lower === 'meta' || lower === 'cmd' || lower === 'command') return '⌘';
+        if (lower === 'alt' || lower === 'option') return '⌥';
+        if (lower === 'shift') return '⇧';
+        if (lower === 'enter' || lower === 'return') return '↵ Enter';
+        if (lower === 'backspace') return '⌫';
+        if (lower === 'tab') return '⇥';
+        if (lower === 'escape' || lower === 'esc') return 'Esc';
+        if (lower === 'arrowup' || lower === 'up') return '↑';
+        if (lower === 'arrowdown' || lower === 'down') return '↓';
+        if (lower === 'arrowleft' || lower === 'left') return '←';
+        if (lower === 'arrowright' || lower === 'right') return '→';
+        if (lower === 'space' || lower === ' ') return 'Space';
+        return k.length === 1 ? k.toUpperCase() : k;
+    };
+
+    const formatted = keys.map(formatKey);
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    const fontKey = 'bold 13px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+    ctx.font = fontKey;
+
+    const keycapPaddingX = 9;
+    const keycapHeight = 28;
+    const keycapGap = 6;
+    const pillPaddingX = 12;
+    const pillPaddingY = 8;
+
+    // Measure keycaps
+    const keyWidths = formatted.map(k => Math.max(26, (ctx.measureText ? ctx.measureText(k).width : 20) + keycapPaddingX * 2));
+    const totalKeysWidth = keyWidths.reduce((sum, w) => sum + w, 0) + (keyWidths.length - 1) * keycapGap;
+    const pillW = totalKeysWidth + pillPaddingX * 2;
+    const pillH = keycapHeight + pillPaddingY * 2;
+
+    const pillX = bounds.padX + (bounds.frameW - pillW) / 2;
+    const pillY = bounds.padY + bounds.videoH - pillH - 24 + slideY;
+
+    // Draw container shadow
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 6;
+
+    // Frosted Pill Container
+    _drawRoundedRectPath(ctx, pillX, pillY, pillW, pillH, 12);
+    ctx.fillStyle = 'rgba(10, 14, 22, 0.88)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(220, 254, 80, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Reset shadow
+    ctx.shadowColor = 'transparent';
+
+    // Draw individual keycaps
+    let curKeyX = pillX + pillPaddingX;
+    const curKeyY = pillY + pillPaddingY;
+
+    formatted.forEach((keyText, i) => {
+        const kw = keyWidths[i];
+
+        // Keycap background
+        _drawRoundedRectPath(ctx, curKeyX, curKeyY, kw, keycapHeight, 6);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Keycap text
+        ctx.fillStyle = (keyText === '⌘' || keyText === 'Ctrl' || keyText === '⌥' || keyText === '⇧') ? '#DCFE50' : '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        if (ctx.fillText) {
+            ctx.fillText(keyText, curKeyX + kw / 2, curKeyY + keycapHeight / 2);
+        }
+
+        curKeyX += kw + keycapGap;
+    });
+
+    ctx.restore();
+}
+

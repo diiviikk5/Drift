@@ -23,8 +23,39 @@ export default function StudioTimeline({
     onChangeTrimStart,
     trimEnd = 0,
     onChangeTrimEnd,
+    onAddFocusSegment,
+    onSplitSegment,
 }) {
     const trackRef = useRef(null);
+
+    const handleResizeStart = (e, seg, edge) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const startX = e.clientX;
+        const origStartTime = seg.startTime;
+        const origEndTime = seg.endTime;
+        const trackWidth = trackRef.current ? trackRef.current.getBoundingClientRect().width : 1;
+
+        const onMouseMove = (moveEvent) => {
+            const dx = moveEvent.clientX - startX;
+            const dt = (dx / trackWidth) * duration;
+            if (edge === 'start') {
+                const newStart = Math.max(0, Math.min(origEndTime - 0.2, origStartTime + dt));
+                if (onUpdateSegment) onUpdateSegment(seg.id, { startTime: newStart });
+            } else {
+                const newEnd = Math.max(origStartTime + 0.2, Math.min(duration, origEndTime + dt));
+                if (onUpdateSegment) onUpdateSegment(seg.id, { endTime: newEnd });
+            }
+        };
+
+        const onMouseUp = () => {
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+        };
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+    };
 
     const formatTime = (s) => {
         if (!s || isNaN(s)) return '00:00.0';
@@ -222,7 +253,48 @@ export default function StudioTimeline({
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
+                        {currentTime > selectedSeg.startTime + 0.1 && currentTime < selectedSeg.endTime - 0.1 && (
+                            <button
+                                onClick={() => {
+                                    if (onSplitSegment) {
+                                        onSplitSegment(selectedSeg.id, currentTime);
+                                    } else if (onUpdateSegment && onAddFocusSegment) {
+                                        const oldEnd = selectedSeg.endTime;
+                                        onUpdateSegment(selectedSeg.id, { endTime: currentTime });
+                                        onAddFocusSegment({
+                                            ...selectedSeg,
+                                            id: 'seg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+                                            startTime: currentTime,
+                                            endTime: oldEnd,
+                                        });
+                                    }
+                                }}
+                                className="px-2 py-0.5 bg-[var(--accent-app)]/20 text-[var(--accent-app)] hover:bg-[var(--accent-app)] hover:text-[var(--accent-app-fg)] rounded text-[10px] font-mono font-bold transition-all flex items-center gap-1"
+                                title="Split segment into two at current playhead"
+                            >
+                                <span>✂ Split</span>
+                            </button>
+                        )}
+                        <button
+                            onClick={() => {
+                                const segDuration = selectedSeg.endTime - selectedSeg.startTime;
+                                const newStart = Math.min(duration - 0.2, currentTime);
+                                const newEnd = Math.min(duration, newStart + segDuration);
+                                if (onAddFocusSegment) {
+                                    onAddFocusSegment({
+                                        ...selectedSeg,
+                                        id: 'seg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+                                        startTime: newStart,
+                                        endTime: newEnd,
+                                    });
+                                }
+                            }}
+                            className="px-1.5 py-0.5 bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)] rounded text-[10px] font-mono"
+                            title="Duplicate this segment at playhead"
+                        >
+                            + Copy
+                        </button>
                         <button
                             onClick={() => {
                                 const newStart = Math.max(0, selectedSeg.startTime - 0.5);
@@ -245,7 +317,7 @@ export default function StudioTimeline({
                         </button>
                         <button
                             onClick={() => onDeleteSegment && onDeleteSegment(selectedSeg.id)}
-                            className="text-[10px] text-red-400 hover:text-red-300 font-mono ml-2 font-semibold"
+                            className="text-[10px] text-red-400 hover:text-red-300 font-mono ml-1 font-semibold"
                         >
                             Delete
                         </button>
@@ -305,31 +377,52 @@ export default function StudioTimeline({
                                 onSeek(seg.startTime);
                             }}
                             style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
-                            className={`absolute top-1.5 bottom-1.5 rounded-lg flex items-center justify-between px-2 cursor-pointer z-10 transition-all border ${
+                            className={`group/seg absolute top-1.5 bottom-1.5 rounded-lg flex items-center justify-between px-2 cursor-pointer z-10 transition-all border ${
                                 isSelected
                                     ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] border-[var(--accent-app)] shadow-md font-bold'
                                     : 'bg-[var(--accent-app)]/20 text-[var(--text-app)] border-[var(--accent-app)]/50 hover:bg-[var(--accent-app)]/35'
                             }`}
                             title={`Focus: ${formatTime(seg.startTime)} - ${formatTime(seg.endTime)} (${seg.zoomScale}x, speed ${seg.speed || 1}x)`}
                         >
-                            <span className="text-[9px] font-mono font-bold truncate select-none flex items-center gap-1">
+                            {/* Left Trim Handle */}
+                            <div
+                                onMouseDown={(e) => handleResizeStart(e, seg, 'start')}
+                                className="absolute left-0 top-0 bottom-0 w-2.5 cursor-ew-resize hover:bg-white/40 rounded-l flex items-center justify-center opacity-0 group-hover/seg:opacity-100 transition-opacity z-20"
+                                title="Drag to trim start time"
+                            >
+                                <div className="w-0.5 h-3 bg-white/70 rounded-full" />
+                            </div>
+
+                            <span className="text-[9px] font-mono font-bold truncate select-none flex items-center gap-1 pl-1">
                                 {seg.sceneMode === 'spotlight' ? '🎙️ Spotlight' :
                                  seg.sceneMode === 'overview' ? '🖥️ Overview' :
                                  seg.sceneMode === 'speed' ? `⏩ ${seg.speed || 2}x Speed` :
                                  `${seg.reason === 'dwell' ? '👁' : '⚡'} ${seg.zoomScale}x ${seg.speed && seg.speed !== 1 ? `(${seg.speed}x)` : ''}`}
                             </span>
-                            {onDeleteSegment && (
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onDeleteSegment(seg.id);
-                                    }}
-                                    className="opacity-60 hover:opacity-100 hover:text-red-400 text-xs font-bold ml-1 px-1 transition-opacity"
-                                    title="Delete focus segment"
-                                >
-                                    ×
-                                </button>
-                            )}
+
+                            <div className="flex items-center pr-1">
+                                {onDeleteSegment && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onDeleteSegment(seg.id);
+                                        }}
+                                        className="opacity-60 hover:opacity-100 hover:text-red-400 text-xs font-bold ml-1 px-1 transition-opacity"
+                                        title="Delete focus segment"
+                                    >
+                                        ×
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Right Trim Handle */}
+                            <div
+                                onMouseDown={(e) => handleResizeStart(e, seg, 'end')}
+                                className="absolute right-0 top-0 bottom-0 w-2.5 cursor-ew-resize hover:bg-white/40 rounded-r flex items-center justify-center opacity-0 group-hover/seg:opacity-100 transition-opacity z-20"
+                                title="Drag to trim end time"
+                            >
+                                <div className="w-0.5 h-3 bg-white/70 rounded-full" />
+                            </div>
                         </div>
                     );
                 })}

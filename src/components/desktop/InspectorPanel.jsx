@@ -83,6 +83,8 @@ export default function InspectorPanel({
     onToggleWindowChrome,
     springProfile = 'cinematic',
     onChangeSpringProfile,
+    showKeystrokes = true,
+    onToggleKeystrokes,
 }) {
     const [activeTab, setActiveTab] = useState('style');
     const fileInputRef = useRef(null);
@@ -492,8 +494,26 @@ export default function InspectorPanel({
                                 </button>
                             </div>
 
+                            {/* Keystroke Overlay Badges (KeyCast) */}
+                            <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)]">
+                                <div>
+                                    <div className="text-xs font-semibold text-[var(--text-app)]">Keystroke Badges</div>
+                                    <div className="text-[10px] text-[var(--text-app-muted)]">Screen Studio style KeyCast pills</div>
+                                </div>
+                                <button
+                                    onClick={() => onToggleKeystrokes && onToggleKeystrokes(!showKeystrokes)}
+                                    className={`w-9 h-5 rounded-full transition-all relative cursor-pointer ${
+                                        showKeystrokes ? 'bg-[var(--accent-app)]' : 'bg-gray-600'
+                                    }`}
+                                >
+                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                                        showKeystrokes ? 'left-[18px]' : 'left-0.5'
+                                    }`} />
+                                </button>
+                            </div>
+
                             <div className="p-3 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] text-[11px] text-[var(--text-app-muted)] leading-relaxed">
-                                Click ripple waves and vector pointer paths are dynamically composited with sub-pixel microsecond accuracy.
+                                Click ripple waves, vector pointer paths, and shortcut badges are dynamically composited with sub-pixel accuracy.
                             </div>
                         </div>
                     </>

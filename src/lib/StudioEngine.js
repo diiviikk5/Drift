@@ -2,9 +2,9 @@
 // Uses Rust-based zoom engine via Tauri IPC for desktop
 // Falls back to simple playback for browser mode
 
-import { isTauri } from './tauri-bridge';
-import { InteractionAnalyzer } from './zoom/InteractionAnalyzer';
-import { renderFrame } from './rendering/renderFrame';
+import { isTauri } from './tauri-bridge.js';
+import { InteractionAnalyzer } from './zoom/InteractionAnalyzer.js';
+import { renderFrame, getFrameMetrics } from './rendering/renderFrame.js';
 
 const FRAME_SCALE = 0.82;
 const TITLE_BAR_HEIGHT = 36;
@@ -25,6 +25,8 @@ export class StudioEngine {
         this.clicks = clicks;
         this.explicitDuration = duration;
         this.mouseMoves = mouseMoves;
+        this.keystrokes = options.keystrokes || [];
+        this.showKeystrokes = options.showKeystrokes !== false;
 
         // Webcam PiP Video & Settings
         this.webcamBlob = options.webcamBlob || null;
@@ -402,28 +404,34 @@ export class StudioEngine {
     }
 
     resolveClick(normX, normY) {
-        const Px = normX * this.canvas.width;
-        const Py = normY * this.canvas.height;
-        const P1x = Px - this.canvas.width / 2;
-        const P1y = Py - this.canvas.height / 2;
-        const P2x = P1x / this.camera.scale;
-        const P2y = P1y / this.camera.scale;
-        const vw = this.canvas.width * FRAME_SCALE;
-        const vRatio = this.video.videoHeight / this.video.videoWidth;
-        const vh = vw * vRatio;
-        const totalHeight = vh + TITLE_BAR_HEIGHT;
-        const panX = (this.camera.x - 0.5) * vw;
-        const panY = (this.camera.y - 0.5) * totalHeight;
-        const P3x = P2x + panX;
-        const P3y = P2y + panY;
-        const winX = -vw / 2;
-        const winY = -totalHeight / 2;
-        const videoX = winX;
-        const videoY = winY + TITLE_BAR_HEIGHT;
-        const relX = P3x - videoX;
-        const relY = P3y - videoY;
-        const finalX = relX / vw;
-        const finalY = relY / vh;
+        const metrics = getFrameMetrics(this.canvas.width, this.canvas.height, this.video, {
+            insetPadding: this.insetPadding ?? 0.08,
+            windowChrome: this.windowChrome !== false,
+            titleBarHeight: this.titleBarHeight ?? 34,
+        });
+
+        const canvasPx = normX * this.canvas.width;
+        const canvasPy = normY * this.canvas.height;
+
+        const centerX = metrics.padX + metrics.frameW * 0.5;
+        const centerY = metrics.padY + metrics.headerH + metrics.videoH * 0.5;
+
+        const camScale = (this.camera && this.camera.scale) ? this.camera.scale : 1.0;
+        const camX = (this.camera && Number.isFinite(this.camera.x)) ? this.camera.x : 0.5;
+        const camY = (this.camera && Number.isFinite(this.camera.y)) ? this.camera.y : 0.5;
+
+        const p1x = canvasPx - centerX;
+        const p1y = canvasPy - centerY;
+
+        const p2x = p1x / camScale;
+        const p2y = p1y / camScale;
+
+        const p3x = p2x + camX * metrics.frameW;
+        const p3y = p2y + camY * metrics.videoH;
+
+        const finalX = p3x / metrics.frameW;
+        const finalY = p3y / metrics.videoH;
+
         return {
             x: Math.max(0, Math.min(1, finalX)),
             y: Math.max(0, Math.min(1, finalY))
@@ -648,6 +656,7 @@ export class StudioEngine {
                 focusSegments: this.focusSegments || [],
                 mouseSamples: this.mouseMoves || [],
                 clicks: this.clicks || [],
+                keystrokes: this.keystrokes || [],
             },
             {
                 background: this.background,
@@ -672,6 +681,7 @@ export class StudioEngine {
                 captions: this.captions || [],
                 captionsEnabled: this.captionsEnabled,
                 annotations: this.annotations || [],
+                showKeystrokes: this.showKeystrokes !== false,
             }
         );
     }
@@ -751,6 +761,16 @@ export class StudioEngine {
 
     setAnnotations(annotations) {
         this.annotations = annotations;
+        this.drawFrame();
+    }
+
+    setShowKeystrokes(enabled) {
+        this.showKeystrokes = Boolean(enabled);
+        this.drawFrame();
+    }
+
+    setKeystrokes(keystrokes) {
+        this.keystrokes = keystrokes || [];
         this.drawFrame();
     }
 
@@ -882,12 +902,24 @@ export class StudioEngine {
 
         let width = 1920;
         let height = 1080;
-        if (resolution === '4k') {
-            width = 3840;
-            height = 2160;
-        } else if (resolution === '720p') {
-            width = 1280;
-            height = 720;
+        if (this.aspectRatio === '9:16') {
+            width = resolution === '4k' ? 2160 : (resolution === '720p' ? 720 : 1080);
+            height = resolution === '4k' ? 3840 : (resolution === '720p' ? 1280 : 1920);
+        } else if (this.aspectRatio === '1:1') {
+            width = resolution === '4k' ? 2160 : (resolution === '720p' ? 720 : 1080);
+            height = width;
+        } else if (this.aspectRatio === '4:5') {
+            width = resolution === '4k' ? 2160 : (resolution === '720p' ? 720 : 1080);
+            height = resolution === '4k' ? 2700 : (resolution === '720p' ? 900 : 1350);
+        } else {
+            // 16:9
+            if (resolution === '4k') {
+                width = 3840;
+                height = 2160;
+            } else if (resolution === '720p') {
+                width = 1280;
+                height = 720;
+            }
         }
 
         const origW = this.canvas.width;
