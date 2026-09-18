@@ -86,13 +86,14 @@ export class StudioEngine {
         this.borderRadius = options.borderRadius ?? 18;
         this.windowChrome = options.windowChrome !== false;
         this.aspectRatio = options.aspectRatio || '16:9';
+        this.autoZoomOnClicks = Boolean(options.autoZoomOnClicks);
 
-        // Semantic Interaction Analyzer & Focus Track
+        // OpenScreen-style soothing recording by default: steady camera overview without jarring click-zooms
         this.interactionAnalyzer = new InteractionAnalyzer();
-        this.focusSegments = options.focusSegments ?? this.interactionAnalyzer.analyze(
-            this.clicks,
-            this.mouseMoves,
-            this.explicitDuration || 10
+        this.focusSegments = options.focusSegments ?? (
+            this.autoZoomOnClicks
+                ? this.interactionAnalyzer.analyze(this.clicks, this.mouseMoves, this.explicitDuration || 10)
+                : []
         );
 
         // Camera state — starts FULLY panned out (scale 1.0)
@@ -137,8 +138,12 @@ export class StudioEngine {
             this.tauriInvoke = invoke;
             console.log('[Studio] Tauri mode — using Rust zoom engine');
 
-            // Generate zoom segments in Rust
-            await this._generateSegments();
+            // Generate zoom segments in Rust only if user explicitly enabled auto-zoom on clicks
+            if (this.autoZoomOnClicks) {
+                await this._generateSegments();
+            } else {
+                this.zoomSegments = [];
+            }
             this.tauriReady = true;
         } catch {
             console.log('[Studio] Browser fallback — no Tauri available');
@@ -391,6 +396,34 @@ export class StudioEngine {
             reason: 'manual',
             sceneMode: 'zoom',
         });
+    }
+
+    /**
+     * Toggle automatic click-zoom generation (OpenScreen soothing style vs click zoom)
+     */
+    async setAutoZoomOnClicks(enabled) {
+        this.autoZoomOnClicks = Boolean(enabled);
+        if (this.autoZoomOnClicks) {
+            const dur = this.videoDuration || this.explicitDuration || 10;
+            this.focusSegments = this.interactionAnalyzer.analyze(this.clicks, this.mouseMoves, dur);
+            if (this.isTauri) {
+                await this._generateSegments();
+            }
+        } else {
+            this.resetToOverview();
+        }
+        this.drawFrame();
+        return this.focusSegments;
+    }
+
+    /**
+     * Restore pure OpenScreen-style calm overview framing (clears all auto zoom cuts)
+     */
+    resetToOverview() {
+        this.focusSegments = [];
+        this.zoomSegments = [];
+        this.camera = { x: 0.5, y: 0.5, scale: 1.0 };
+        this.drawFrame();
     }
 
     updateClick(index, updates) {

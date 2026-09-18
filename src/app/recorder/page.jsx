@@ -64,8 +64,11 @@ export default function RecorderPage() {
     const isNativeRecordingRef = useRef(false);
     const nativeTimerIntervalRef = useRef(null);
     const nativeSessionStartRef = useRef(null);
+    const nativeWebcamRecorderRef = useRef(null);
+    const nativeWebcamChunksRef = useRef([]);
     const [isNativeSupported, setIsNativeSupported] = useState(false);
     const [nativeAudioTracks, setNativeAudioTracks] = useState({ systemAudioUrl: null, micAudioUrl: null });
+    const [autoZoomOnClicks, setAutoZoomOnClicks] = useState(false);
 
     // --- State ---
     const [viewMode, setViewMode] = useState('recorder'); // 'recorder' | 'studio'
@@ -393,6 +396,7 @@ export default function RecorderPage() {
                         showKeystrokes,
                         keystrokes: recordedKeystrokes,
                         focusSegments: savedSegmentsRef.current,
+                        autoZoomOnClicks,
                         showCursor: showCursor || ((recordedMoves && recordedMoves.length > 0) || (recordedClicks && recordedClicks.length > 0)),
                         systemAudioUrl: nativeAudioTracks.systemAudioUrl,
                         micAudioUrl: nativeAudioTracks.micAudioUrl,
@@ -475,15 +479,42 @@ export default function RecorderPage() {
         }
     }, [aspectRatio]);
 
-    // Source selection
+    // Source selection & live preview
     const selectSource = async (id) => {
         setSelectedSource(id);
         if (platform === 'tauri') {
-            const ok = await engineRef.current?.selectSourceBrowser();
-            if (ok) setHasActiveStream(true);
+            const idx = typeof id === 'number' ? id : (parseInt(String(id).replace(/\D+/g, ''), 10) || 0);
+            try {
+                const bytes = await drift.captureScreenshot(idx);
+                if (bytes && bytes.length > 0) {
+                    const blob = new Blob([new Uint8Array(bytes)], { type: 'image/png' });
+                    const url = URL.createObjectURL(blob);
+                    setSourceThumbnails(prev => ({ ...prev, [id]: url }));
+                }
+            } catch (e) {
+                console.warn('[Drift] Screenshot refresh failed:', e);
+            }
         } else if (platform === 'electron') {
             const ok = await engineRef.current?.selectSource(id, micEnabled);
             if (ok) setHasActiveStream(true);
+        }
+    };
+
+    const handleStartPreview = async () => {
+        if (platform === 'tauri') {
+            const idx = typeof selectedSource === 'number' ? selectedSource : (parseInt(String(selectedSource || '0').replace(/\D+/g, ''), 10) || 0);
+            try {
+                const bytes = await drift.captureScreenshot(idx);
+                if (bytes && bytes.length > 0) {
+                    const blob = new Blob([new Uint8Array(bytes)], { type: 'image/png' });
+                    const url = URL.createObjectURL(blob);
+                    setSourceThumbnails(prev => ({ ...prev, [selectedSource || `screen:${idx}`]: url }));
+                }
+            } catch (e) {
+                console.warn('[Drift] Screenshot preview failed:', e);
+            }
+        } else {
+            await selectBrowserSource();
         }
     };
 
@@ -664,7 +695,7 @@ export default function RecorderPage() {
                 isNativeRecordingRef.current = true;
                 const monitorIndex = typeof selectedSource === 'number'
                     ? selectedSource
-                    : (parseInt(selectedSource, 10) || 0);
+                    : (parseInt(String(selectedSource || '0').replace(/\D+/g, ''), 10) || 0);
 
                 await drift.startNativeSession({
                     monitorIndex,
@@ -674,6 +705,25 @@ export default function RecorderPage() {
                     withoutCursor: true,
                 });
                 await drift.startSessionTelemetry();
+
+                // Capture webcam stream in parallel if enabled
+                if (webcamEnabled && engineRef.current?.webcamStream) {
+                    try {
+                        const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+                        const rec = new MediaRecorder(engineRef.current.webcamStream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
+                        nativeWebcamChunksRef.current = [];
+                        rec.ondataavailable = (e) => {
+                            if (e.data.size > 0) nativeWebcamChunksRef.current.push(e.data);
+                        };
+                        rec.start(1000);
+                        nativeWebcamRecorderRef.current = rec;
+                    } catch (camErr) {
+                        console.warn('[Drift] Native webcam recorder start failed:', camErr);
+                        nativeWebcamRecorderRef.current = null;
+                    }
+                } else {
+                    nativeWebcamRecorderRef.current = null;
+                }
 
                 nativeSessionStartRef.current = Date.now();
                 nativeTimerIntervalRef.current = setInterval(() => {
@@ -806,6 +856,24 @@ export default function RecorderPage() {
                     setRecordedBlob(videoUrl);
                     setRecordedClicks(clickList);
                     setRecordedMoves(moves);
+
+                    // Finalize native webcam recording if active
+                    if (nativeWebcamRecorderRef.current) {
+                        try {
+                            if (nativeWebcamRecorderRef.current.state !== 'inactive') {
+                                nativeWebcamRecorderRef.current.stop();
+                            }
+                            if (nativeWebcamChunksRef.current.length > 0) {
+                                const camBlob = new Blob(nativeWebcamChunksRef.current, { type: 'video/webm' });
+                                setRecordedWebcamBlob(camBlob);
+                                setWebcamSettings(prev => ({ ...prev, enabled: true }));
+                            }
+                        } catch (camErr) {
+                            console.warn('[Drift] Native webcam finalize notice:', camErr);
+                        }
+                        nativeWebcamRecorderRef.current = null;
+                    }
+
                     setShowCursor(true);
                     recDurationRef.current = (result.duration_ms || (Date.now() - (nativeSessionStartRef.current || Date.now()))) / 1000;
                     setViewMode('studio');
@@ -1431,8 +1499,9 @@ export default function RecorderPage() {
                                 />
                             }
                             hasActiveStream={hasActiveStream || isRecording}
-                            onStartPreview={selectBrowserSource}
+                            onStartPreview={handleStartPreview}
                             isNativeSupported={isNativeSupported}
+                            webcamStream={engineRef.current?.webcamStream || null}
                         />
                     </div>
                 ) : (
@@ -1642,6 +1711,22 @@ export default function RecorderPage() {
                             onToggleKeystrokes={(enabled) => {
                                 setShowKeystrokes(enabled);
                                 if (studioRef.current) studioRef.current.setShowKeystrokes(enabled);
+                            }}
+                            autoZoomOnClicks={autoZoomOnClicks}
+                            onToggleAutoZoomOnClicks={(val) => {
+                                setAutoZoomOnClicks(val);
+                                if (studioRef.current) {
+                                    studioRef.current.setAutoZoomOnClicks(val).then(segs => {
+                                        setFocusSegments([...(segs || [])]);
+                                    });
+                                }
+                            }}
+                            onResetToOverview={() => {
+                                setAutoZoomOnClicks(false);
+                                if (studioRef.current) {
+                                    studioRef.current.resetToOverview();
+                                    setFocusSegments([]);
+                                }
                             }}
                         />
                     </div>

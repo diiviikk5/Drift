@@ -58,7 +58,7 @@ export class DriftEngine {
         this.camera = { x: 0.5, y: 0.5, scale: 1 };
 
         this.zoomLevel = 2.0;
-        this.zoomEnabled = true;
+        this.zoomEnabled = false; // OpenScreen soothing recording: steady camera overview without live click zooms
 
         // Capture source resolution (for normalizing mouse coordinates)
         // Updated when a stream is selected — defaults to screen dimensions

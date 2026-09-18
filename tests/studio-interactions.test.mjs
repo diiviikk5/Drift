@@ -103,3 +103,27 @@ test('StudioEngine aspect ratio and export resolution mappings support 4K UHD an
     engine.setAspectRatio('4:5');
     assert.equal(engine.aspectRatio, '4:5');
 });
+
+test('StudioEngine defaults to calm OpenScreen-style overview without auto click zooms', async () => {
+    const canvas = createMockCanvas(1920, 1080);
+    const mockVideo = { videoWidth: 1920, videoHeight: 1080, currentTime: 0 };
+    const clicks = [
+        { time: 1000, x: 0.2, y: 0.3 },
+        { time: 2500, x: 0.7, y: 0.8 },
+        { time: 4000, x: 0.5, y: 0.5 },
+    ];
+    const engine = new StudioEngine(canvas, mockVideo, null, clicks, 10, [], {});
+
+    // By default, focusSegments must be empty (overview) so recordings are soothing and don't jump around
+    assert.equal(engine.focusSegments.length, 0, 'Expected no auto click-zoom cuts by default');
+    assert.equal(engine.camera.scale, 1.0, 'Expected overview scale 1.0');
+
+    // Enabling autoZoomOnClicks generates segments from clicks
+    await engine.setAutoZoomOnClicks(true);
+    assert.ok(engine.focusSegments.length > 0, 'Expected focus segments when autoZoomOnClicks is enabled');
+
+    // Resetting to overview clears them and restores steady camera
+    engine.resetToOverview();
+    assert.equal(engine.focusSegments.length, 0, 'Expected focus segments cleared after resetToOverview');
+    assert.equal(engine.camera.scale, 1.0, 'Expected overview scale 1.0 after reset');
+});

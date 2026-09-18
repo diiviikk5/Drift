@@ -35,6 +35,7 @@ export default function CaptureCockpit({
     autoMinimize = true,
     onToggleAutoMinimize = null,
     isNativeSupported = false,
+    webcamStream = null,
 }) {
     const [audioLevel, setAudioLevel] = useState(0);
 
@@ -178,6 +179,24 @@ export default function CaptureCockpit({
                         </span>
                     </div>
 
+                    {/* Floating Live Webcam PiP preview overlay on top of screen preview */}
+                    {webcamEnabled && webcamStream && (
+                        <div className="absolute bottom-14 right-4 w-20 h-20 rounded-full overflow-hidden border-2 border-[var(--accent-app)] shadow-2xl z-20 pointer-events-none bg-black">
+                            <video
+                                ref={(el) => {
+                                    if (el && el.srcObject !== webcamStream) {
+                                        el.srcObject = webcamStream;
+                                        el.play().catch(() => {});
+                                    }
+                                }}
+                                autoPlay
+                                playsInline
+                                muted
+                                className="w-full h-full object-cover scale-x-[-1]"
+                            />
+                        </div>
+                    )}
+
                     <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between bg-black/75 backdrop-blur-md px-3 py-2 rounded-lg border border-white/10 text-xs text-white pointer-events-none">
                         <span className="truncate max-w-[300px] font-medium">{activeSource.name}</span>
                         <span className="text-[11px] text-gray-300 font-mono">
@@ -271,6 +290,28 @@ export default function CaptureCockpit({
                         </span>
                     </div>
 
+                    {/* Live Camera Preview Feed */}
+                    {webcamEnabled && webcamStream && (
+                        <div className="relative w-full h-16 rounded-lg overflow-hidden border border-white/10 bg-black">
+                            <video
+                                ref={(el) => {
+                                    if (el && el.srcObject !== webcamStream) {
+                                        el.srcObject = webcamStream;
+                                        el.play().catch(() => {});
+                                    }
+                                }}
+                                autoPlay
+                                playsInline
+                                muted
+                                className="w-full h-full object-cover scale-x-[-1]"
+                            />
+                            <div className="absolute top-1 left-1.5 px-1.5 py-0.5 rounded bg-black/70 backdrop-blur-xs text-[9px] font-mono text-emerald-400 font-semibold flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                <span>LIVE CAM</span>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Camera Device Dropdown */}
                     {webcamEnabled && videoDevices.length > 1 ? (
                         <select
@@ -286,7 +327,7 @@ export default function CaptureCockpit({
                         </select>
                     ) : (
                         <div className="text-[10px] font-mono text-[var(--text-app-muted)] truncate">
-                            {webcamEnabled ? 'Picture-in-Picture' : 'Click to enable camera'}
+                            {webcamEnabled ? 'Picture-in-Picture active' : 'Click to enable camera'}
                         </div>
                     )}
                 </div>

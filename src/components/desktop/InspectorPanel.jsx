@@ -85,6 +85,9 @@ export default function InspectorPanel({
     onChangeSpringProfile,
     showKeystrokes = true,
     onToggleKeystrokes,
+    autoZoomOnClicks = false,
+    onToggleAutoZoomOnClicks,
+    onResetToOverview,
 }) {
     const [activeTab, setActiveTab] = useState('style');
     const fileInputRef = useRef(null);
@@ -308,6 +311,44 @@ export default function InspectorPanel({
                 {/* ═══ ZOOM TAB ═══ */}
                 {activeTab === 'camera' && (
                     <>
+                        {/* OpenScreen Overview Mode Banner & Reset */}
+                        <div className="p-3 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] space-y-2.5">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <div className="text-xs font-semibold text-[var(--text-app)] flex items-center gap-1.5">
+                                        <span>📺 Full Overview (OpenScreen Style)</span>
+                                    </div>
+                                    <div className="text-[10px] text-[var(--text-app-muted)] mt-0.5">
+                                        Calm, steady framing without sudden click-zooms
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={onResetToOverview}
+                                    title="Clear all zoom cuts and stay in steady overview"
+                                    className="px-2.5 py-1 text-[10px] font-mono font-medium rounded-md bg-white/5 border border-white/10 hover:bg-[var(--accent-app)] hover:text-[var(--accent-app-fg)] transition-all cursor-pointer"
+                                >
+                                    Reset
+                                </button>
+                            </div>
+
+                            <div className="pt-2 border-t border-[var(--border-app)] flex items-center justify-between">
+                                <div>
+                                    <div className="text-xs font-semibold text-[var(--text-app)]">Auto-Zoom on Clicks</div>
+                                    <div className="text-[10px] text-[var(--text-app-muted)]">Automatically zoom camera into mouse clicks</div>
+                                </div>
+                                <button
+                                    onClick={() => onToggleAutoZoomOnClicks && onToggleAutoZoomOnClicks(!autoZoomOnClicks)}
+                                    className={`w-9 h-5 rounded-full transition-all relative cursor-pointer ${
+                                        autoZoomOnClicks ? 'bg-[var(--accent-app)]' : 'bg-gray-600'
+                                    }`}
+                                >
+                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                                        autoZoomOnClicks ? 'left-[18px]' : 'left-0.5'
+                                    }`} />
+                                </button>
+                            </div>
+                        </div>
+
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
                                 <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
