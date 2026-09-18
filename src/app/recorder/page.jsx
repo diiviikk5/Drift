@@ -104,6 +104,7 @@ export default function RecorderPage() {
     const [recordedWebcamBlob, setRecordedWebcamBlob] = useState(null);
     const [recordedClicks, setRecordedClicks] = useState([]);
     const [recordedMoves, setRecordedMoves] = useState([]);
+    const [recordedKeystrokes, setRecordedKeystrokes] = useState([]);
     const [focusSegments, setFocusSegments] = useState([]);
     const [selectedSegmentId, setSelectedSegmentId] = useState(null);
     const recDurationRef = useRef(null);
@@ -153,6 +154,7 @@ export default function RecorderPage() {
     const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
     const [exportProgress, setExportProgress] = useState(0);
+    const [exportStage, setExportStage] = useState('Rendering & Encoding');
 
     // AI BYOK Settings Modal State
     const [isAISettingsOpen, setIsAISettingsOpen] = useState(false);
@@ -389,6 +391,7 @@ export default function RecorderPage() {
                         windowChrome,
                         springProfile,
                         showKeystrokes,
+                        keystrokes: recordedKeystrokes,
                         focusSegments: savedSegmentsRef.current,
                         showCursor: showCursor || ((recordedMoves && recordedMoves.length > 0) || (recordedClicks && recordedClicks.length > 0)),
                         systemAudioUrl: nativeAudioTracks.systemAudioUrl,
@@ -417,6 +420,7 @@ export default function RecorderPage() {
                     windowChrome,
                     springProfile,
                     showKeystrokes,
+                    keystrokes: recordedKeystrokes,
                     tiltAngle,
                     connectedZooms,
                     reactiveWebcam,
@@ -781,6 +785,23 @@ export default function RecorderPage() {
                         button: s.click,
                     }));
 
+                    let keystrokeList = [];
+                    if (typeof drift.getSessionKeystrokes === 'function') {
+                        try {
+                            keystrokeList = await drift.getSessionKeystrokes();
+                        } catch (e) {
+                            console.warn('[Drift] Keystroke fetch notice:', e);
+                        }
+                    }
+                    if ((!keystrokeList || keystrokeList.length === 0) && result.keystrokes_path) {
+                        try {
+                            const keysUrl = await drift.resolveAssetUrl(result.keystrokes_path);
+                            const res = await fetch(keysUrl);
+                            if (res.ok) keystrokeList = await res.json();
+                        } catch (e) {}
+                    }
+                    setRecordedKeystrokes(keystrokeList || []);
+
                     setNativeAudioTracks({ systemAudioUrl: sysAudioUrl, micAudioUrl });
                     setRecordedBlob(videoUrl);
                     setRecordedClicks(clickList);
@@ -1102,35 +1123,47 @@ export default function RecorderPage() {
     };
 
     // Export Logic
-    const executeExport = async (format = 'mp4', resolution = '1080p') => {
+    const executeExport = async (format = 'mp4', resolution = '1080p', fps = 60, quality = 'pro') => {
         if (!studioRef.current) return;
         setIsExporting(true);
         setExportProgress(0);
+        setExportStage('Rendering frames & camera transforms...');
 
         try {
             studioRef.current.trimStart = trimStart;
             studioRef.current.trimEnd = trimEnd;
 
             const videoBlob = await studioRef.current.exportVideo((pct) => {
-                setExportProgress(Math.round(Math.min(Math.max(pct || 0, 0), 1) * 92));
-            }, { format, resolution });
+                const scaled = Math.round(Math.min(Math.max(pct || 0, 0), 1) * 92);
+                setExportProgress(scaled);
+                if (scaled < 40) {
+                    setExportStage(`Compositing ${resolution.toUpperCase()} @ ${fps}fps...`);
+                } else if (scaled < 85) {
+                    setExportStage('Hardware encoding audio & video tracks...');
+                } else {
+                    setExportStage('Finalizing MP4 container...');
+                }
+            }, { format, resolution, fps, quality });
 
             const ext = format === 'gif' ? 'gif' : (videoBlob.type === 'video/mp4' ? 'mp4' : 'webm');
 
             if (platform === 'tauri') {
                 try {
+                    setExportStage('Selecting save location...');
                     const savePath = await drift.showSaveDialog({
-                        defaultPath: `drift-recording-${Date.now()}.${ext}`,
+                        defaultPath: `drift-cinema-${resolution}-${fps}fps-${Date.now()}.${ext}`,
                         filters: [{ name: `${ext.toUpperCase()} Video`, extensions: [ext] }],
                     });
 
                     if (!savePath) {
                         triggerBlobDownload(videoBlob, ext);
                     } else {
+                        setExportStage('Saving high-speed video to disk...');
                         setExportProgress(96);
                         const fileBytes = new Uint8Array(await videoBlob.arrayBuffer());
                         await drift.saveFile(savePath, fileBytes);
                         setExportProgress(100);
+                        setNotice(`Exported ${ext.toUpperCase()} video successfully to ${savePath}`);
                     }
                 } catch (e) {
                     console.error('[Export] Save failed, fallback download:', e);
@@ -1141,6 +1174,7 @@ export default function RecorderPage() {
             }
         } catch (error) {
             console.error('Export failed:', error);
+            setNotice(`Export failed: ${error.message}`);
         } finally {
             setIsExporting(false);
             setExportProgress(0);
@@ -1209,7 +1243,7 @@ export default function RecorderPage() {
             }
             const project = await encodeProject({
                 recording: blobToSave, webcam: webcamToSave, duration,
-                clicks: recordedClicks, moves: recordedMoves,
+                clicks: recordedClicks, moves: recordedMoves, keystrokes: recordedKeystrokes,
                 focusSegments: studioRef.current?.getFocusSegments() ?? focusSegments,
                 annotations, captions, captionsEnabled, background,
                 customBackground: customImage?.src ?? null,
@@ -1261,6 +1295,7 @@ export default function RecorderPage() {
             setRecordedWebcamBlob(project.webcam ?? null);
             setRecordedClicks(project.clicks ?? []);
             setRecordedMoves(project.moves ?? []);
+            setRecordedKeystrokes(project.keystrokes ?? []);
             savedSegmentsRef.current = project.focusSegments ?? [];
             setFocusSegments(savedSegmentsRef.current);
             recDurationRef.current = project.duration;
@@ -1633,6 +1668,7 @@ export default function RecorderPage() {
                 onStartExport={executeExport}
                 isExporting={isExporting}
                 exportProgress={exportProgress}
+                exportStage={exportStage}
             />
 
             {/* AI Settings Modal (BYOK: Claude, OpenAI, Gemini, OpenRouter) */}

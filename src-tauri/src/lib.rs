@@ -43,6 +43,7 @@ pub fn run() {
             commands::input::start_session_telemetry,
             commands::input::stop_session_telemetry,
             commands::input::get_session_telemetry,
+            commands::input::get_session_keystrokes,
             commands::input::minimize_window,
             commands::input::restore_window,
             commands::hotkeys::get_hotkeys,

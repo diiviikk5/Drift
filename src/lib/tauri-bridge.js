@@ -155,6 +155,30 @@ export async function getSessionTelemetry() {
 }
 
 /**
+ * Retrieve recorded session keystrokes with synchronized timestamps
+ */
+export async function getSessionKeystrokes() {
+    if (isTauri()) {
+        const api = await getTauriApi();
+        return api.invoke('get_session_keystrokes');
+    }
+    return [];
+}
+
+/**
+ * Listen for live global keystroke events from desktop listener
+ */
+export async function onGlobalKeystroke(callback) {
+    if (isTauri()) {
+        const events = await getEventApi();
+        return events.listen('global-keystroke', (event) => {
+            callback(event.payload);
+        });
+    }
+    return () => {};
+}
+
+/**
  * Minimize app window during active recording
  */
 export async function minimizeWindow() {
@@ -370,6 +394,23 @@ export async function clearFrameBuffer() {
     }
 }
 
+/**
+ * Convert WebM data to MP4 using native FFmpeg or GPU hardware encoder
+ */
+export async function convertWebmToMp4(webmData, config = {}) {
+    if (isTauri()) {
+        const api = await getTauriApi();
+        const bytes = webmData instanceof Uint8Array ? Array.from(webmData) : (
+            webmData instanceof ArrayBuffer ? Array.from(new Uint8Array(webmData)) : Array.from(webmData)
+        );
+        return api.invoke('convert_webm_to_mp4', {
+            webmData: bytes,
+            config,
+        });
+    }
+    throw new Error('Native convertWebmToMp4 only available in Tauri');
+}
+
 // ============================================================
 // GPU COMPOSITOR
 // ============================================================
@@ -575,6 +616,8 @@ export const drift = {
     startSessionTelemetry,
     stopSessionTelemetry,
     getSessionTelemetry,
+    getSessionKeystrokes,
+    onGlobalKeystroke,
     minimizeWindow,
     restoreWindow,
     getHotkeys,
@@ -589,6 +632,7 @@ export const drift = {
     // MP4 export
     exportMp4,
     exportCompositedMp4,
+    convertWebmToMp4,
     checkFfmpeg,
     onExportProgress,
     clearFrameBuffer,

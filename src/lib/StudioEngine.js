@@ -85,6 +85,7 @@ export class StudioEngine {
         this.insetPadding = options.insetPadding ?? 0.08;
         this.borderRadius = options.borderRadius ?? 18;
         this.windowChrome = options.windowChrome !== false;
+        this.aspectRatio = options.aspectRatio || '16:9';
 
         // Semantic Interaction Analyzer & Focus Track
         this.interactionAnalyzer = new InteractionAnalyzer();
@@ -872,23 +873,23 @@ export class StudioEngine {
         const { format = 'mp4', resolution = '1080p' } = options;
 
         if (format === 'webm') {
-            return await this._exportWebM(onProgress, resolution);
+            return await this._exportWebM(onProgress, resolution, options);
         }
 
         // Try WebCodecs MP4 first (no ffmpeg, hardware-accelerated)
         if (typeof VideoEncoder !== 'undefined') {
             try {
-                return await this._exportMP4(onProgress, resolution);
+                return await this._exportMP4(onProgress, resolution, options);
             } catch (e) {
                 console.warn('[Studio] WebCodecs MP4 export failed, falling back to WebM:', e.message);
             }
         }
         // Fallback: WebM via MediaRecorder
-        return await this._exportWebM(onProgress, resolution);
+        return await this._exportWebM(onProgress, resolution, options);
     }
 
     // --- WebCodecs + mp4-muxer → direct MP4 blob (no ffmpeg) ---
-    async _exportMP4(onProgress, resolution = '1080p') {
+    async _exportMP4(onProgress, resolution = '1080p', options = {}) {
         const { Muxer, ArrayBufferTarget } = await import('mp4-muxer');
 
         this.video.pause();
@@ -898,24 +899,28 @@ export class StudioEngine {
         await new Promise(r => setTimeout(r, 300));
 
         const exportDuration = (this.trimEnd || this.videoDuration) - (this.trimStart || 0);
-        const fps = 60;
+        const fps = options.fps ? Number(options.fps) : 60;
+        const quality = options.quality || 'pro';
 
         let width = 1920;
         let height = 1080;
         if (this.aspectRatio === '9:16') {
-            width = resolution === '4k' ? 2160 : (resolution === '720p' ? 720 : 1080);
-            height = resolution === '4k' ? 3840 : (resolution === '720p' ? 1280 : 1920);
+            width = resolution === '4k' ? 2160 : (resolution === '2k' ? 1440 : (resolution === '720p' ? 720 : 1080));
+            height = resolution === '4k' ? 3840 : (resolution === '2k' ? 2560 : (resolution === '720p' ? 1280 : 1920));
         } else if (this.aspectRatio === '1:1') {
-            width = resolution === '4k' ? 2160 : (resolution === '720p' ? 720 : 1080);
+            width = resolution === '4k' ? 2160 : (resolution === '2k' ? 1440 : (resolution === '720p' ? 720 : 1080));
             height = width;
         } else if (this.aspectRatio === '4:5') {
-            width = resolution === '4k' ? 2160 : (resolution === '720p' ? 720 : 1080);
-            height = resolution === '4k' ? 2700 : (resolution === '720p' ? 900 : 1350);
+            width = resolution === '4k' ? 2160 : (resolution === '2k' ? 1440 : (resolution === '720p' ? 720 : 1080));
+            height = resolution === '4k' ? 2700 : (resolution === '2k' ? 1800 : (resolution === '720p' ? 900 : 1350));
         } else {
             // 16:9
             if (resolution === '4k') {
                 width = 3840;
                 height = 2160;
+            } else if (resolution === '2k') {
+                width = 2560;
+                height = 1440;
             } else if (resolution === '720p') {
                 width = 1280;
                 height = 720;
@@ -947,12 +952,31 @@ export class StudioEngine {
         const totalFrames = Math.ceil(exportDuration * fps);
         const frameDurationUs = 1_000_000 / fps;
 
-        // Target bitrate: scale with resolution for consistent quality
-        const isHD = width >= 1920;
-        const targetBitrate = isHD ? 30_000_000 : 15_000_000; // 30Mbps for 1080p+, 15 for lower
+        // Target bitrate: scale with resolution and quality preset
+        const is4K = width >= 3840 || height >= 3840;
+        const is2K = width >= 2560 || height >= 2560;
+        const isFHD = width >= 1920 || height >= 1920;
+        let targetBitrate = 24_000_000;
+        if (is4K) {
+            targetBitrate = quality === 'master' ? 60_000_000 : (quality === 'standard' ? 35_000_000 : 48_000_000);
+        } else if (is2K) {
+            targetBitrate = quality === 'master' ? 40_000_000 : (quality === 'standard' ? 22_000_000 : 32_000_000);
+        } else if (isFHD) {
+            targetBitrate = quality === 'master' ? 32_000_000 : (quality === 'standard' ? 16_000_000 : 24_000_000);
+        } else {
+            targetBitrate = quality === 'master' ? 18_000_000 : (quality === 'standard' ? 8_000_000 : 12_000_000);
+        }
 
-        // Find a supported H.264 codec — try highest profile first (best quality)
-        const profiles = ['avc1.640028', 'avc1.4d001f', 'avc1.42001f'];
+        // Find a supported H.264 codec — try highest profile first (Level 5.2 for 4K60, Level 4.2 for 1080p60)
+        const profiles = [
+            'avc1.640034', // High Profile Level 5.2 (4K 60fps)
+            'avc1.640033', // High Profile Level 5.1 (4K 30fps)
+            'avc1.64002a', // High Profile Level 4.2 (1080p 60fps)
+            'avc1.640028', // High Profile Level 4.0 (1080p 30fps)
+            'avc1.4d002a', // Main Profile Level 4.2
+            'avc1.4d001f', // Main Profile Level 3.1
+            'avc1.42001f', // Baseline
+        ];
         let codecConfig = null;
         for (const codec of profiles) {
             try {
@@ -967,7 +991,7 @@ export class StudioEngine {
                 });
                 if (support.supported) {
                     codecConfig = support.config;
-                    console.log('[Studio] Using H.264 profile:', codec);
+                    console.log('[Studio] Using H.264 profile:', codec, 'Hardware accelerated');
                     break;
                 }
             } catch { continue; }
@@ -1241,7 +1265,7 @@ export class StudioEngine {
     }
 
     // --- WebM fallback via MediaRecorder ---
-    async _exportWebM(onProgress, resolution = '1080p') {
+    async _exportWebM(onProgress, resolution = '1080p', options = {}) {
         this.video.pause();
         this.video.currentTime = this.trimStart || 0;
         this.camera = { x: 0.5, y: 0.5, scale: 1 };
@@ -1249,16 +1273,31 @@ export class StudioEngine {
         await new Promise(r => setTimeout(r, 300));
 
         const exportDuration = (this.trimEnd || this.videoDuration) - (this.trimStart || 0);
-        const fps = 60;
+        const fps = options.fps ? Number(options.fps) : 60;
 
         let width = 1920;
         let height = 1080;
-        if (resolution === '4k') {
-            width = 3840;
-            height = 2160;
-        } else if (resolution === '720p') {
-            width = 1280;
-            height = 720;
+        if (this.aspectRatio === '9:16') {
+            width = resolution === '4k' ? 2160 : (resolution === '2k' ? 1440 : (resolution === '720p' ? 720 : 1080));
+            height = resolution === '4k' ? 3840 : (resolution === '2k' ? 2560 : (resolution === '720p' ? 1280 : 1920));
+        } else if (this.aspectRatio === '1:1') {
+            width = resolution === '4k' ? 2160 : (resolution === '2k' ? 1440 : (resolution === '720p' ? 720 : 1080));
+            height = width;
+        } else if (this.aspectRatio === '4:5') {
+            width = resolution === '4k' ? 2160 : (resolution === '2k' ? 1440 : (resolution === '720p' ? 720 : 1080));
+            height = resolution === '4k' ? 2700 : (resolution === '2k' ? 1800 : (resolution === '720p' ? 900 : 1350));
+        } else {
+            // 16:9
+            if (resolution === '4k') {
+                width = 3840;
+                height = 2160;
+            } else if (resolution === '2k') {
+                width = 2560;
+                height = 1440;
+            } else if (resolution === '720p') {
+                width = 1280;
+                height = 720;
+            }
         }
 
         const origW = this.canvas.width;

@@ -1,4 +1,4 @@
-﻿use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -24,6 +24,7 @@ pub struct NativeSessionResult {
     pub system_audio_path: Option<String>,
     pub mic_audio_path: Option<String>,
     pub telemetry_path: String,
+    pub keystrokes_path: Option<String>,
     pub manifest_path: String,
     pub duration_ms: f64,
     pub width: u32,
@@ -435,6 +436,13 @@ pub async fn stop_native_session(app: AppHandle) -> Result<NativeSessionResult, 
         .unwrap_or_else(|_| "[]".to_string());
     let _ = std::fs::write(&telemetry_path, telemetry_json);
 
+    // 4.5 Retrieve synchronized keystrokes and write keystrokes.json
+    let keystroke_samples = crate::commands::input::get_session_keystrokes(app.state::<crate::commands::input::InputListenerState>());
+    let keystrokes_path = session_dir.join("keystrokes.json");
+    let keystrokes_json = serde_json::to_string_pretty(&keystroke_samples)
+        .unwrap_or_else(|_| "[]".to_string());
+    let _ = std::fs::write(&keystrokes_path, keystrokes_json);
+
     // 5. Write manifest.json
     let manifest_path = session_dir.join("session.json");
     let manifest_data = serde_json::json!({
@@ -450,6 +458,7 @@ pub async fn stop_native_session(app: AppHandle) -> Result<NativeSessionResult, 
             "system_audio": system_audio_path.as_ref().map(|p| p.to_string_lossy()),
             "microphone": mic_audio_path.as_ref().map(|p| p.to_string_lossy()),
             "telemetry": telemetry_path.to_string_lossy(),
+            "keystrokes": keystrokes_path.to_string_lossy(),
         }
     });
     let _ = std::fs::write(&manifest_path, serde_json::to_string_pretty(&manifest_data).unwrap_or_default());
@@ -461,6 +470,7 @@ pub async fn stop_native_session(app: AppHandle) -> Result<NativeSessionResult, 
         system_audio_path: system_audio_path.map(|p| p.to_string_lossy().to_string()),
         mic_audio_path: mic_audio_path.map(|p| p.to_string_lossy().to_string()),
         telemetry_path: telemetry_path.to_string_lossy().to_string(),
+        keystrokes_path: Some(keystrokes_path.to_string_lossy().to_string()),
         manifest_path: manifest_path.to_string_lossy().to_string(),
         duration_ms,
         width,

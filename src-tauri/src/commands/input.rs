@@ -1,5 +1,5 @@
 use parking_lot::Mutex;
-use rdev::{listen, Event, EventType};
+use rdev::{listen, Event, EventType, Key};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::thread;
@@ -28,12 +28,23 @@ pub struct CursorSample {
     pub click: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeystrokeSample {
+    pub time: f64,
+    pub text: String,
+}
+
 /// State to control the global input listener and buffer session telemetry
 pub struct InputListenerState {
     pub is_listening: Arc<Mutex<bool>>,
     pub is_recording: Arc<Mutex<bool>>,
     pub recording_start: Arc<Mutex<Option<std::time::Instant>>>,
     pub session_samples: Arc<Mutex<Vec<CursorSample>>>,
+    pub session_keystrokes: Arc<Mutex<Vec<KeystrokeSample>>>,
+    pub active_ctrl: Arc<Mutex<bool>>,
+    pub active_shift: Arc<Mutex<bool>>,
+    pub active_alt: Arc<Mutex<bool>>,
+    pub active_meta: Arc<Mutex<bool>>,
 }
 
 impl Default for InputListenerState {
@@ -43,11 +54,127 @@ impl Default for InputListenerState {
             is_recording: Arc::new(Mutex::new(false)),
             recording_start: Arc::new(Mutex::new(None)),
             session_samples: Arc::new(Mutex::new(Vec::with_capacity(16384))),
+            session_keystrokes: Arc::new(Mutex::new(Vec::with_capacity(2048))),
+            active_ctrl: Arc::new(Mutex::new(false)),
+            active_shift: Arc::new(Mutex::new(false)),
+            active_alt: Arc::new(Mutex::new(false)),
+            active_meta: Arc::new(Mutex::new(false)),
         }
     }
 }
 
-/// Start listening for global mouse events (clicks + movement)
+fn format_key_name(key: &Key) -> Option<&'static str> {
+    match key {
+        Key::KeyA => Some("A"),
+        Key::KeyB => Some("B"),
+        Key::KeyC => Some("C"),
+        Key::KeyD => Some("D"),
+        Key::KeyE => Some("E"),
+        Key::KeyF => Some("F"),
+        Key::KeyG => Some("G"),
+        Key::KeyH => Some("H"),
+        Key::KeyI => Some("I"),
+        Key::KeyJ => Some("J"),
+        Key::KeyK => Some("K"),
+        Key::KeyL => Some("L"),
+        Key::KeyM => Some("M"),
+        Key::KeyN => Some("N"),
+        Key::KeyO => Some("O"),
+        Key::KeyP => Some("P"),
+        Key::KeyQ => Some("Q"),
+        Key::KeyR => Some("R"),
+        Key::KeyS => Some("S"),
+        Key::KeyT => Some("T"),
+        Key::KeyU => Some("U"),
+        Key::KeyV => Some("V"),
+        Key::KeyW => Some("W"),
+        Key::KeyX => Some("X"),
+        Key::KeyY => Some("Y"),
+        Key::KeyZ => Some("Z"),
+        Key::Num0 => Some("0"),
+        Key::Num1 => Some("1"),
+        Key::Num2 => Some("2"),
+        Key::Num3 => Some("3"),
+        Key::Num4 => Some("4"),
+        Key::Num5 => Some("5"),
+        Key::Num6 => Some("6"),
+        Key::Num7 => Some("7"),
+        Key::Num8 => Some("8"),
+        Key::Num9 => Some("9"),
+        Key::Return => Some("Enter"),
+        Key::Escape => Some("Esc"),
+        Key::Space => Some("Space"),
+        Key::Backspace => Some("Backspace"),
+        Key::Tab => Some("Tab"),
+        Key::Delete => Some("Del"),
+        Key::UpArrow => Some("↑"),
+        Key::DownArrow => Some("↓"),
+        Key::LeftArrow => Some("←"),
+        Key::RightArrow => Some("→"),
+        Key::Home => Some("Home"),
+        Key::End => Some("End"),
+        Key::PageUp => Some("PgUp"),
+        Key::PageDown => Some("PgDn"),
+        Key::F1 => Some("F1"),
+        Key::F2 => Some("F2"),
+        Key::F3 => Some("F3"),
+        Key::F4 => Some("F4"),
+        Key::F5 => Some("F5"),
+        Key::F6 => Some("F6"),
+        Key::F7 => Some("F7"),
+        Key::F8 => Some("F8"),
+        Key::F9 => Some("F9"),
+        Key::F10 => Some("F10"),
+        Key::F11 => Some("F11"),
+        Key::F12 => Some("F12"),
+        Key::Minus => Some("-"),
+        Key::Equal => Some("="),
+        Key::LeftBracket => Some("["),
+        Key::RightBracket => Some("]"),
+        Key::BackSlash => Some("\\"),
+        Key::SemiColon => Some(";"),
+        Key::Quote => Some("'"),
+        Key::Comma => Some(","),
+        Key::Dot => Some("."),
+        Key::Slash => Some("/"),
+        Key::BackQuote => Some("`"),
+        _ => None,
+    }
+}
+
+fn is_special_key(key: &Key) -> bool {
+    matches!(
+        key,
+        Key::Return
+            | Key::Escape
+            | Key::Space
+            | Key::Backspace
+            | Key::Tab
+            | Key::Delete
+            | Key::UpArrow
+            | Key::DownArrow
+            | Key::LeftArrow
+            | Key::RightArrow
+            | Key::Home
+            | Key::End
+            | Key::PageUp
+            | Key::PageDown
+            | Key::F1
+            | Key::F2
+            | Key::F3
+            | Key::F4
+            | Key::F5
+            | Key::F6
+            | Key::F7
+            | Key::F8
+            | Key::F9
+            | Key::F10
+            | Key::F11
+            | Key::F12
+    )
+}
+
+/// Start listening for global mouse and keyboard events
 #[tauri::command]
 pub fn start_global_listener(app: AppHandle) {
     let state = app.state::<InputListenerState>();
@@ -58,12 +185,18 @@ pub fn start_global_listener(app: AppHandle) {
     }
     *listening = true;
     state.session_samples.lock().clear();
+    state.session_keystrokes.lock().clear();
     drop(listening);
 
     let is_listening = state.is_listening.clone();
     let is_recording = state.is_recording.clone();
     let recording_start = state.recording_start.clone();
     let session_samples = state.session_samples.clone();
+    let session_keystrokes = state.session_keystrokes.clone();
+    let active_ctrl = state.active_ctrl.clone();
+    let active_shift = state.active_shift.clone();
+    let active_alt = state.active_alt.clone();
+    let active_meta = state.active_meta.clone();
     let app_handle = app.clone();
 
     thread::spawn(move || {
@@ -140,6 +273,65 @@ pub fn start_global_listener(app: AppHandle) {
                         let _ = app_handle.emit("global-mouse-move", &move_evt);
                     }
                 }
+                EventType::KeyPress(key) => {
+                    match key {
+                        Key::ControlLeft | Key::ControlRight => *active_ctrl.lock() = true,
+                        Key::ShiftLeft | Key::ShiftRight => *active_shift.lock() = true,
+                        Key::Alt | Key::AltGr => *active_alt.lock() = true,
+                        Key::MetaLeft | Key::MetaRight => *active_meta.lock() = true,
+                        _ => {
+                            if let Some(key_name) = format_key_name(&key) {
+                                let ctrl = *active_ctrl.lock();
+                                let alt = *active_alt.lock();
+                                let shift = *active_shift.lock();
+                                let meta = *active_meta.lock();
+
+                                let has_modifier = ctrl || alt || shift || meta;
+                                let special = is_special_key(&key);
+
+                                if has_modifier || special {
+                                    let mut parts = Vec::new();
+                                    if ctrl {
+                                        parts.push("Ctrl");
+                                    }
+                                    if alt {
+                                        parts.push("Alt");
+                                    }
+                                    if shift {
+                                        parts.push("Shift");
+                                    }
+                                    if meta {
+                                        #[cfg(target_os = "macos")]
+                                        parts.push("⌘");
+                                        #[cfg(not(target_os = "macos"))]
+                                        parts.push("Win");
+                                    }
+                                    parts.push(key_name);
+                                    let combo = parts.join("+");
+
+                                    let sample = KeystrokeSample {
+                                        time: (elapsed / 1000.0 * 100.0).round() / 100.0,
+                                        text: combo,
+                                    };
+
+                                    if is_rec {
+                                        session_keystrokes.lock().push(sample.clone());
+                                    }
+                                    let _ = app_handle.emit("global-keystroke", &sample);
+                                }
+                            }
+                        }
+                    }
+                }
+                EventType::KeyRelease(key) => {
+                    match key {
+                        Key::ControlLeft | Key::ControlRight => *active_ctrl.lock() = false,
+                        Key::ShiftLeft | Key::ShiftRight => *active_shift.lock() = false,
+                        Key::Alt | Key::AltGr => *active_alt.lock() = false,
+                        Key::MetaLeft | Key::MetaRight => *active_meta.lock() = false,
+                        _ => {}
+                    }
+                }
                 _ => {}
             }
         })
@@ -164,6 +356,7 @@ pub fn start_session_telemetry(app: AppHandle) {
     *state.is_recording.lock() = true;
     *state.recording_start.lock() = Some(std::time::Instant::now());
     state.session_samples.lock().clear();
+    state.session_keystrokes.lock().clear();
 }
 
 /// Stop session telemetry buffering and retrieve recorded samples
@@ -178,6 +371,12 @@ pub fn stop_session_telemetry(state: tauri::State<'_, InputListenerState>) -> Ve
 #[tauri::command]
 pub fn get_session_telemetry(state: tauri::State<'_, InputListenerState>) -> Vec<CursorSample> {
     state.session_samples.lock().clone()
+}
+
+/// Retrieve the session keystroke buffer recorded during the session
+#[tauri::command]
+pub fn get_session_keystrokes(state: tauri::State<'_, InputListenerState>) -> Vec<KeystrokeSample> {
+    state.session_keystrokes.lock().clone()
 }
 
 /// Minimize the main application window during active desktop recording

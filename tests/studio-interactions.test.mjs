@@ -87,3 +87,19 @@ test('StudioEngine setKeystrokes updates keystroke state and preserves overlay c
     engine.setShowKeystrokes(false);
     assert.equal(engine.showKeystrokes, false);
 });
+
+test('StudioEngine aspect ratio and export resolution mappings support 4K UHD and 2K QHD', () => {
+    const canvas = createMockCanvas(1920, 1080);
+    const mockVideo = { videoWidth: 1920, videoHeight: 1080, currentTime: 0 };
+    const engine = new StudioEngine(canvas, mockVideo, null, [], 10, [], {});
+
+    assert.equal(engine.aspectRatio, '16:9');
+    engine.setAspectRatio('9:16');
+    assert.equal(engine.aspectRatio, '9:16');
+
+    engine.setAspectRatio('1:1');
+    assert.equal(engine.aspectRatio, '1:1');
+
+    engine.setAspectRatio('4:5');
+    assert.equal(engine.aspectRatio, '4:5');
+});

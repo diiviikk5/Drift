@@ -28,7 +28,7 @@ export async function decodeProject(file) {
         12 + length + sizes[0] + sizes[1] !== file.size) throw new Error('Project media is incomplete.');
     const state = manifest.state;
     if (!state || !Number.isFinite(state.duration) || state.duration <= 0) throw new Error('Invalid recording duration.');
-    for (const field of ['focusSegments', 'clicks', 'moves', 'annotations', 'captions']) {
+    for (const field of ['focusSegments', 'clicks', 'moves', 'annotations', 'captions', 'keystrokes']) {
         if (state[field] !== undefined && !Array.isArray(state[field])) throw new Error(`Invalid ${field}.`);
     }
     if ((state.focusSegments || []).some(segment => !Number.isFinite(segment.startTime) ||

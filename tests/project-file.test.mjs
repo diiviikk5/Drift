@@ -5,11 +5,18 @@ import { encodeProject, decodeProject } from '../src/lib/project-file.js';
 test('project preserves media and editable state without base64 conversion', async () => {
     const recording = new Blob(['screen'], { type: 'video/webm' });
     const webcam = new Blob(['camera'], { type: 'video/webm' });
-    const state = { duration: 5, focusSegments: [], annotations: [{ text: 'Demo' }], background: 'midnight' };
+    const state = { 
+        duration: 5, 
+        focusSegments: [], 
+        annotations: [{ text: 'Demo' }], 
+        background: 'midnight',
+        keystrokes: [{ time: 1.2, text: 'Ctrl+C' }, { time: 3.4, text: '⌘K' }] 
+    };
     const restored = await decodeProject(await encodeProject({ recording, webcam, ...state }));
     assert.equal(await restored.recording.text(), 'screen');
     assert.equal(await restored.webcam.text(), 'camera');
     assert.deepEqual(restored.annotations, state.annotations);
+    assert.deepEqual(restored.keystrokes, state.keystrokes);
     assert.equal(restored.background, state.background);
 });
 
