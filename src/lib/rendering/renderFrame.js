@@ -290,7 +290,7 @@ export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples =
 /**
  * Binary search cursor sample interpolation for sub-pixel smooth pointer path
  */
-export function getInterpolatedCursor(timeSec, mouseSamples = []) {
+export function getInterpolatedCursor(timeSec, mouseSamples = [], options = {}) {
     if (!mouseSamples || mouseSamples.length === 0) return null;
 
     const timeMs = timeSec * 1000;
@@ -298,13 +298,16 @@ export function getInterpolatedCursor(timeSec, mouseSamples = []) {
     let low = 0;
     let high = mouseSamples.length - 1;
 
+    const normX = (s) => (s.x > 1 ? s.x / 1920 : s.x);
+    const normY = (s) => (s.y > 1 ? s.y / 1080 : s.y);
+
     if (timeMs <= (mouseSamples[0].time ?? mouseSamples[0].t ?? 0)) {
         const s = mouseSamples[0];
-        return { x: s.x > 1 ? s.x / 1920 : s.x, y: s.y > 1 ? s.y / 1080 : s.y };
+        return { x: normX(s), y: normY(s) };
     }
     if (timeMs >= (mouseSamples[high].time ?? mouseSamples[high].t ?? 0)) {
         const s = mouseSamples[high];
-        return { x: s.x > 1 ? s.x / 1920 : s.x, y: s.y > 1 ? s.y / 1080 : s.y };
+        return { x: normX(s), y: normY(s) };
     }
 
     while (low <= high) {
@@ -318,21 +321,53 @@ export function getInterpolatedCursor(timeSec, mouseSamples = []) {
         }
     }
 
-    const prev = mouseSamples[Math.max(0, low - 1)];
-    const next = mouseSamples[Math.min(mouseSamples.length - 1, low)];
+    const i1 = Math.max(0, low - 1);
+    const i2 = Math.min(mouseSamples.length - 1, low);
+
+    const prev = mouseSamples[i1];
+    const next = mouseSamples[i2];
 
     const tPrev = prev.time ?? prev.t ?? 0;
     const tNext = next.time ?? next.t ?? 0;
     const alpha = tNext === tPrev ? 0 : Math.max(0, Math.min(1, (timeMs - tPrev) / (tNext - tPrev)));
 
-    const pX = prev.x > 1 ? prev.x / 1920 : prev.x;
-    const pY = prev.y > 1 ? prev.y / 1080 : prev.y;
-    const nX = next.x > 1 ? next.x / 1920 : next.x;
-    const nY = next.y > 1 ? next.y / 1080 : next.y;
+    const p1x = normX(prev);
+    const p1y = normY(prev);
+    const p2x = normX(next);
+    const p2y = normY(next);
+
+    // If only 2 samples, or long pause (>350ms), or spline explicitly disabled, use linear
+    if (mouseSamples.length < 3 || (tNext - tPrev) > 350 || options.spline === false) {
+        return {
+            x: p1x + (p2x - p1x) * alpha,
+            y: p1y + (p2y - p1y) * alpha,
+        };
+    }
+
+    // 4-point Catmull-Rom Spline for silky smooth organic mouse trajectories
+    const i0 = Math.max(0, i1 - 1);
+    const i3 = Math.min(mouseSamples.length - 1, i2 + 1);
+
+    const p0 = mouseSamples[i0];
+    const p3 = mouseSamples[i3];
+
+    const p0x = normX(p0), p0y = normY(p0);
+    const p3x = normX(p3), p3y = normY(p3);
+
+    const u = alpha;
+    const u2 = u * u;
+    const u3 = u2 * u;
+
+    const catmull = (v0, v1, v2, v3) => 0.5 * (
+        (2 * v1) +
+        (-v0 + v2) * u +
+        (2 * v0 - 5 * v1 + 4 * v2 - v3) * u2 +
+        (-v0 + 3 * v1 - 3 * v2 + v3) * u3
+    );
 
     return {
-        x: pX + (nX - pX) * alpha,
-        y: pY + (nY - pY) * alpha,
+        x: Math.max(0, Math.min(1, catmull(p0x, p1x, p2x, p3x))),
+        y: Math.max(0, Math.min(1, catmull(p0y, p1y, p2y, p3y))),
     };
 }
 
@@ -972,6 +1007,73 @@ function _drawThemedCursor(ctx, x, y, scale = 1.0, theme = 'macos') {
         ctx.fill();
         ctx.lineWidth = 2;
         ctx.strokeStyle = '#000000';
+        ctx.stroke();
+        ctx.restore();
+        return;
+    }
+
+    if (theme === 'ring') {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, 9 * scale, 0, Math.PI * 2);
+        ctx.lineWidth = 2.5 * scale;
+        ctx.strokeStyle = '#DCFE50';
+        ctx.shadowColor = 'rgba(220, 254, 80, 0.7)';
+        ctx.shadowBlur = 12;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(x, y, 2.5 * scale, 0, Math.PI * 2);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.shadowColor = 'transparent';
+        ctx.fill();
+        ctx.restore();
+        return;
+    }
+
+    if (theme === 'cyber') {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(scale * 1.3, scale * 1.3);
+        ctx.shadowColor = '#DCFE50';
+        ctx.shadowBlur = 18;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, 20);
+        ctx.lineTo(5.5, 15);
+        ctx.lineTo(10, 22.5);
+        ctx.lineTo(13, 21);
+        ctx.lineTo(8.5, 14);
+        ctx.lineTo(14.5, 14);
+        ctx.closePath();
+        ctx.fillStyle = '#DCFE50';
+        ctx.fill();
+        ctx.strokeStyle = '#050801';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+        ctx.restore();
+        return;
+    }
+
+    if (theme === 'windows') {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(scale * 1.25, scale * 1.25);
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, 18);
+        ctx.lineTo(4.5, 14);
+        ctx.lineTo(8.5, 21.5);
+        ctx.lineTo(11.5, 20);
+        ctx.lineTo(7.5, 12.8);
+        ctx.lineTo(13, 12.8);
+        ctx.closePath();
+        ctx.fillStyle = '#0f172a';
+        ctx.fill();
+        ctx.strokeStyle = '#f8fafc';
+        ctx.lineWidth = 1.6;
         ctx.stroke();
         ctx.restore();
         return;

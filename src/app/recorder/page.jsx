@@ -119,6 +119,12 @@ export default function RecorderPage() {
     const [showCursor, setShowCursor] = useState(false);
     const [cursorTheme, setCursorTheme] = useState('macos');
     const [cursorScale, setCursorScale] = useState(1.0);
+    const [splineSmoothing, setSplineSmoothing] = useState(true);
+    const [systemAudioVolume, setSystemAudioVolume] = useState(1.0);
+    const [micAudioVolume, setMicAudioVolume] = useState(1.2);
+    const [isSystemAudioMuted, setIsSystemAudioMuted] = useState(false);
+    const [isMicAudioMuted, setIsMicAudioMuted] = useState(false);
+    const [autoDuck, setAutoDuck] = useState(true);
     const [aspectRatio, setAspectRatio] = useState('16:9');
 
     // OpenScreen & Recordly Features State
@@ -361,6 +367,13 @@ export default function RecorderPage() {
                         captionsEnabled,
                         customBackgroundImage: customImage,
                         cursorTheme,
+                        cursorScale,
+                        splineSmoothing,
+                        systemAudioVolume,
+                        micAudioVolume,
+                        isSystemAudioMuted,
+                        isMicAudioMuted,
+                        autoDuck,
                         focusSegments: savedSegmentsRef.current,
                         showCursor: showCursor || ((recordedMoves && recordedMoves.length > 0) || (recordedClicks && recordedClicks.length > 0)),
                         systemAudioUrl: nativeAudioTracks.systemAudioUrl,
@@ -376,7 +389,19 @@ export default function RecorderPage() {
                     setShowCursor(true);
                 }
                 studioRef.current.cursorTheme = cursorTheme;
-                Object.assign(studioRef.current, { cursorScale, tiltAngle, connectedZooms, reactiveWebcam, captionsEnabled });
+                Object.assign(studioRef.current, {
+                    cursorScale,
+                    splineSmoothing,
+                    systemAudioVolume,
+                    micAudioVolume,
+                    isSystemAudioMuted,
+                    isMicAudioMuted,
+                    autoDuck,
+                    tiltAngle,
+                    connectedZooms,
+                    reactiveWebcam,
+                    captionsEnabled,
+                });
                 studioRef.current.setAspectRatio(aspectRatio);
 
                 if (studioVideoRef.current) {
@@ -1044,7 +1069,8 @@ export default function RecorderPage() {
                 focusSegments: studioRef.current?.getFocusSegments() ?? focusSegments,
                 annotations, captions, captionsEnabled, background,
                 customBackground: customImage?.src ?? null,
-                zoomLevel, showCursor, cursorTheme, cursorScale, aspectRatio,
+                zoomLevel, showCursor, cursorTheme, cursorScale, splineSmoothing, aspectRatio,
+                systemAudioVolume, micAudioVolume, isSystemAudioMuted, isMicAudioMuted, autoDuck,
                 tiltAngle, connectedZooms, reactiveWebcam, webcamSettings, trimStart, trimEnd,
             });
             triggerBlobDownload(project, 'drift');
@@ -1105,6 +1131,12 @@ export default function RecorderPage() {
             setShowCursor(project.showCursor ?? false);
             setCursorTheme(project.cursorTheme ?? 'macos');
             setCursorScale(project.cursorScale ?? 1);
+            setSplineSmoothing(project.splineSmoothing ?? true);
+            setSystemAudioVolume(project.systemAudioVolume ?? 1.0);
+            setMicAudioVolume(project.micAudioVolume ?? 1.2);
+            setIsSystemAudioMuted(project.isSystemAudioMuted ?? false);
+            setIsMicAudioMuted(project.isMicAudioMuted ?? false);
+            setAutoDuck(project.autoDuck ?? true);
             setAspectRatio(project.aspectRatio ?? '16:9');
             setTiltAngle(project.tiltAngle ?? 0);
             setConnectedZooms(project.connectedZooms ?? true);
@@ -1296,9 +1328,45 @@ export default function RecorderPage() {
                             showCursor={showCursor}
                             onToggleCursor={() => setShowCursor(prev => !prev)}
                             cursorTheme={cursorTheme}
-                            onChangeCursorTheme={setCursorTheme}
+                            onChangeCursorTheme={(theme) => {
+                                setCursorTheme(theme);
+                                if (studioRef.current) studioRef.current.setCursorTheme(theme);
+                            }}
                             cursorScale={cursorScale}
-                            onChangeCursorScale={setCursorScale}
+                            onChangeCursorScale={(scale) => {
+                                setCursorScale(scale);
+                                if (studioRef.current) studioRef.current.setCursorScale(scale);
+                            }}
+                            splineSmoothing={splineSmoothing}
+                            onToggleSplineSmoothing={(enabled) => {
+                                setSplineSmoothing(enabled);
+                                if (studioRef.current) studioRef.current.setSplineSmoothing(enabled);
+                            }}
+                            systemAudioVolume={systemAudioVolume}
+                            onChangeSystemAudioVolume={(vol) => {
+                                setSystemAudioVolume(vol);
+                                if (studioRef.current) studioRef.current.setSystemAudioVolume(vol);
+                            }}
+                            micAudioVolume={micAudioVolume}
+                            onChangeMicAudioVolume={(vol) => {
+                                setMicAudioVolume(vol);
+                                if (studioRef.current) studioRef.current.setMicAudioVolume(vol);
+                            }}
+                            isSystemAudioMuted={isSystemAudioMuted}
+                            onToggleSystemAudioMute={(muted) => {
+                                setIsSystemAudioMuted(muted);
+                                if (studioRef.current) studioRef.current.setSystemAudioMuted(muted);
+                            }}
+                            isMicAudioMuted={isMicAudioMuted}
+                            onToggleMicAudioMute={(muted) => {
+                                setIsMicAudioMuted(muted);
+                                if (studioRef.current) studioRef.current.setMicAudioMuted(muted);
+                            }}
+                            autoDuck={autoDuck}
+                            onToggleAutoDuck={(duck) => {
+                                setAutoDuck(duck);
+                                if (studioRef.current) studioRef.current.setAutoDuck(duck);
+                            }}
                             webcamSettings={webcamSettings}
                             onChangeWebcamSettings={handleUpdateWebcamSettings}
                             captions={captions}

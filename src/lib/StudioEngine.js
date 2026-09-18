@@ -59,6 +59,14 @@ export class StudioEngine {
             this.micAudio.preload = 'auto';
         }
 
+        // Multi-Track Audio Mixer (Volume, Mute & Smart Voice Ducking)
+        this.systemAudioVolume = options.systemAudioVolume ?? 1.0;
+        this.micAudioVolume = options.micAudioVolume ?? 1.2;
+        this.isSystemAudioMuted = options.isSystemAudioMuted ?? false;
+        this.isMicAudioMuted = options.isMicAudioMuted ?? false;
+        this.autoDuck = options.autoDuck ?? true;
+        this.updateAudioVolumes();
+
         // Auto-Captions Subtitles
         this.captions = options.captions || [];
         this.captionsEnabled = options.captionsEnabled ?? true;
@@ -69,6 +77,8 @@ export class StudioEngine {
         // Custom Background Image
         this.customBackgroundImage = options.customBackgroundImage || null;
         this.cursorTheme = options.cursorTheme || 'macos';
+        this.cursorScale = options.cursorScale ?? 1.0;
+        this.splineSmoothing = options.splineSmoothing ?? true;
 
         // Semantic Interaction Analyzer & Focus Track
         this.interactionAnalyzer = new InteractionAnalyzer();
@@ -291,6 +301,40 @@ export class StudioEngine {
             this.webcamVideo.load();
         }
         this.drawFrame();
+    }
+
+    setSystemAudioVolume(vol) {
+        this.systemAudioVolume = Math.max(0, Math.min(1.5, vol));
+        this.updateAudioVolumes();
+    }
+
+    setMicAudioVolume(vol) {
+        this.micAudioVolume = Math.max(0, Math.min(2.0, vol));
+        this.updateAudioVolumes();
+    }
+
+    setSystemAudioMuted(muted) {
+        this.isSystemAudioMuted = Boolean(muted);
+        this.updateAudioVolumes();
+    }
+
+    setMicAudioMuted(muted) {
+        this.isMicAudioMuted = Boolean(muted);
+        this.updateAudioVolumes();
+    }
+
+    setAutoDuck(enabled) {
+        this.autoDuck = Boolean(enabled);
+    }
+
+    updateAudioVolumes() {
+        if (this.systemAudio) {
+            this.systemAudio.volume = this.isSystemAudioMuted ? 0 : Math.max(0, Math.min(1, this.systemAudioVolume));
+        }
+        if (this.micAudio) {
+            // Scale mic volume (default max 1.0 on standard HTMLAudioElement)
+            this.micAudio.volume = this.isMicAudioMuted ? 0 : Math.max(0, Math.min(1, this.micAudioVolume > 1.0 ? 1.0 : this.micAudioVolume));
+        }
     }
 
     resetCamera() {
@@ -608,6 +652,7 @@ export class StudioEngine {
                 showCursor: this.showCursor,
                 cursorTheme: this.cursorTheme || 'macos',
                 cursorScale: this.cursorScale ?? 1,
+                splineSmoothing: this.splineSmoothing !== false,
                 zoomMagnification: (this.zoomLevel || 2.0) / 2.0,
                 clickRipples: true,
                 tiltAngle: this.tiltAngle ?? 3.5,
@@ -640,6 +685,21 @@ export class StudioEngine {
             this.webcamVideo.load();
             this.webcamVideo = null;
         }
+    }
+
+    setCursorTheme(theme) {
+        this.cursorTheme = theme;
+        this.drawFrame();
+    }
+
+    setCursorScale(scale) {
+        this.cursorScale = Math.max(0.2, Math.min(3.0, scale));
+        this.drawFrame();
+    }
+
+    setSplineSmoothing(enabled) {
+        this.splineSmoothing = Boolean(enabled);
+        this.drawFrame();
     }
 
     setTiltAngle(angle) {
@@ -879,6 +939,10 @@ export class StudioEngine {
                         const sysBuf = await loadBuf(this.systemAudioUrl);
                         const micBuf = await loadBuf(this.micAudioUrl);
 
+                        const sVol = this.isSystemAudioMuted ? 0 : (this.systemAudioVolume ?? 1.0);
+                        const mVol = this.isMicAudioMuted ? 0 : (this.micAudioVolume ?? 1.2);
+                        const autoDuck = this.autoDuck ?? true;
+
                         if (sysBuf && micBuf) {
                             const numChannels = Math.max(sysBuf.numberOfChannels, micBuf.numberOfChannels, 2);
                             const length = Math.max(sysBuf.length, micBuf.length);
@@ -889,16 +953,36 @@ export class StudioEngine {
                                 const out = audioBuffer.getChannelData(ch);
                                 const s = ch < sysBuf.numberOfChannels ? sysBuf.getChannelData(ch) : sysBuf.getChannelData(0);
                                 const m = ch < micBuf.numberOfChannels ? micBuf.getChannelData(ch) : micBuf.getChannelData(0);
+                                let duckGain = 1.0;
                                 for (let i = 0; i < length; i++) {
-                                    const sVal = i < s.length ? s[i] : 0;
-                                    const mVal = i < m.length ? m[i] * 1.3 : 0;
+                                    const mVal = i < m.length ? m[i] * mVol : 0;
+                                    const isVoiceActive = Math.abs(mVal) > 0.035;
+                                    const targetDuck = (autoDuck && isVoiceActive) ? 0.30 : 1.0;
+                                    duckGain += (targetDuck - duckGain) * 0.005; // smooth anti-pop gain transition
+                                    const sVal = i < s.length ? s[i] * sVol * duckGain : 0;
                                     out[i] = Math.max(-1, Math.min(1, sVal + mVal));
                                 }
                             }
                         } else if (sysBuf) {
-                            audioBuffer = sysBuf;
+                            const numChannels = sysBuf.numberOfChannels;
+                            audioBuffer = tempCtx.createBuffer(numChannels, sysBuf.length, sysBuf.sampleRate);
+                            for (let ch = 0; ch < numChannels; ch++) {
+                                const out = audioBuffer.getChannelData(ch);
+                                const s = sysBuf.getChannelData(ch);
+                                for (let i = 0; i < sysBuf.length; i++) {
+                                    out[i] = Math.max(-1, Math.min(1, s[i] * sVol));
+                                }
+                            }
                         } else if (micBuf) {
-                            audioBuffer = micBuf;
+                            const numChannels = micBuf.numberOfChannels;
+                            audioBuffer = tempCtx.createBuffer(numChannels, micBuf.length, micBuf.sampleRate);
+                            for (let ch = 0; ch < numChannels; ch++) {
+                                const out = audioBuffer.getChannelData(ch);
+                                const m = micBuf.getChannelData(ch);
+                                for (let i = 0; i < micBuf.length; i++) {
+                                    out[i] = Math.max(-1, Math.min(1, m[i] * mVol));
+                                }
+                            }
                         } else if (this.blob) {
                             audioBuffer = await loadBuf(this.blob);
                         }

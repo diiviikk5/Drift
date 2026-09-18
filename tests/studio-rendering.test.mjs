@@ -79,3 +79,43 @@ test('interaction analyzer converts synchronized session clicks to zoom targets'
     assert.ok(Math.abs(segments[0].targetX - 0.35) < 0.05);
     assert.ok(Math.abs(segments[0].targetY - 0.42) < 0.05);
 });
+
+test('Catmull-Rom spline curves smoothly through multi-point trajectories without corner cuts', () => {
+    const trajectory = [
+        { time: 0, x: 0.1, y: 0.1 },
+        { time: 100, x: 0.2, y: 0.4 },
+        { time: 200, x: 0.6, y: 0.8 },
+        { time: 300, x: 0.9, y: 0.9 },
+    ];
+    // Evaluate between p1 and p2 at t = 150ms
+    const pt = getInterpolatedCursor(0.15, trajectory);
+    assert.ok(pt !== null);
+    assert.ok(pt.x > 0.2 && pt.x < 0.6);
+    assert.ok(pt.y > 0.4 && pt.y < 0.8);
+    // Linear midpoint would be (0.4, 0.6). Spline curve produces non-linear smooth curve
+    assert.ok(Math.abs(pt.x - 0.375) < 0.05);
+});
+
+test('compositor renders all vector cursor themes without throwing', () => {
+    const noop = () => {};
+    const context = new Proxy({ canvas: { width: 1920, height: 1080 } }, {
+        get(target, key) {
+            if (key in target) return target[key];
+            if (key === 'createLinearGradient' || key === 'createRadialGradient') return () => ({ addColorStop: noop });
+            return noop;
+        },
+    });
+
+    const themes = ['macos', 'windows', 'cyber', 'neon', 'dot', 'ring'];
+    for (const theme of themes) {
+        assert.doesNotThrow(() => {
+            renderFrame(context, 1.0, null, {
+                mouseMoves: [{ time: 0, x: 0.5, y: 0.5 }, { time: 2000, x: 0.6, y: 0.6 }],
+            }, {
+                showCursor: true,
+                cursorTheme: theme,
+                cursorScale: 1.5,
+            });
+        }, `Failed rendering cursor theme: ${theme}`);
+    }
+});

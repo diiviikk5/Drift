@@ -16,7 +16,12 @@ import {
     Send,
     Subtitles,
     RefreshCw,
-    Settings2
+    Settings2,
+    Volume2,
+    VolumeX,
+    Mic,
+    MicOff,
+    Activity
 } from 'lucide-react';
 
 export default function InspectorPanel({
@@ -33,6 +38,18 @@ export default function InspectorPanel({
     onChangeCursorTheme,
     cursorScale = 1.0,
     onChangeCursorScale,
+    splineSmoothing = true,
+    onToggleSplineSmoothing,
+    systemAudioVolume = 1.0,
+    onChangeSystemAudioVolume,
+    micAudioVolume = 1.2,
+    onChangeMicAudioVolume,
+    isSystemAudioMuted = false,
+    onToggleSystemAudioMute,
+    isMicAudioMuted = false,
+    onToggleMicAudioMute,
+    autoDuck = true,
+    onToggleAutoDuck,
     webcamSettings = {
         enabled: false,
         shape: 'circle',
@@ -98,6 +115,7 @@ export default function InspectorPanel({
                     { id: 'style', label: 'Canvas', icon: Palette },
                     { id: 'camera', label: 'Zoom', icon: Camera },
                     { id: 'cursor', label: 'Cursor', icon: MousePointer },
+                    { id: 'audio', label: 'Audio', icon: Volume2 },
                     { id: 'webcam', label: 'Webcam', icon: Video },
                     { id: 'ai', label: 'AI Studio', icon: Sparkles },
                 ].map((tab) => {
@@ -342,15 +360,18 @@ export default function InspectorPanel({
                                 <div className="grid grid-cols-3 gap-1">
                                     {[
                                         { id: 'macos', label: 'macOS' },
-                                        { id: 'dot', label: 'Minimal Dot' },
+                                        { id: 'windows', label: 'Windows 11' },
+                                        { id: 'cyber', label: 'Cyber Lime' },
                                         { id: 'neon', label: 'Neon Glow' },
+                                        { id: 'dot', label: 'Minimal Dot' },
+                                        { id: 'ring', label: 'Studio Ring' },
                                     ].map((t) => (
                                         <button
                                             key={t.id}
                                             onClick={() => onChangeCursorTheme && onChangeCursorTheme(t.id)}
-                                            className={`py-1.5 px-1 rounded-md border text-center text-xs transition-all ${
+                                            className={`py-1.5 px-1 rounded-md border text-center text-[11px] transition-all cursor-pointer ${
                                                 cursorTheme === t.id
-                                                    ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold'
+                                                    ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold shadow-xs'
                                                     : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
                                             }`}
                                         >
@@ -381,11 +402,136 @@ export default function InspectorPanel({
                                 />
                             </div>
 
+                            {/* Catmull-Rom Spline Trajectory Smoothing */}
+                            <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)]">
+                                <div>
+                                    <div className="text-xs font-semibold text-[var(--text-app)]">Cinema Spline Curves</div>
+                                    <div className="text-[10px] text-[var(--text-app-muted)]">Catmull-Rom organic glide</div>
+                                </div>
+                                <button
+                                    onClick={() => onToggleSplineSmoothing && onToggleSplineSmoothing(!splineSmoothing)}
+                                    className={`w-9 h-5 rounded-full transition-all relative cursor-pointer ${
+                                        splineSmoothing ? 'bg-[var(--accent-app)]' : 'bg-gray-600'
+                                    }`}
+                                >
+                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                                        splineSmoothing ? 'left-[18px]' : 'left-0.5'
+                                    }`} />
+                                </button>
+                            </div>
+
                             <div className="p-3 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] text-[11px] text-[var(--text-app-muted)] leading-relaxed">
-                                Click ripple waves are automatically rendered in sync with user interaction events.
+                                Click ripple waves and vector pointer paths are dynamically composited with sub-pixel microsecond accuracy.
                             </div>
                         </div>
                     </>
+                )}
+
+                {/* ═══ AUDIO MIXER TAB ═══ */}
+                {activeTab === 'audio' && (
+                    <div className="space-y-4">
+                        {/* Desktop Audio Track Card */}
+                        <div className="p-3.5 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => onToggleSystemAudioMute && onToggleSystemAudioMute(!isSystemAudioMuted)}
+                                        className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                                            isSystemAudioMuted
+                                                ? 'bg-red-500/20 text-red-400'
+                                                : 'bg-[var(--accent-app)] text-[var(--accent-app-fg)]'
+                                        }`}
+                                        title={isSystemAudioMuted ? 'Unmute Desktop Sound' : 'Mute Desktop Sound'}
+                                    >
+                                        {isSystemAudioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                                    </button>
+                                    <div>
+                                        <div className="text-xs font-semibold text-[var(--text-app)]">Desktop Audio</div>
+                                        <div className="text-[10px] text-[var(--text-app-muted)]">WASAPI Loopback</div>
+                                    </div>
+                                </div>
+                                <span className="font-mono text-xs font-bold text-[var(--accent-app)]">
+                                    {isSystemAudioMuted ? 'MUTED' : `${Math.round((systemAudioVolume ?? 1.0) * 100)}%`}
+                                </span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="1.5"
+                                step="0.05"
+                                value={isSystemAudioMuted ? 0 : (systemAudioVolume ?? 1.0)}
+                                onChange={(e) => onChangeSystemAudioVolume && onChangeSystemAudioVolume(parseFloat(e.target.value))}
+                                disabled={isSystemAudioMuted}
+                                className="w-full accent-[var(--accent-app)] cursor-pointer"
+                            />
+                        </div>
+
+                        {/* Microphone Voice Card */}
+                        <div className="p-3.5 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => onToggleMicAudioMute && onToggleMicAudioMute(!isMicAudioMuted)}
+                                        className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                                            isMicAudioMuted
+                                                ? 'bg-red-500/20 text-red-400'
+                                                : 'bg-[var(--accent-app)] text-[var(--accent-app-fg)]'
+                                        }`}
+                                        title={isMicAudioMuted ? 'Unmute Microphone' : 'Mute Microphone'}
+                                    >
+                                        {isMicAudioMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                                    </button>
+                                    <div>
+                                        <div className="text-xs font-semibold text-[var(--text-app)]">Microphone Voice</div>
+                                        <div className="text-[10px] text-[var(--text-app-muted)]">Voice Narration</div>
+                                    </div>
+                                </div>
+                                <span className="font-mono text-xs font-bold text-[var(--accent-app)]">
+                                    {isMicAudioMuted ? 'MUTED' : `${Math.round((micAudioVolume ?? 1.2) * 100)}%`}
+                                </span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="2.0"
+                                step="0.05"
+                                value={isMicAudioMuted ? 0 : (micAudioVolume ?? 1.2)}
+                                onChange={(e) => onChangeMicAudioVolume && onChangeMicAudioVolume(parseFloat(e.target.value))}
+                                disabled={isMicAudioMuted}
+                                className="w-full accent-[var(--accent-app)] cursor-pointer"
+                            />
+                        </div>
+
+                        {/* Smart Voice Ducking */}
+                        <div className="flex items-center justify-between p-3.5 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)]">
+                            <div>
+                                <div className="text-xs font-semibold text-[var(--text-app)]">Smart Voice Ducking</div>
+                                <div className="text-[10px] text-[var(--text-app-muted)] leading-tight mt-0.5">
+                                    Auto-dip desktop volume 70% during speech
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => onToggleAutoDuck && onToggleAutoDuck(!autoDuck)}
+                                className={`w-9 h-5 rounded-full transition-all relative cursor-pointer ${
+                                    autoDuck ? 'bg-[var(--accent-app)]' : 'bg-gray-600'
+                                }`}
+                            >
+                                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                                    autoDuck ? 'left-[18px]' : 'left-0.5'
+                                }`} />
+                            </button>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-black/20 border border-white/5 space-y-1.5 text-[11px] text-[var(--text-app-muted)]">
+                            <div className="flex items-center gap-1.5 text-[var(--text-app)] font-semibold">
+                                <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>Cinema Multi-Track Processing</span>
+                            </div>
+                            <p className="leading-relaxed">
+                                Audio tracks are balanced non-destructively. Adjustments synchronize seamlessly with live Studio playback and hardware-accelerated MP4 export.
+                            </p>
+                        </div>
+                    </div>
                 )}
 
                 {/* ═══ WEBCAM TAB ═══ */}
