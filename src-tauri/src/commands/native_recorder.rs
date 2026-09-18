@@ -6,6 +6,7 @@ use parking_lot::Mutex;
 use tauri::{command, AppHandle, Emitter, Manager};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct NativeSessionConfig {
     pub monitor_index: usize,
     pub fps: Option<u32>,
