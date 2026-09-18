@@ -664,10 +664,10 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         for (const click of clicks) {
             const cTimeMs = click.time;
             const dt = curMs - cTimeMs;
-            if (dt >= 0 && dt <= 450) {
-                const progress = dt / 450;
-                const ringRadius = progress * 40 * (frameW / 1920);
-                const ringAlpha = (1 - progress) * 0.75;
+            if (dt >= 0 && dt <= 380) {
+                const progress = dt / 380;
+                const ringRadius = progress * 28 * (frameW / 1920);
+                const ringAlpha = (1 - progress) * 0.55;
                 const cx = (click.x > 1 ? click.x / 1920 : click.x) * frameW;
                 const cy = (click.y > 1 ? click.y / 1080 : click.y) * videoH;
 
@@ -675,13 +675,13 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
                 ctx.beginPath();
                 ctx.arc(cx, cy, ringRadius, 0, Math.PI * 2);
                 ctx.strokeStyle = `rgba(220, 254, 80, ${ringAlpha})`;
-                ctx.lineWidth = 3 * (1 - progress);
+                ctx.lineWidth = 1.8 * (1 - progress);
                 ctx.stroke();
 
-                // Inner ping
+                // Subtle inner accent ping
                 ctx.beginPath();
-                ctx.arc(cx, cy, ringRadius * 0.45, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(220, 254, 80, ${ringAlpha * 0.4})`;
+                ctx.arc(cx, cy, ringRadius * 0.4, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(220, 254, 80, ${ringAlpha * 0.25})`;
                 ctx.fill();
                 ctx.restore();
             }
@@ -1266,36 +1266,38 @@ function _drawThemedCursor(ctx, x, y, scale = 1.0, theme = 'macos') {
 }
 
 /**
- * Draw crisp modern macOS-style synthetic pointer
+ * Draw crisp modern macOS-style synthetic pointer (OpenScreen / Screen Studio aesthetic)
  */
 function _drawSyntheticCursor(ctx, x, y, scale = 1.0) {
     ctx.save();
     ctx.translate(x, y);
-    ctx.scale(scale * 1.3, scale * 1.3);
+    ctx.scale(scale * 1.05, scale * 1.05);
 
-    // Subtle pointer shadow
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 3;
+    // Subtle ambient pointer shadow
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.38)';
+    ctx.shadowBlur = 5;
+    ctx.shadowOffsetY = 2.5;
 
-    // Pointer body path
+    // Iconic macOS pointer geometry (clean ~18.5px height)
     ctx.beginPath();
     ctx.moveTo(0, 0);
-    ctx.lineTo(0, 19);
-    ctx.lineTo(4.8, 14.8);
-    ctx.lineTo(8.5, 22.5);
-    ctx.lineTo(12, 21);
-    ctx.lineTo(8.3, 13.5);
-    ctx.lineTo(14, 13.5);
+    ctx.lineTo(0, 18.5);
+    ctx.lineTo(4.4, 14.2);
+    ctx.lineTo(7.8, 22.0);
+    ctx.lineTo(10.8, 20.6);
+    ctx.lineTo(7.5, 13.2);
+    ctx.lineTo(13.2, 13.2);
     ctx.closePath();
 
-    ctx.fillStyle = '#FFFFFF';
+    // Deep obsidian black body for maximum clarity and contrast
+    ctx.fillStyle = '#0f1117';
     ctx.fill();
 
-    // Sharp dark outline
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1.4;
+    // Crisp pure white outline
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.25;
     ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
     ctx.stroke();
 
     ctx.restore();
