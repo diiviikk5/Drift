@@ -166,8 +166,8 @@ export default function RecorderPage() {
     const [showHotkeySettings, setShowHotkeySettings] = useState(false);
     const [hookStatus, setHookStatus] = useState('Active');
     const [hotkeys, setHotkeys] = useState({
-        toggle_recording: 'CmdOrCtrl+Shift+R',
-        stop_recording: 'CmdOrCtrl+Shift+S',
+        toggle_recording: 'CmdOrCtrl+X',
+        stop_recording: 'CmdOrCtrl+X',
         toggle_pause: 'CmdOrCtrl+Shift+P',
         toggle_zoom: 'CmdOrCtrl+Shift+Z',
     });
@@ -692,58 +692,64 @@ export default function RecorderPage() {
     const startRecordingActual = async () => {
         try {
             if (isNativeSupported && drift.isTauri()) {
-                isNativeRecordingRef.current = true;
-                const monitorIndex = typeof selectedSource === 'number'
-                    ? selectedSource
-                    : (parseInt(String(selectedSource || '0').replace(/\D+/g, ''), 10) || 0);
+                try {
+                    isNativeRecordingRef.current = true;
+                    const monitorIndex = typeof selectedSource === 'number'
+                        ? selectedSource
+                        : (parseInt(String(selectedSource || '0').replace(/\D+/g, ''), 10) || 0);
 
-                await drift.startNativeSession({
-                    monitorIndex,
-                    fps: 60,
-                    withSystemAudio: true,
-                    withMic: micEnabled,
-                    withoutCursor: true,
-                });
-                await drift.startSessionTelemetry();
+                    await drift.startNativeSession({
+                        monitorIndex,
+                        fps: 60,
+                        withSystemAudio: true,
+                        withMic: micEnabled,
+                        withoutCursor: true,
+                    });
+                    await drift.startSessionTelemetry();
 
-                // Capture webcam stream in parallel if enabled
-                if (webcamEnabled && engineRef.current?.webcamStream) {
-                    try {
-                        const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
-                        const rec = new MediaRecorder(engineRef.current.webcamStream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
-                        nativeWebcamChunksRef.current = [];
-                        rec.ondataavailable = (e) => {
-                            if (e.data.size > 0) nativeWebcamChunksRef.current.push(e.data);
-                        };
-                        rec.start(1000);
-                        nativeWebcamRecorderRef.current = rec;
-                    } catch (camErr) {
-                        console.warn('[Drift] Native webcam recorder start failed:', camErr);
+                    // Capture webcam stream in parallel if enabled
+                    if (webcamEnabled && engineRef.current?.webcamStream) {
+                        try {
+                            const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+                            const rec = new MediaRecorder(engineRef.current.webcamStream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
+                            nativeWebcamChunksRef.current = [];
+                            rec.ondataavailable = (e) => {
+                                if (e.data.size > 0) nativeWebcamChunksRef.current.push(e.data);
+                            };
+                            rec.start(1000);
+                            nativeWebcamRecorderRef.current = rec;
+                        } catch (camErr) {
+                            console.warn('[Drift] Native webcam recorder start failed:', camErr);
+                            nativeWebcamRecorderRef.current = null;
+                        }
+                    } else {
                         nativeWebcamRecorderRef.current = null;
                     }
-                } else {
-                    nativeWebcamRecorderRef.current = null;
-                }
 
-                nativeSessionStartRef.current = Date.now();
-                nativeTimerIntervalRef.current = setInterval(() => {
-                    const s = (Date.now() - nativeSessionStartRef.current) / 1000;
-                    const m = Math.floor(s / 60).toString().padStart(2, '0');
-                    const sec = Math.floor(s % 60).toString().padStart(2, '0');
-                    setTimer(`${m}:${sec}`);
-                }, 1000);
+                    nativeSessionStartRef.current = Date.now();
+                    nativeTimerIntervalRef.current = setInterval(() => {
+                        const s = (Date.now() - nativeSessionStartRef.current) / 1000;
+                        const m = Math.floor(s / 60).toString().padStart(2, '0');
+                        const sec = Math.floor(s % 60).toString().padStart(2, '0');
+                        setTimer(`${m}:${sec}`);
+                    }, 1000);
 
-                setIsRecording(true);
-                setHasActiveStream(true);
+                    setIsRecording(true);
+                    setHasActiveStream(true);
 
-                if (autoMinimize && typeof drift.minimizeWindow === 'function') {
-                    try {
-                        await drift.minimizeWindow();
-                    } catch (minErr) {
-                        console.warn('[Drift] Window auto-minimize notice:', minErr);
+                    if (autoMinimize && typeof drift.minimizeWindow === 'function') {
+                        try {
+                            await drift.minimizeWindow();
+                        } catch (minErr) {
+                            console.warn('[Drift] Window auto-minimize notice:', minErr);
+                        }
                     }
+                    return;
+                } catch (nativeErr) {
+                    console.warn('[Drift] Native recording failed, falling back to screen capture:', nativeErr);
+                    setNotice(`Native capture notice: ${nativeErr?.message || nativeErr} — recording via screen capture`);
+                    isNativeRecordingRef.current = false;
                 }
-                return;
             }
 
             if (!selectedSource || platform !== 'electron') {
@@ -779,6 +785,7 @@ export default function RecorderPage() {
             }
         } catch (e) {
             console.error('[Drift] Recording launch error:', e);
+            setNotice(`Recording error: ${e?.message || e}`);
             isNativeRecordingRef.current = false;
         }
     };
@@ -1489,7 +1496,7 @@ export default function RecorderPage() {
                             onChangeCountdown={setCountdownSeconds}
                             autoMinimize={autoMinimize}
                             onToggleAutoMinimize={handleToggleAutoMinimize}
-                            hotkey={(typeof hotkeys.toggle_recording === 'string' ? hotkeys.toggle_recording : 'Ctrl+Shift+R').replace('CmdOrCtrl', 'Ctrl')}
+                            hotkey={(typeof hotkeys.toggle_recording === 'string' ? hotkeys.toggle_recording : 'Ctrl+X').replace('CmdOrCtrl', 'Ctrl')}
                             previewCanvas={
                                 <canvas
                                     ref={recorderCanvasRef}
@@ -1616,7 +1623,10 @@ export default function RecorderPage() {
                             customImage={customImage}
                             onUploadCustomImage={handleUploadCustomImage}
                             zoomLevel={zoomLevel}
-                            onChangeZoomLevel={setZoomLevel}
+                            onChangeZoomLevel={(level) => {
+                                setZoomLevel(level);
+                                if (studioRef.current) studioRef.current.setZoomLevel(level);
+                            }}
                             showCursor={showCursor}
                             onToggleCursor={() => setShowCursor(prev => !prev)}
                             cursorTheme={cursorTheme}

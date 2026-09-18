@@ -200,3 +200,24 @@ test('renderFrame renders animated keystroke overlay without throwing', () => {
 
     assert.ok(textRendered, 'Keystroke text should be rendered');
 });
+
+test('evaluateCameraAtTime smoothly decelerates to overview with zero exit velocity and no snap', () => {
+    const singleZoom = [
+        { startTime: 1.0, endTime: 4.0, zoomScale: 2.0, targetX: 0.3, targetY: 0.4 },
+    ];
+    // rampDownStart is around 4.0 - 0.7 = 3.3s
+    const midExit = evaluateCameraAtTime(3.65, singleZoom);
+    const nearExit = evaluateCameraAtTime(3.95, singleZoom);
+    const postExit = evaluateCameraAtTime(4.01, singleZoom);
+
+    // Zoom should be gradually decreasing
+    assert.ok(midExit.scale < 2.0 && midExit.scale > 1.0);
+    assert.ok(nearExit.scale < midExit.scale && nearExit.scale > 1.0);
+    // Near exit should be extremely close to 1.0 (smooth landing without abrupt drop)
+    assert.ok(nearExit.scale < 1.08, `Expected near-exit scale < 1.08, got ${nearExit.scale}`);
+    assert.equal(postExit.scale, 1.0);
+    // Position should also smoothly blend back to neutral (0.5, 0.5)
+    assert.ok(Math.abs(nearExit.x - 0.5) < 0.05);
+    assert.ok(Math.abs(nearExit.y - 0.5) < 0.05);
+});
+

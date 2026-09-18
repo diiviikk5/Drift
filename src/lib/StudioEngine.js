@@ -716,6 +716,11 @@ export class StudioEngine {
         );
     }
 
+    setZoomLevel(level) {
+        this.zoomLevel = Math.max(1.0, Math.min(4.0, Number(level) || 1.8));
+        this.drawFrame();
+    }
+
     setCursorTheme(theme) {
         this.cursorTheme = theme;
         this.drawFrame();
@@ -909,7 +914,8 @@ export class StudioEngine {
         await this._generateSegments();
         await new Promise(r => setTimeout(r, 300));
 
-        const exportDuration = (this.trimEnd || this.videoDuration) - (this.trimStart || 0);
+        const effectiveDuration = this.videoDuration || this.explicitDuration || this.video?.duration || 10;
+        const exportDuration = Math.max(0.5, (this.trimEnd || effectiveDuration) - (this.trimStart || 0));
         const fps = options.fps ? Number(options.fps) : 60;
         const quality = options.quality || 'pro';
 
@@ -938,6 +944,10 @@ export class StudioEngine {
             }
         }
 
+        // Enforce even dimensions required by H.264 codecs
+        width = Math.round(width / 2) * 2;
+        height = Math.round(height / 2) * 2;
+
         const origW = this.canvas.width;
         const origH = this.canvas.height;
         this.canvas.width = width;
@@ -961,43 +971,97 @@ export class StudioEngine {
             targetBitrate = quality === 'master' ? 18_000_000 : (quality === 'standard' ? 8_000_000 : 12_000_000);
         }
 
-        // Find a supported H.264 codec — try highest profile first (Level 5.2 for 4K60, Level 4.2 for 1080p60)
-        const profiles = [
+        // Ordered H.264 profile fallback list: High 5.2/5.1/4.2 → Main 5.1/4.2/3.1 → Baseline
+        const candidateProfiles = [
             'avc1.640034', // High Profile Level 5.2 (4K 60fps)
-            'avc1.640033', // High Profile Level 5.1 (4K 30fps)
+            'avc1.640033', // High Profile Level 5.1 (4K 30fps / 1440p)
             'avc1.64002a', // High Profile Level 4.2 (1080p 60fps)
             'avc1.640028', // High Profile Level 4.0 (1080p 30fps)
-            'avc1.4d002a', // Main Profile Level 4.2
-            'avc1.4d001f', // Main Profile Level 3.1
-            'avc1.42001f', // Baseline
+            'avc1.4d4033', // Main Profile Level 5.1
+            'avc1.4d402a', // Main Profile Level 4.2
+            'avc1.4d401f', // Main Profile Level 3.1
+            'avc1.420033', // Baseline Level 5.1
+            'avc1.42001f', // Baseline Level 3.1
+            'avc1.42e01f', // Constrained Baseline
         ];
+
         let codecConfig = null;
-        for (const codec of profiles) {
+        // Priority 1: Hardware acceleration with variable bitrate
+        for (const codec of candidateProfiles) {
             try {
                 const support = await VideoEncoder.isConfigSupported({
-                    codec, width, height,
+                    codec,
+                    width,
+                    height,
                     bitrate: targetBitrate,
-                    bitrateMode: 'constant',
+                    bitrateMode: 'variable',
                     framerate: fps,
                     latencyMode: 'quality',
                     hardwareAcceleration: 'prefer-hardware',
-                    avc: { format: 'avc' },
                 });
                 if (support.supported) {
                     codecConfig = support.config;
-                    console.log('[Studio] Using H.264 profile:', codec, 'Hardware accelerated');
+                    console.log('[Studio] Using hardware-accelerated H.264 profile:', codec);
                     break;
                 }
-            } catch { continue; }
+            } catch {}
         }
-        if (!codecConfig) throw new Error('No supported H.264 profile');
 
-        console.log('[Studio] Exporting MP4 via WebCodecs:', width, 'x', height, '@', fps, 'fps,', (targetBitrate / 1_000_000) + 'Mbps');
+        // Priority 2: Fallback to no-preference
+        if (!codecConfig) {
+            for (const codec of candidateProfiles) {
+                try {
+                    const support = await VideoEncoder.isConfigSupported({
+                        codec,
+                        width,
+                        height,
+                        bitrate: targetBitrate,
+                        bitrateMode: 'variable',
+                        framerate: fps,
+                        latencyMode: 'quality',
+                        hardwareAcceleration: 'no-preference',
+                    });
+                    if (support.supported) {
+                        codecConfig = support.config;
+                        console.log('[Studio] Using fallback H.264 profile:', codec);
+                        break;
+                    }
+                } catch {}
+            }
+        }
 
-        // Extract & decode audio track from recorded blob for MP4 audio muxing
-        let audioBuffer = null;
-        let audioEncoder = null;
-        let hasAacAudio = false;
+        // Priority 3: Fallback to software encoding
+        if (!codecConfig) {
+            for (const codec of candidateProfiles) {
+                try {
+                    const support = await VideoEncoder.isConfigSupported({
+                        codec,
+                        width,
+                        height,
+                        bitrate: targetBitrate,
+                        bitrateMode: 'variable',
+                        framerate: fps,
+                        latencyMode: 'quality',
+                        hardwareAcceleration: 'prefer-software',
+                    });
+                    if (support.supported) {
+                        codecConfig = support.config;
+                        console.log('[Studio] Using software H.264 profile:', codec);
+                        break;
+                    }
+                } catch {}
+            }
+        }
+
+        if (!codecConfig) {
+            throw new Error(`No supported H.264 profile found for ${width}x${height} @ ${fps}fps.`);
+        }
+
+        console.log('[Studio] Exporting MP4 via WebCodecs:', width, 'x', height, '@', fps, 'fps,', (targetBitrate / 1_000_000).toFixed(1) + 'Mbps');
+
+        // Pre-encode audio track into AAC packets so muxer never receives an empty audio track
+        let audioConfig = null;
+        const encodedAudioPackets = [];
 
         if (typeof AudioEncoder !== 'undefined' && (this.systemAudioUrl || this.micAudioUrl || this.blob)) {
             try {
@@ -1013,8 +1077,9 @@ export class StudioEngine {
                             return await tempCtx.decodeAudioData(buf);
                         };
 
-                        const sysBuf = await loadBuf(this.systemAudioUrl);
-                        const micBuf = await loadBuf(this.micAudioUrl);
+                        const sysBuf = await loadBuf(this.systemAudioUrl).catch(() => null);
+                        const micBuf = await loadBuf(this.micAudioUrl).catch(() => null);
+                        let audioBuffer = null;
 
                         const sVol = this.isSystemAudioMuted ? 0 : (this.systemAudioVolume ?? 1.0);
                         const mVol = this.isMicAudioMuted ? 0 : (this.micAudioVolume ?? 1.2);
@@ -1035,7 +1100,7 @@ export class StudioEngine {
                                     const mVal = i < m.length ? m[i] * mVol : 0;
                                     const isVoiceActive = Math.abs(mVal) > 0.035;
                                     const targetDuck = (autoDuck && isVoiceActive) ? 0.30 : 1.0;
-                                    duckGain += (targetDuck - duckGain) * 0.005; // smooth anti-pop gain transition
+                                    duckGain += (targetDuck - duckGain) * 0.005;
                                     const sVal = i < s.length ? s[i] * sVol * duckGain : 0;
                                     out[i] = Math.max(-1, Math.min(1, sVal + mVal));
                                 }
@@ -1061,131 +1126,129 @@ export class StudioEngine {
                                 }
                             }
                         } else if (this.blob) {
-                            audioBuffer = await loadBuf(this.blob);
+                            audioBuffer = await loadBuf(this.blob).catch(() => null);
                         }
 
                         if (audioBuffer && audioBuffer.length > 0) {
+                            const numChannels = Math.min(2, audioBuffer.numberOfChannels);
+                            const sampleRate = audioBuffer.sampleRate;
                             const aacCheck = await AudioEncoder.isConfigSupported({
                                 codec: 'mp4a.40.2',
-                                sampleRate: audioBuffer.sampleRate,
-                                numberOfChannels: Math.min(2, audioBuffer.numberOfChannels),
+                                sampleRate,
+                                numberOfChannels: numChannels,
                                 bitrate: 192_000,
-                            });
-                            hasAacAudio = Boolean(aacCheck && aacCheck.supported);
-                            console.log('[Studio] Decoded audio for export:', audioBuffer.duration.toFixed(2), 's, AAC supported:', hasAacAudio);
+                            }).catch(() => null);
+
+                            if (aacCheck && aacCheck.supported) {
+                                audioConfig = {
+                                    codec: 'aac',
+                                    numberOfChannels: numChannels,
+                                    sampleRate,
+                                };
+
+                                const audioEncoder = new AudioEncoder({
+                                    output: (chunk, meta) => encodedAudioPackets.push({ chunk, meta }),
+                                    error: (e) => console.warn('[Studio] Audio encoder notice:', e),
+                                });
+                                audioEncoder.configure({
+                                    codec: 'mp4a.40.2',
+                                    sampleRate,
+                                    numberOfChannels: numChannels,
+                                    bitrate: 192_000,
+                                });
+
+                                const startSample = Math.max(0, Math.floor((this.trimStart || 0) * sampleRate));
+                                const endSample = Math.min(audioBuffer.length, Math.ceil((this.trimEnd || effectiveDuration) * sampleRate));
+
+                                if (endSample > startSample) {
+                                    const ch0 = audioBuffer.getChannelData(0);
+                                    const ch1 = numChannels > 1 ? audioBuffer.getChannelData(1) : ch0;
+                                    const CHUNK_SIZE = 1024;
+                                    let offset = startSample;
+
+                                    while (offset < endSample) {
+                                        const frames = Math.min(CHUNK_SIZE, endSample - offset);
+                                        const planar = new Float32Array(frames * numChannels);
+                                        planar.set(ch0.subarray(offset, offset + frames), 0);
+                                        if (numChannels > 1) {
+                                            planar.set(ch1.subarray(offset, offset + frames), frames);
+                                        }
+
+                                        const timestampUs = Math.round(((offset - startSample) / sampleRate) * 1_000_000);
+                                        const audioData = new AudioData({
+                                            format: 'f32-planar',
+                                            sampleRate,
+                                            numberOfFrames: frames,
+                                            numberOfChannels: numChannels,
+                                            timestamp: timestampUs,
+                                            data: planar,
+                                        });
+                                        audioEncoder.encode(audioData);
+                                        audioData.close();
+                                        offset += frames;
+                                    }
+
+                                    await audioEncoder.flush();
+                                    audioEncoder.close();
+                                    console.log('[Studio] Pre-encoded', encodedAudioPackets.length, 'AAC audio packets for MP4');
+                                }
+                            }
                         }
                     } catch (decodeErr) {
-                        console.log('[Studio] No decodable audio track in source media:', decodeErr.message);
+                        console.log('[Studio] Audio preparation skipped:', decodeErr.message);
                     } finally {
                         try { await tempCtx.close(); } catch (e) {}
                     }
                 }
             } catch (audioErr) {
-                console.warn('[Studio] Audio extraction notice:', audioErr);
+                console.warn('[Studio] Audio processing notice:', audioErr);
             }
         }
 
         const target = new ArrayBufferTarget();
         const muxerOptions = {
             target,
-            video: { codec: 'avc', width, height },
+            video: {
+                codec: 'avc',
+                width,
+                height,
+                frameRate: fps,
+            },
             fastStart: 'in-memory',
+            firstTimestampBehavior: 'offset',
         };
 
-        if (hasAacAudio && audioBuffer) {
-            muxerOptions.audio = {
-                codec: 'aac',
-                numberOfChannels: Math.min(2, audioBuffer.numberOfChannels),
-                sampleRate: audioBuffer.sampleRate,
-            };
+        if (audioConfig && encodedAudioPackets.length > 0) {
+            muxerOptions.audio = audioConfig;
         }
 
         const muxer = new Muxer(muxerOptions);
+
+        // Pipe audio chunks into muxer
+        if (muxerOptions.audio && encodedAudioPackets.length > 0) {
+            for (const item of encodedAudioPackets) {
+                muxer.addAudioChunk(item.chunk, item.meta);
+            }
+        }
 
         return new Promise((resolve, reject) => {
             const encoder = new VideoEncoder({
                 output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
                 error: (e) => reject(e),
             });
-            encoder.configure({
-                ...codecConfig,
-                hardwareAcceleration: 'prefer-hardware',
-                latencyMode: 'quality',
-                bitrateMode: 'constant',
-                bitrate: targetBitrate,
-            });
-
-            // If AAC audio is available, initialize AudioEncoder and encode all audio packets
-            if (hasAacAudio && audioBuffer) {
-                try {
-                    const numChannels = Math.min(2, audioBuffer.numberOfChannels);
-                    const sampleRate = audioBuffer.sampleRate;
-
-                    audioEncoder = new AudioEncoder({
-                        output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
-                        error: (e) => console.error('[Studio] Audio encoder error:', e),
-                    });
-                    audioEncoder.configure({
-                        codec: 'mp4a.40.2',
-                        sampleRate,
-                        numberOfChannels: numChannels,
-                        bitrate: 192_000,
-                    });
-
-                    // Sliced trimmed audio
-                    const startSample = Math.max(0, Math.floor((this.trimStart || 0) * sampleRate));
-                    const endSample = Math.min(audioBuffer.length, Math.ceil((this.trimEnd || this.videoDuration) * sampleRate));
-
-                    if (endSample > startSample) {
-                        const ch0 = audioBuffer.getChannelData(0);
-                        const ch1 = numChannels > 1 ? audioBuffer.getChannelData(1) : ch0;
-                        const CHUNK_SIZE = 1024;
-                        let offset = startSample;
-
-                        while (offset < endSample) {
-                            const frames = Math.min(CHUNK_SIZE, endSample - offset);
-                            const planar = new Float32Array(frames * numChannels);
-                            planar.set(ch0.subarray(offset, offset + frames), 0);
-                            if (numChannels > 1) {
-                                planar.set(ch1.subarray(offset, offset + frames), frames);
-                            }
-
-                            const timestampUs = Math.round(((offset - startSample) / sampleRate) * 1_000_000);
-                            const audioData = new AudioData({
-                                format: 'f32-planar',
-                                sampleRate,
-                                numberOfFrames: frames,
-                                numberOfChannels: numChannels,
-                                timestamp: timestampUs,
-                                data: planar,
-                            });
-                            audioEncoder.encode(audioData);
-                            audioData.close();
-
-                            offset += frames;
-                        }
-                    }
-                } catch (audioEncErr) {
-                    console.warn('[Studio] Audio encoding failed, exporting video-only:', audioEncErr);
-                    audioEncoder = null;
-                }
-            }
+            encoder.configure(codecConfig);
 
             let frameIndex = 0;
             this.video.currentTime = this.trimStart || 0;
 
             const seekAndRender = () => {
-                return new Promise(seekResolve => {
+                return new Promise((seekResolve, seekReject) => {
                     const targetTime = (this.trimStart || 0) + (frameIndex / fps);
-                    if (targetTime >= (this.trimEnd || this.videoDuration) || frameIndex >= totalFrames) {
+                    if (targetTime >= (this.trimEnd || effectiveDuration) || frameIndex >= totalFrames) {
                         seekResolve(false);
                         return;
                     }
 
-                    this.video.currentTime = targetTime;
-                    if (this.webcamVideo) {
-                        this.webcamVideo.currentTime = targetTime;
-                    }
                     let handled = false;
                     let timeoutId = null;
 
@@ -1195,51 +1258,62 @@ export class StudioEngine {
                         if (timeoutId) clearTimeout(timeoutId);
                         this.video.removeEventListener('seeked', onSeeked);
 
-                        this.drawFrame();
+                        try {
+                            this.drawFrame();
 
-                        // Encode the canvas frame
-                        const timestamp = Math.round(frameIndex * frameDurationUs);
-                        const frame = new VideoFrame(this.canvas, {
-                            timestamp,
-                            duration: Math.round(frameDurationUs),
-                        });
-                        // Keyframe every 1 second for better seeking + quality
-                        encoder.encode(frame, { keyFrame: frameIndex % fps === 0 });
-                        frame.close();
+                            const timestamp = Math.round(frameIndex * frameDurationUs);
+                            const frame = new VideoFrame(this.canvas, {
+                                timestamp,
+                                duration: Math.round(frameDurationUs),
+                            });
+                            // Keyframe every 1 second
+                            encoder.encode(frame, { keyFrame: frameIndex % fps === 0 });
+                            frame.close();
 
-                        frameIndex++;
-                        if (onProgress) {
-                            const p = Math.min(frameIndex / totalFrames, 1);
-                            if (isFinite(p)) onProgress(p);
+                            frameIndex++;
+                            if (onProgress) {
+                                const p = Math.min(frameIndex / totalFrames, 1);
+                                if (isFinite(p)) onProgress(p);
+                            }
+                            seekResolve(true);
+                        } catch (renderErr) {
+                            seekReject(renderErr);
                         }
-                        seekResolve(true);
                     };
 
                     const onSeeked = () => finishFrame();
-                    this.video.addEventListener('seeked', onSeeked);
+
+                    // If video is already positioned at targetTime, encode immediately without waiting for seek event
+                    if (Math.abs(this.video.currentTime - targetTime) < 0.002) {
+                        finishFrame();
+                        return;
+                    }
+
+                    this.video.currentTime = targetTime;
+                    if (this.webcamVideo) {
+                        this.webcamVideo.currentTime = targetTime;
+                    }
+
+                    this.video.addEventListener('seeked', onSeeked, { once: true });
                     // Safety timeout in case seeked event hangs on boundary frames
-                    timeoutId = setTimeout(() => finishFrame(), 200);
+                    timeoutId = setTimeout(() => finishFrame(), 150);
                 });
             };
 
             const processFrames = async () => {
                 try {
                     while (true) {
+                        // Apply queue backpressure so encoder queue never saturates GPU memory
+                        while (encoder.encodeQueueSize >= 30) {
+                            await new Promise(r => setTimeout(r, 10));
+                        }
+
                         const hasMore = await seekAndRender();
                         if (!hasMore) break;
                     }
 
                     await encoder.flush();
                     encoder.close();
-
-                    if (audioEncoder) {
-                        try {
-                            await audioEncoder.flush();
-                            audioEncoder.close();
-                        } catch (aeFlushErr) {
-                            console.warn('[Studio] AudioEncoder flush notice:', aeFlushErr);
-                        }
-                    }
 
                     muxer.finalize();
 

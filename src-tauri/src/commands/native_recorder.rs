@@ -221,8 +221,10 @@ pub async fn start_native_session(
             Monitor::primary().map_err(|e| format!("Failed to acquire primary monitor: {:?}", e))?
         };
 
-        let width = config.width.unwrap_or_else(|| monitor.width().unwrap_or(1920));
-        let height = config.height.unwrap_or_else(|| monitor.height().unwrap_or(1080));
+        let mut width = config.width.unwrap_or_else(|| monitor.width().unwrap_or(1920));
+        let mut height = config.height.unwrap_or_else(|| monitor.height().unwrap_or(1080));
+        width = (width / 2) * 2;
+        height = (height / 2) * 2;
         let fps = config.fps.unwrap_or(60).clamp(15, 120);
         let without_cursor = config.without_cursor.unwrap_or(true);
 

@@ -13,8 +13,8 @@ pub struct HotkeyConfig {
 impl Default for HotkeyConfig {
     fn default() -> Self {
         Self {
-            toggle_recording: "CmdOrCtrl+Shift+R".to_string(),
-            stop_recording: "CmdOrCtrl+Shift+S".to_string(),
+            toggle_recording: "CmdOrCtrl+X".to_string(),
+            stop_recording: "CmdOrCtrl+X".to_string(),
             toggle_pause: "CmdOrCtrl+Shift+P".to_string(),
             toggle_zoom: "CmdOrCtrl+Shift+Z".to_string(),
         }

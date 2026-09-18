@@ -311,12 +311,12 @@ export default function InspectorPanel({
                 {/* ═══ ZOOM TAB ═══ */}
                 {activeTab === 'camera' && (
                     <>
-                        {/* OpenScreen Overview Mode Banner & Reset */}
+                        {/* Overview Mode Banner & Reset */}
                         <div className="p-3 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] space-y-2.5">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <div className="text-xs font-semibold text-[var(--text-app)] flex items-center gap-1.5">
-                                        <span>📺 Full Overview (OpenScreen Style)</span>
+                                        <span>📺 Full Overview</span>
                                     </div>
                                     <div className="text-[10px] text-[var(--text-app-muted)] mt-0.5">
                                         Calm, steady framing without sudden click-zooms
@@ -398,7 +398,7 @@ export default function InspectorPanel({
                             </div>
                         </div>
 
-                        {/* OpenScreen Connected Zooms */}
+                        {/* Connected Zooms */}
                         <div className="pt-2 border-t border-[var(--border-app)] space-y-2">
                             <div className="flex items-center justify-between">
                                 <div>
@@ -767,7 +767,7 @@ export default function InspectorPanel({
                             </button>
                         </div>
 
-                        {/* OpenScreen Reactive Webcam Scaling */}
+                        {/* Dynamic Reactive Webcam Scaling */}
                         <div className="pt-2 border-t border-[var(--border-app)] flex items-center justify-between">
                             <div>
                                 <div className="text-xs font-semibold text-[var(--text-app)]">Reactive Zoom Scaling</div>
@@ -785,7 +785,7 @@ export default function InspectorPanel({
                             </button>
                         </div>
 
-                        {/* OpenScreen Full Camera Mode Toggle */}
+                        {/* Presenter Full Camera Mode Toggle */}
                         <div className="flex items-center justify-between">
                             <div>
                                 <div className="text-xs font-semibold text-[var(--text-app)]">Full Camera Mode</div>

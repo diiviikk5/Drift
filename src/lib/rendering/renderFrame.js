@@ -73,11 +73,15 @@ export function cubicBezier(p1x, p1y, p2x, p2y, t) {
 }
 
 export function easeOutScreenStudio(t) {
-    return cubicBezier(0.1, 0.0, 0.2, 1.0, t);
+    return cubicBezier(0.1, 0.0, 0.2, 1.0, Math.max(0, Math.min(1, t)));
+}
+
+export function easeInOutCinema(t) {
+    return cubicBezier(0.42, 0.0, 0.18, 1.0, Math.max(0, Math.min(1, t)));
 }
 
 export function easeConnectedPan(t) {
-    return cubicBezier(0.1, 0.0, 0.2, 1.0, t);
+    return easeInOutCinema(t);
 }
 
 /**
@@ -204,9 +208,9 @@ export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples =
                 const progress = Math.max(0, Math.min(1, (timeSec - leadIn) / rampDuration));
                 blendWeight = easeOutScreenStudio(progress);
             } else if (timeSec > rampDownStart && !hasConnectedNext) {
-                // Zooming out (only if not chained into next segment)
-                const progress = Math.max(0, Math.min(1, (leadOut - timeSec) / rampDuration));
-                blendWeight = easeOutScreenStudio(progress);
+                // Silky zoom out returning to overview: zero-velocity landing
+                const progress = Math.max(0, Math.min(1, (timeSec - rampDownStart) / rampDuration));
+                blendWeight = 1 - easeOutScreenStudio(progress);
             } else {
                 // Fully zoomed in or chained
                 blendWeight = 1.0;

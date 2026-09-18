@@ -501,17 +501,35 @@ export async function registerGlobalShortcuts(hotkeyConfig) {
     const entries = Object.entries(hotkeyConfig || {});
     for (const [action, accelerator] of entries) {
         if (!accelerator || typeof accelerator !== 'string') continue;
-        try {
-            await api.register(accelerator, (event) => {
-                // Only fire on key-down (not release)
-                if (event.state === 'Released') return;
-                window.dispatchEvent(new CustomEvent('drift-hotkey', {
-                    detail: { action, accelerator }
-                }));
-            });
-            _registeredShortcuts.push(accelerator);
-        } catch (err) {
-            console.warn(`[drift] Failed to register shortcut "${accelerator}" for ${action}:`, err);
+        
+        const variants = [
+            accelerator,
+            accelerator.replace(/^CmdOrCtrl/i, 'CommandOrControl'),
+            accelerator.replace(/^CommandOrControl/i, 'Ctrl'),
+            accelerator.replace(/^CmdOrCtrl/i, 'Ctrl'),
+        ];
+        const uniqueVariants = [...new Set(variants)];
+        let registered = false;
+
+        for (const candidate of uniqueVariants) {
+            try {
+                await api.register(candidate, (event) => {
+                    // Only fire on key-down (not release)
+                    if (event.state === 'Released') return;
+                    window.dispatchEvent(new CustomEvent('drift-hotkey', {
+                        detail: { action, accelerator: candidate }
+                    }));
+                });
+                _registeredShortcuts.push(candidate);
+                registered = true;
+                break;
+            } catch (err) {
+                // Try next variant
+            }
+        }
+
+        if (!registered) {
+            console.warn(`[drift] Failed to register shortcut for ${action}:`, uniqueVariants);
         }
     }
     console.log('[drift] Registered global shortcuts:', _registeredShortcuts);

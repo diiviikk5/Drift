@@ -127,3 +127,19 @@ test('StudioEngine defaults to calm OpenScreen-style overview without auto click
     assert.equal(engine.focusSegments.length, 0, 'Expected focus segments cleared after resetToOverview');
     assert.equal(engine.camera.scale, 1.0, 'Expected overview scale 1.0 after reset');
 });
+
+test('StudioEngine setZoomLevel updates zoomLevel and clamps to valid range', () => {
+    const canvas = createMockCanvas(1920, 1080);
+    const mockVideo = { videoWidth: 1920, videoHeight: 1080, currentTime: 0 };
+    const engine = new StudioEngine(canvas, mockVideo, null, [], 10, [], {});
+
+    engine.setZoomLevel(2.4);
+    assert.equal(engine.zoomLevel, 2.4);
+
+    engine.setZoomLevel(0.5); // below min 1.0
+    assert.equal(engine.zoomLevel, 1.0);
+
+    engine.setZoomLevel(5.0); // above max 4.0
+    assert.equal(engine.zoomLevel, 4.0);
+});
+
