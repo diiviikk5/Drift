@@ -414,6 +414,9 @@ export function getFrameMetrics(width, height, videoSource, renderSettings = {})
     };
 }
 
+let _cachedBackdropCanvas = null;
+let _cachedBackdropKey = '';
+
 /**
  * Pure Deterministic Frame Render
  */
@@ -458,27 +461,6 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         keystrokes = [],
     } = sessionData;
 
-    // 1. Draw Background (Custom Image or Gradient)
-    if (customBackgroundImage && (customBackgroundImage.complete !== false)) {
-        _drawCoverImage(ctx, customBackgroundImage, 0, 0, width, height);
-    } else {
-        const colors = WALLPAPERS[background] || WALLPAPERS.bigSur;
-        const grad = ctx.createLinearGradient(0, 0, width, height);
-        const step = 1 / (colors.length - 1);
-        colors.forEach((c, i) => grad.addColorStop(i * step, c));
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, width, height);
-    }
-
-    // Subtle Cap film grain noise overlay (removes color banding, adds texture)
-    const grain = _getNoisePattern(ctx);
-    if (grain) {
-        ctx.save();
-        ctx.fillStyle = grain;
-        ctx.fillRect(0, 0, width, height);
-        ctx.restore();
-    }
-
     // 2. Compute Inset Screen Frame with aspect ratio preservation
     const { padX, padY, frameW, frameH, headerH, videoH } = getFrameMetrics(width, height, videoSource, {
         insetPadding,
@@ -486,15 +468,99 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         titleBarHeight,
     });
 
-    // 3. Draw Ambient Drop Shadow
-    ctx.save();
-    ctx.shadowColor = `rgba(0, 0, 0, ${shadowOpacity})`;
-    ctx.shadowBlur = shadowBlur;
-    ctx.shadowOffsetY = shadowOffsetY;
-    ctx.fillStyle = '#000000';
-    _drawRoundedRectPath(ctx, padX, padY, frameW, frameH, borderRadius);
-    ctx.fill();
-    ctx.restore();
+    // 1 & 3. Draw Cached Backdrop (Wallpaper + Film Grain + Ambient Drop Shadow)
+    // Pre-rendering to an offscreen canvas avoids calculating expensive Gaussian shadowBlur (45px) and gradients on every frame.
+    const customImgKey = customBackgroundImage?.src || customBackgroundImage?.currentSrc || (customBackgroundImage ? 'custom' : 'none');
+    const backdropKey = `${width}x${height}_${background}_${customImgKey}_${Math.round(padX)}_${Math.round(padY)}_${Math.round(frameW)}_${Math.round(frameH)}_${borderRadius}_${shadowBlur}_${shadowOffsetY}_${shadowOpacity}`;
+
+    let drewFromCache = false;
+    try {
+        if (typeof OffscreenCanvas !== 'undefined' || (typeof document !== 'undefined' && document.createElement)) {
+            if (!_cachedBackdropCanvas || _cachedBackdropCanvas.width !== width || _cachedBackdropCanvas.height !== height) {
+                if (typeof OffscreenCanvas !== 'undefined') {
+                    _cachedBackdropCanvas = new OffscreenCanvas(width, height);
+                } else if (typeof document !== 'undefined' && document.createElement) {
+                    _cachedBackdropCanvas = document.createElement('canvas');
+                    _cachedBackdropCanvas.width = width;
+                    _cachedBackdropCanvas.height = height;
+                }
+                _cachedBackdropKey = '';
+            }
+
+            if (_cachedBackdropCanvas && _cachedBackdropKey !== backdropKey) {
+                const bCtx = _cachedBackdropCanvas.getContext('2d');
+                if (bCtx) {
+                    if (customBackgroundImage && (customBackgroundImage.complete !== false)) {
+                        _drawCoverImage(bCtx, customBackgroundImage, 0, 0, width, height);
+                    } else {
+                        const colors = WALLPAPERS[background] || WALLPAPERS.bigSur;
+                        const grad = bCtx.createLinearGradient(0, 0, width, height);
+                        const step = 1 / (colors.length - 1);
+                        colors.forEach((c, i) => grad.addColorStop(i * step, c));
+                        bCtx.fillStyle = grad;
+                        bCtx.fillRect(0, 0, width, height);
+                    }
+
+                    const grain = _getNoisePattern(bCtx);
+                    if (grain) {
+                        bCtx.save();
+                        bCtx.fillStyle = grain;
+                        bCtx.fillRect(0, 0, width, height);
+                        bCtx.restore();
+                    }
+
+                    bCtx.save();
+                    bCtx.shadowColor = `rgba(0, 0, 0, ${shadowOpacity})`;
+                    bCtx.shadowBlur = shadowBlur;
+                    bCtx.shadowOffsetY = shadowOffsetY;
+                    bCtx.fillStyle = '#000000';
+                    _drawRoundedRectPath(bCtx, padX, padY, frameW, frameH, borderRadius);
+                    bCtx.fill();
+                    bCtx.restore();
+
+                    _cachedBackdropKey = backdropKey;
+                }
+            }
+
+            if (_cachedBackdropCanvas && _cachedBackdropKey === backdropKey && ctx.drawImage) {
+                ctx.drawImage(_cachedBackdropCanvas, 0, 0);
+                drewFromCache = true;
+            }
+        }
+    } catch {
+        drewFromCache = false;
+    }
+
+    if (!drewFromCache) {
+        // Fallback for headless environments or mock contexts without offscreen canvas
+        if (customBackgroundImage && (customBackgroundImage.complete !== false)) {
+            _drawCoverImage(ctx, customBackgroundImage, 0, 0, width, height);
+        } else {
+            const colors = WALLPAPERS[background] || WALLPAPERS.bigSur;
+            const grad = ctx.createLinearGradient(0, 0, width, height);
+            const step = 1 / (colors.length - 1);
+            colors.forEach((c, i) => grad.addColorStop(i * step, c));
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, width, height);
+        }
+
+        const grain = _getNoisePattern(ctx);
+        if (grain) {
+            ctx.save();
+            ctx.fillStyle = grain;
+            ctx.fillRect(0, 0, width, height);
+            ctx.restore();
+        }
+
+        ctx.save();
+        ctx.shadowColor = `rgba(0, 0, 0, ${shadowOpacity})`;
+        ctx.shadowBlur = shadowBlur;
+        ctx.shadowOffsetY = shadowOffsetY;
+        ctx.fillStyle = '#000000';
+        _drawRoundedRectPath(ctx, padX, padY, frameW, frameH, borderRadius);
+        ctx.fill();
+        ctx.restore();
+    }
 
     // 4. Clip to Rounded Rect Screen Frame
     ctx.save();

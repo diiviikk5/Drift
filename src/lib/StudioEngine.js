@@ -4,7 +4,7 @@
 
 import { isTauri } from './tauri-bridge.js';
 import { InteractionAnalyzer } from './zoom/InteractionAnalyzer.js';
-import { renderFrame, getFrameMetrics } from './rendering/renderFrame.js';
+import { renderFrame, getFrameMetrics, evaluateCameraAtTime } from './rendering/renderFrame.js';
 
 const FRAME_SCALE = 0.82;
 const TITLE_BAR_HEIGHT = 36;
@@ -450,9 +450,17 @@ export class StudioEngine {
         const centerX = metrics.padX + metrics.frameW * 0.5;
         const centerY = metrics.padY + metrics.headerH + metrics.videoH * 0.5;
 
-        const camScale = (this.camera && this.camera.scale) ? this.camera.scale : 1.0;
-        const camX = (this.camera && Number.isFinite(this.camera.x)) ? this.camera.x : 0.5;
-        const camY = (this.camera && Number.isFinite(this.camera.y)) ? this.camera.y : 0.5;
+        const curTimeSec = this.video?.currentTime || 0;
+        const cam = evaluateCameraAtTime(curTimeSec, this.focusSegments || [], this.mouseMoves || [], {
+            zoomMultiplier: (this.zoomLevel || 2.0) / 2.0,
+            connectedZooms: this.connectedZooms !== false,
+            tiltAngle: this.tiltAngle ?? 3.5,
+            springProfile: this.springProfile || 'cinematic',
+        });
+
+        const camScale = (cam && cam.scale) ? cam.scale : (this.camera?.scale || 1.0);
+        const camX = (cam && Number.isFinite(cam.x)) ? cam.x : (this.camera?.x || 0.5);
+        const camY = (cam && Number.isFinite(cam.y)) ? cam.y : (this.camera?.y || 0.5);
 
         const p1x = canvasPx - centerX;
         const p1y = canvasPy - centerY;
@@ -479,7 +487,7 @@ export class StudioEngine {
             if (this.video) {
                 this._applyPlaybackRate(this.video.currentTime);
             }
-            this.updateCamera();
+            // renderFrame handles camera spring transforms and cursor rendering in pure JS in ~1ms
             this.drawFrame();
             if (this.isPlaying) this.animationFrame = requestAnimationFrame(loop);
         };
@@ -512,6 +520,9 @@ export class StudioEngine {
         }
         if (this.video) {
             this.video.pause();
+            if (this.video.src && this.video.src.startsWith('blob:')) {
+                URL.revokeObjectURL(this.video.src);
+            }
             this.video.onloadedmetadata = null;
             this.video.onloadeddata = null;
             this.video.oncanplay = null;
@@ -523,7 +534,11 @@ export class StudioEngine {
         }
         if (this.webcamVideo) {
             this.webcamVideo.pause();
-            this.webcamVideo.src = '';
+            if (this.webcamVideo.src && this.webcamVideo.src.startsWith('blob:')) {
+                URL.revokeObjectURL(this.webcamVideo.src);
+            }
+            this.webcamVideo.removeAttribute('src');
+            try { this.webcamVideo.load(); } catch (e) {}
             this.webcamVideo = null;
         }
         if (this.systemAudio) {
@@ -538,34 +553,15 @@ export class StudioEngine {
         }
     }
 
-    async updateCamera() {
-        const currentMs = this.video.currentTime * 1000;
-
-        if (this.isTauri && this.tauriReady) {
-            try {
-                // Single Rust call for both zoom and cursor state
-                const state = await this.tauriInvoke('evaluate_frame', {
-                    segments: this.zoomSegments,
-                    moves: (this.mouseMoves || []).map(m => ({ time: m.time, x: m.x, y: m.y })),
-                    clicks: this.clicks.map(c => ({ time: c.time, x: c.x, y: c.y, down: true })),
-                    timeMs: currentMs,
-                });
-
-                this.camera = {
-                    x: state.zoom.x,
-                    y: state.zoom.y,
-                    scale: state.zoom.scale,
-                };
-                this.cursorState = state.cursor;
-            } catch (e) {
-                // Fallback: no zoom
-                this.camera = { x: 0.5, y: 0.5, scale: 1 };
-            }
-        } else {
-            // Browser mode: no zoom, just basic cursor position from raw data
-            this.camera = { x: 0.5, y: 0.5, scale: 1 };
-            this._updateBrowserCursor(currentMs);
-        }
+    updateCamera() {
+        const curTimeSec = this.video?.currentTime || 0;
+        this.camera = evaluateCameraAtTime(curTimeSec, this.focusSegments || [], this.mouseMoves || [], {
+            zoomMultiplier: (this.zoomLevel || 2.0) / 2.0,
+            connectedZooms: this.connectedZooms !== false,
+            tiltAngle: this.tiltAngle ?? 3.5,
+            springProfile: this.springProfile || 'cinematic',
+        });
+        this._updateBrowserCursor(curTimeSec * 1000);
     }
 
     // Simple browser fallback cursor (no spring, no zoom)
@@ -718,24 +714,6 @@ export class StudioEngine {
                 showKeystrokes: this.showKeystrokes !== false,
             }
         );
-    }
-
-    dispose() {
-        this.pause();
-        cancelAnimationFrame(this.animationFrame);
-        if (this.video?.src) URL.revokeObjectURL(this.video.src);
-        this.video.onloadedmetadata = null;
-        this.video.onplay = null;
-        this.video.onpause = null;
-        this.video.onended = null;
-        this.video.onseeked = null;
-        this.video.ontimeupdate = null;
-        if (this.webcamVideo) {
-            if (this.webcamVideo.src) URL.revokeObjectURL(this.webcamVideo.src);
-            this.webcamVideo.removeAttribute('src');
-            this.webcamVideo.load();
-            this.webcamVideo = null;
-        }
     }
 
     setCursorTheme(theme) {
@@ -964,23 +942,6 @@ export class StudioEngine {
         const origH = this.canvas.height;
         this.canvas.width = width;
         this.canvas.height = height;
-
-        // Precompute frames in Rust
-        if (this.isTauri && this.tauriReady) {
-            try {
-                this.precomputedFrames = await this.tauriInvoke('precompute_frames', {
-                    segments: this.zoomSegments,
-                    moves: (this.mouseMoves || []).map(m => ({ time: m.time, x: m.x, y: m.y })),
-                    clicks: this.clicks.map(c => ({ time: c.time, x: c.x, y: c.y, down: true })),
-                    durationMs: exportDuration * 1000,
-                    fps,
-                });
-                console.log('[Studio] Precomputed', this.precomputedFrames.length, 'frames for export');
-            } catch (e) {
-                console.error('[Studio] Precompute failed:', e);
-                this.precomputedFrames = null;
-            }
-        }
 
         const totalFrames = Math.ceil(exportDuration * fps);
         const frameDurationUs = 1_000_000 / fps;
@@ -1225,17 +1186,15 @@ export class StudioEngine {
                     if (this.webcamVideo) {
                         this.webcamVideo.currentTime = targetTime;
                     }
-                    const onSeeked = () => {
+                    let handled = false;
+                    let timeoutId = null;
+
+                    const finishFrame = () => {
+                        if (handled) return;
+                        handled = true;
+                        if (timeoutId) clearTimeout(timeoutId);
                         this.video.removeEventListener('seeked', onSeeked);
 
-                        // Apply precomputed or live camera state
-                        if (this.precomputedFrames && frameIndex < this.precomputedFrames.length) {
-                            const state = this.precomputedFrames[frameIndex];
-                            this.camera = { x: state.zoom.x, y: state.zoom.y, scale: state.zoom.scale };
-                            this.cursorState = state.cursor;
-                        } else {
-                            this.updateCamera();
-                        }
                         this.drawFrame();
 
                         // Encode the canvas frame
@@ -1255,7 +1214,11 @@ export class StudioEngine {
                         }
                         seekResolve(true);
                     };
+
+                    const onSeeked = () => finishFrame();
                     this.video.addEventListener('seeked', onSeeked);
+                    // Safety timeout in case seeked event hangs on boundary frames
+                    timeoutId = setTimeout(() => finishFrame(), 200);
                 });
             };
 
@@ -1338,23 +1301,6 @@ export class StudioEngine {
         this.canvas.width = width;
         this.canvas.height = height;
 
-        // Precompute frames in Rust
-        if (this.isTauri && this.tauriReady) {
-            try {
-                this.precomputedFrames = await this.tauriInvoke('precompute_frames', {
-                    segments: this.zoomSegments,
-                    moves: (this.mouseMoves || []).map(m => ({ time: m.time, x: m.x, y: m.y })),
-                    clicks: this.clicks.map(c => ({ time: c.time, x: c.x, y: c.y, down: true })),
-                    durationMs: exportDuration * 1000,
-                    fps,
-                });
-                console.log('[Studio] Precomputed', this.precomputedFrames.length, 'frames for export');
-            } catch (e) {
-                console.error('[Studio] Precompute failed:', e);
-                this.precomputedFrames = null;
-            }
-        }
-
         const chunks = [];
         const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
             ? 'video/webm;codecs=vp8,opus'
@@ -1401,14 +1347,6 @@ export class StudioEngine {
                     this.video.pause();
                     rec.stop();
                     return;
-                }
-
-                if (this.precomputedFrames && frameIndex < this.precomputedFrames.length) {
-                    const state = this.precomputedFrames[frameIndex];
-                    this.camera = { x: state.zoom.x, y: state.zoom.y, scale: state.zoom.scale };
-                    this.cursorState = state.cursor;
-                } else {
-                    this.updateCamera();
                 }
 
                 this.drawFrame();
