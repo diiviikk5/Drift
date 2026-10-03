@@ -298,11 +298,12 @@ pub async fn start_native_session(
                     if let Ok(supported_config) = device.default_output_config() {
                         let channels = supported_config.channels();
                         let sample_rate = supported_config.sample_rate().0;
+                        // 16-bit PCM: half the size of 32-bit float with no audible loss.
                         let spec = hound::WavSpec {
                             channels,
                             sample_rate,
-                            bits_per_sample: 32,
-                            sample_format: hound::SampleFormat::Float,
+                            bits_per_sample: 16,
+                            sample_format: hound::SampleFormat::Int,
                         };
 
                         if let Ok(writer) = hound::WavWriter::create(&sys_path_clone, spec) {
@@ -313,7 +314,7 @@ pub async fn start_native_session(
                                 move |data: &[f32], _| {
                                     let mut w = writer_cb.lock();
                                     for &s in data {
-                                        let _ = w.write_sample(s);
+                                        let _ = w.write_sample((s.clamp(-1.0, 1.0) * 32767.0) as i16);
                                     }
                                 },
                                 |err| log::warn!("System audio loopback error: {}", err),
@@ -336,11 +337,12 @@ pub async fn start_native_session(
                     if let Ok(supported_config) = mic_device.default_input_config() {
                         let channels = supported_config.channels();
                         let sample_rate = supported_config.sample_rate().0;
+                        // 16-bit PCM: half the size of 32-bit float with no audible loss.
                         let spec = hound::WavSpec {
                             channels,
                             sample_rate,
-                            bits_per_sample: 32,
-                            sample_format: hound::SampleFormat::Float,
+                            bits_per_sample: 16,
+                            sample_format: hound::SampleFormat::Int,
                         };
 
                         if let Ok(writer) = hound::WavWriter::create(&mic_path_clone, spec) {
@@ -351,7 +353,7 @@ pub async fn start_native_session(
                                 move |data: &[f32], _| {
                                     let mut w = writer_cb.lock();
                                     for &s in data {
-                                        let _ = w.write_sample(s);
+                                        let _ = w.write_sample((s.clamp(-1.0, 1.0) * 32767.0) as i16);
                                     }
                                 },
                                 |err| log::warn!("Microphone capture error: {}", err),
