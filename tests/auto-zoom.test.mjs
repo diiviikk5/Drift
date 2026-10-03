@@ -163,3 +163,19 @@ test('smoothed cursor path is fast on long recordings and rests between movement
     assert.ok(elapsed < 3000, `smoothing took ${elapsed}ms`);
     assert.ok(mid && Math.abs(mid.cx - 0.8) < 0.02, `cursor should rest at the end of the move, got ${JSON.stringify(mid)}`);
 });
+
+test('resting cursor fades smoothly and wakes before moving again', async () => {
+    const { cursorIdleOpacity } = await import('../src/lib/rendering/renderFrame.js');
+    const samples = [];
+    for (let t = 0; t <= 1000; t += 8) samples.push({ time: t, x: 0.5, y: 0.5 });
+    for (let t = 5000; t <= 6000; t += 8) samples.push({ time: t, x: 0.6, y: 0.5 });
+    assert.equal(cursorIdleOpacity(0.5, samples), 1);
+    assert.ok(cursorIdleOpacity(4, samples) < 0.35, 'should be faded while resting');
+    assert.equal(cursorIdleOpacity(5.2, samples), 1);
+    let prev = cursorIdleOpacity(1, samples);
+    for (let t = 1; t < 5.2; t += 1 / 60) {
+        const o = cursorIdleOpacity(t, samples);
+        assert.ok(Math.abs(o - prev) < 0.2, `opacity popped at ${t.toFixed(3)}`);
+        prev = o;
+    }
+});

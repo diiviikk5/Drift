@@ -201,6 +201,53 @@ export function getInterpolatedCursor(timeSec, mouseSamples = [], options = {}) 
 }
 
 /**
+ * Cursor position for rendering: spring-smoothed path when smoothing is on
+ * (memoized per sample set), otherwise the raw interpolated telemetry.
+ */
+export function sampleCursor(timeSec, mouseSamples, smooth = true) {
+    if (smooth && mouseSamples.length >= 2) {
+        const path = getSmoothedCursorPath(mouseSamples, 1.0);
+        const p = path && path.sampleAt(timeSec * 1000);
+        if (p) return { x: p.cx, y: p.cy };
+    }
+    return getInterpolatedCursor(timeSec, mouseSamples);
+}
+
+const IDLE_FADE_AFTER = 1.6;   // seconds of stillness before fading
+const IDLE_FADE_DURATION = 0.5;
+const IDLE_WAKE_LEAD = 0.12;   // start fading back in this long before the next move
+const IDLE_MIN_OPACITY = 0.3;
+
+function _sampleMs(s) {
+    return s.timeMs ?? s.time ?? s.t ?? 0;
+}
+
+/**
+ * Opacity of a resting cursor. The recorder only emits samples while the
+ * mouse moves, so the time since the previous sample is the idle time.
+ */
+export function cursorIdleOpacity(timeSec, mouseSamples) {
+    const n = mouseSamples ? mouseSamples.length : 0;
+    if (n < 2) return 1;
+    const tMs = timeSec * 1000;
+    let lo = 0;
+    let hi = n - 1;
+    let idx = -1;
+    while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (_sampleMs(mouseSamples[mid]) <= tMs) { idx = mid; lo = mid + 1; } else { hi = mid - 1; }
+    }
+    if (idx < 0) return 1;
+    const idle = (tMs - _sampleMs(mouseSamples[idx])) / 1000;
+    const next = idx + 1 < n ? (_sampleMs(mouseSamples[idx + 1]) - tMs) / 1000 : Infinity;
+    const ease = (v) => v * v * (3 - 2 * v);
+    const fadeOut = ease(Math.max(0, Math.min(1, (idle - IDLE_FADE_AFTER) / IDLE_FADE_DURATION)));
+    const wake = next < IDLE_WAKE_LEAD ? ease(1 - next / IDLE_WAKE_LEAD) : 0;
+    const dim = fadeOut * (1 - wake);
+    return 1 - dim * (1 - IDLE_MIN_OPACITY);
+}
+
+/**
  * Computes window frame dimensions and offsets preserving video aspect ratio inside canvas
  */
 export function getFrameMetrics(width, height, videoSource, renderSettings = {}) {
@@ -526,19 +573,18 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
 
     // 8. Draw Synthetic Pointer with OpenScreen dynamic cursor sway & click bounce
     if (showCursor && mouseSamples && mouseSamples.length > 0) {
-        const cursor = getInterpolatedCursor(timeSec, mouseSamples, { sourceWidth: frameW, sourceHeight: videoH });
+        const smooth = renderSettings.splineSmoothing !== false;
+        const cursor = sampleCursor(timeSec, mouseSamples, smooth);
         if (cursor) {
             const curScreenX = cursor.x * frameW;
             const curScreenY = cursor.y * videoH;
 
-            // OpenScreen Click Bounce: quick compression on click and bouncy release
+            // Click bounce: quick compression on press and springy release (click times are ms)
             let clickFactor = 1.0;
             if (clicks && clicks.length > 0) {
                 const curMs = timeSec * 1000;
                 for (let i = clicks.length - 1; i >= 0; i--) {
-                    const c = clicks[i];
-                    const cTime = c.time > 10000 ? c.time : c.time * 1000;
-                    const dt = curMs - cTime;
+                    const dt = curMs - clicks[i].time;
                     if (dt >= 0 && dt <= 140) {
                         clickFactor = Math.max(0.72, 1 - Math.sin((dt / 140) * Math.PI) * 0.14);
                         break;
@@ -546,22 +592,14 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
                 }
             }
 
-            // Cap Idle Auto-Fade: stationary mouse fades to 25% opacity so product UI is never obscured
-            let idleOpacity = 1.0;
-            if (mouseSamples.length > 5 && timeSec > 0.8) {
-                const prevCursor = getInterpolatedCursor(timeSec - 0.7, mouseSamples, { sourceWidth: frameW, sourceHeight: videoH });
-                if (prevCursor) {
-                    const moveDist = Math.hypot(cursor.x - prevCursor.x, cursor.y - prevCursor.y);
-                    if (moveDist < 0.005) {
-                        idleOpacity = 0.25;
-                    }
-                }
-            }
+            // Idle fade: a resting cursor gently fades so it never covers the UI,
+            // and fades back in just before it moves again (no popping).
+            const idleOpacity = cursorIdleOpacity(timeSec, mouseSamples);
 
-            // OpenScreen dynamic cursor sway rotation
+            // Dynamic cursor sway rotation from velocity
             let swayAngle = 0;
             if (mouseSamples.length > 2 && timeSec > 0.02) {
-                const prev = getInterpolatedCursor(timeSec - 0.02, mouseSamples, { sourceWidth: frameW, sourceHeight: videoH });
+                const prev = sampleCursor(timeSec - 0.02, mouseSamples, smooth);
                 if (prev) {
                     const dx = (cursor.x - prev.x) * frameW;
                     const dy = (cursor.y - prev.y) * videoH;
