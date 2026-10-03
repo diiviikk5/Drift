@@ -195,6 +195,33 @@ export function sampleCursor(timeSec, mouseSamples, smooth = true) {
     return getInterpolatedCursor(timeSec, mouseSamples);
 }
 
+const CURSOR_BASE_SCALE = 1.45;  // ~32px tall on a 1080p recording at 1x
+const CLICK_RIPPLE_MS = 480;
+const PRESS_DOWN_MS = 70;
+const PRESS_UP_MS = 260;
+
+/**
+ * Pointer squash on click: quick press down, springy release with a hint of
+ * overshoot (click times are ms).
+ */
+export function cursorPressScale(timeSec, clicks) {
+    if (!clicks || !clicks.length) return 1;
+    const curMs = timeSec * 1000;
+    for (let i = clicks.length - 1; i >= 0; i--) {
+        const dt = curMs - clicks[i].time;
+        if (dt < 0) continue;
+        if (dt > PRESS_DOWN_MS + PRESS_UP_MS) break;
+        if (dt < PRESS_DOWN_MS) {
+            const u = dt / PRESS_DOWN_MS;
+            return 1 - 0.2 * u * u * (3 - 2 * u);
+        }
+        const u = (dt - PRESS_DOWN_MS) / PRESS_UP_MS;
+        const spring = 1 - Math.exp(-6 * u) * Math.cos(9 * u);
+        return 0.8 + 0.2 * spring;
+    }
+    return 1;
+}
+
 const IDLE_FADE_AFTER = 1.6;   // seconds of stillness before fading
 const IDLE_FADE_DURATION = 0.5;
 const IDLE_WAKE_LEAD = 0.12;   // start fading back in this long before the next move
@@ -460,75 +487,72 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         }
     }
 
-    // 7. Draw Click Ripple Waves in Screen Space
+    // 7. Click ripples (content space, so they zoom with the camera)
     if (clickRipples && clicks && clicks.length > 0) {
         const curMs = timeSec * 1000;
         for (const click of clicks) {
-            const cTimeMs = click.time;
-            const dt = curMs - cTimeMs;
-            if (dt >= 0 && dt <= 380) {
-                const progress = dt / 380;
-                const ringRadius = progress * 28 * unit;
-                const ringAlpha = (1 - progress) * 0.55;
-                const cx = (click.x > 1 ? click.x / 1920 : click.x) * contentW;
-                const cy = (click.y > 1 ? click.y / 1080 : click.y) * contentH;
+            const dt = curMs - click.time;
+            if (dt < 0 || dt > CLICK_RIPPLE_MS) continue;
+            const p = dt / CLICK_RIPPLE_MS;
+            const eased = 1 - Math.pow(1 - p, 3);
+            const cx = (click.x > 1 ? click.x / 1920 : click.x) * contentW;
+            const cy = (click.y > 1 ? click.y / 1080 : click.y) * contentH;
+            const r = (6 + eased * 30) * unit;
+            const alpha = (1 - p) * (1 - p);
 
-                ctx.save();
-                ctx.beginPath();
-                ctx.arc(cx, cy, ringRadius, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(220, 254, 80, ${ringAlpha})`;
-                ctx.lineWidth = 1.8 * (1 - progress);
-                ctx.stroke();
-
-                // Subtle inner accent ping
-                ctx.beginPath();
-                ctx.arc(cx, cy, ringRadius * 0.4, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(220, 254, 80, ${ringAlpha * 0.25})`;
-                ctx.fill();
-                ctx.restore();
-            }
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.18})`;
+            ctx.fill();
+            ctx.lineWidth = 2.2 * unit * (1 - p * 0.6);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.85})`;
+            ctx.shadowColor = `rgba(0, 0, 0, ${alpha * 0.35})`;
+            ctx.shadowBlur = 6 * unit;
+            ctx.stroke();
+            ctx.restore();
         }
     }
 
-    // 8. Draw Synthetic Pointer with OpenScreen dynamic cursor sway & click bounce
+    // 8. Synthetic pointer: smoothed path, press squash, motion trail, idle fade
     if (showCursor && mouseSamples && mouseSamples.length > 0) {
         const smooth = renderSettings.splineSmoothing !== false;
         const cursor = sampleCursor(timeSec, mouseSamples, smooth);
         if (cursor) {
             const curScreenX = cursor.x * contentW;
             const curScreenY = cursor.y * contentH;
-
-            // Click bounce: quick compression on press and springy release (click times are ms)
-            let clickFactor = 1.0;
-            if (clicks && clicks.length > 0) {
-                const curMs = timeSec * 1000;
-                for (let i = clicks.length - 1; i >= 0; i--) {
-                    const dt = curMs - clicks[i].time;
-                    if (dt >= 0 && dt <= 140) {
-                        clickFactor = Math.max(0.72, 1 - Math.sin((dt / 140) * Math.PI) * 0.14);
-                        break;
-                    }
-                }
-            }
-
-            // Idle fade: a resting cursor gently fades so it never covers the UI,
-            // and fades back in just before it moves again (no popping).
+            const press = cursorPressScale(timeSec, clicks);
             const idleOpacity = cursorIdleOpacity(timeSec, mouseSamples);
+            // Cursor size is relative to the recording, like a real pointer.
+            const size = cursorScale * press * (contentH / 1080) * CURSOR_BASE_SCALE;
 
-            // Dynamic cursor sway rotation from velocity
             let swayAngle = 0;
-            if (mouseSamples.length > 2 && timeSec > 0.02) {
+            let trail = null;
+            if (mouseSamples.length > 2 && timeSec > 0.03) {
                 const prev = sampleCursor(timeSec - 0.02, mouseSamples, smooth);
                 if (prev) {
                     const dx = (cursor.x - prev.x) * contentW;
                     const dy = (cursor.y - prev.y) * contentH;
                     swayAngle = computeCursorSwayRotation(dx, dy, 20, renderSettings.sway ?? 1.0);
+                    // px per second in 1080p units
+                    const speed = Math.hypot(dx, dy) / 0.02 / Math.max(0.25, contentH / 1080);
+                    if (renderSettings.cursorMotionBlur !== false && speed > 900) trail = speed;
                 }
             }
 
             ctx.save();
+            if (trail) {
+                // Short ghost trail along the recent path: reads as motion blur.
+                const strength = Math.min(1, (trail - 900) / 2400);
+                for (let k = 3; k >= 1; k--) {
+                    const g = sampleCursor(timeSec - k * 0.008, mouseSamples, smooth);
+                    if (!g) continue;
+                    ctx.globalAlpha = idleOpacity * strength * (0.22 - k * 0.05);
+                    _drawThemedCursor(ctx, g.x * contentW, g.y * contentH, size, cursorTheme, swayAngle);
+                }
+            }
             ctx.globalAlpha = idleOpacity;
-            _drawThemedCursor(ctx, curScreenX, curScreenY, cursorScale * clickFactor * (contentH / 1080), cursorTheme, swayAngle);
+            _drawThemedCursor(ctx, curScreenX, curScreenY, size, cursorTheme, swayAngle);
             ctx.restore();
         }
     }
@@ -1106,34 +1130,43 @@ function _drawSyntheticCursor(ctx, x, y, scale = 1.0, swayAngle = 0) {
     ctx.save();
     ctx.translate(x, y);
     if (swayAngle) ctx.rotate(swayAngle);
-    ctx.scale(scale * 1.05, scale * 1.05);
+    ctx.scale(scale, scale);
 
-    // Subtle ambient pointer shadow
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.38)';
-    ctx.shadowBlur = 5;
-    ctx.shadowOffsetY = 2.5;
+    // Proportions follow the classic macOS arrow (tip at the hotspot).
+    const arrow = () => {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, 17.2);
+        ctx.lineTo(4.1, 13.4);
+        ctx.lineTo(6.9, 19.9);
+        ctx.quadraticCurveTo(7.3, 20.8, 8.2, 20.4);
+        ctx.lineTo(10.1, 19.6);
+        ctx.quadraticCurveTo(11, 19.2, 10.6, 18.3);
+        ctx.lineTo(7.9, 12.1);
+        ctx.lineTo(13.4, 12.1);
+        ctx.closePath();
+    };
 
-    // Iconic macOS pointer geometry (clean ~18.5px height)
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(0, 18.5);
-    ctx.lineTo(4.4, 14.2);
-    ctx.lineTo(7.8, 22.0);
-    ctx.lineTo(10.8, 20.6);
-    ctx.lineTo(7.5, 13.2);
-    ctx.lineTo(13.2, 13.2);
-    ctx.closePath();
-
-    // Deep obsidian black body for maximum clarity and contrast
-    ctx.fillStyle = '#0f1117';
-    ctx.fill();
-
-    // Crisp pure white outline
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1.25;
+    // Soft drop shadow
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+    ctx.shadowBlur = 3.5;
+    ctx.shadowOffsetY = 1.4;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
+
+    // White rim (drawn as a thick stroke under the body for a clean outline)
+    arrow();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2.6;
     ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+
+    // Body
+    ctx.shadowColor = 'transparent';
+    arrow();
+    ctx.fillStyle = '#111114';
+    ctx.fill();
 
     ctx.restore();
 }

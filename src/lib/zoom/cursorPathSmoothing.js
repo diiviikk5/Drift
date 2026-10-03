@@ -16,6 +16,7 @@
 const STEP_MS = 1000 / 240;
 const STEP_S = STEP_MS / 1000;
 const HOLD_GAP_MS = 60;
+const CLICK_PIN_MS = 220;
 const MOVE_IN_MS = 16;
 
 /**
@@ -235,13 +236,27 @@ function buildSmoothedRun(samples, stiffness, damping, mass, srcW, srcH, settleM
         rawY[i] = ay + (getNormalizedY(b, srcH) - ay) * k;
     }
 
-    return {
-        start,
-        end,
-        times,
-        xs: springSmooth(rawX, stiffness, damping, mass),
-        ys: springSmooth(rawY, stiffness, damping, mass),
-    };
+    const xs = springSmooth(rawX, stiffness, damping, mass);
+    const ys = springSmooth(rawY, stiffness, damping, mass);
+
+    // Pin the smoothed path to the real position around every click, so the
+    // pointer lands exactly on what it clicks (and on its click ripple)
+    // instead of trailing behind it.
+    for (const sample of samples) {
+        if (!sample.click) continue;
+        const tc = getSampleTime(sample);
+        const lo = Math.max(0, Math.floor((tc - start - CLICK_PIN_MS) / STEP_MS));
+        const hi = Math.min(n - 1, Math.ceil((tc - start + CLICK_PIN_MS) / STEP_MS));
+        for (let i = lo; i <= hi; i++) {
+            const u = 1 - Math.abs(times[i] - tc) / CLICK_PIN_MS;
+            if (u <= 0) continue;
+            const w = u * u * (3 - 2 * u);
+            xs[i] += (rawX[i] - xs[i]) * w;
+            ys[i] += (rawY[i] - ys[i]) * w;
+        }
+    }
+
+    return { start, end, times, xs, ys };
 }
 
 function sampleRun(run, timeMs) {

@@ -188,3 +188,21 @@ test('a burst of typing zooms in; a single stray key does not', () => {
     assert.ok(Math.abs(segs[0].targetX - 0.7) < 0.1);
     assert.equal(new InteractionAnalyzer().analyze([], moves, 10, [{ time: 2, text: '', typed: true }]).length, 0);
 });
+
+test('smoothed cursor lands exactly on clicks', async () => {
+    const { getSmoothedCursorPath } = await import('../src/lib/zoom/cursorPathSmoothing.js');
+    const samples = [];
+    for (let t = 0; t <= 600; t += 4) samples.push({ time: t, x: 0.1 + 0.8 * (t / 600), y: 0.5 });
+    samples.push({ time: 600, x: 0.9, y: 0.5, click: 'left' });
+    for (let t = 604; t <= 1200; t += 4) samples.push({ time: t, x: 0.9, y: 0.5 });
+    const p = getSmoothedCursorPath(samples, 1.0).sampleAt(600);
+    assert.ok(Math.abs(p.cx - 0.9) < 0.005, `cursor should be on the click, got ${p.cx}`);
+});
+
+test('click press squashes the pointer and springs back', async () => {
+    const { cursorPressScale } = await import('../src/lib/rendering/renderFrame.js');
+    const clicks = [{ time: 1000 }];
+    assert.equal(cursorPressScale(0.9, clicks), 1);
+    assert.ok(cursorPressScale(1.07, clicks) < 0.85);
+    assert.ok(Math.abs(cursorPressScale(1.5, clicks) - 1) < 1e-9);
+});
