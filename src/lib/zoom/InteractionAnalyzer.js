@@ -149,13 +149,23 @@ export class InteractionAnalyzer {
 
     _keySignals(keystrokes, moves) {
         if (!keystrokes || !keystrokes.length || !moves.length) return [];
-        return keystrokes
-            .filter(k => k && typeof k.text === 'string')
+        const keys = keystrokes
+            .filter(k => k && (typeof k.text === 'string' || k.typed))
+            .map(k => ({ ...k, timeSec: (k.time ?? 0) > 1000 ? k.time / 1000 : (k.time ?? 0) }))
+            .sort((a, b) => a.timeSec - b.timeSec);
+        const typedTimes = keys.filter(k => k.typed).map(k => k.timeSec);
+        const typingBurst = (t) => typedTimes.some(o => o !== t && Math.abs(o - t) <= 1.5);
+
+        return keys
             .map(k => {
-                const time = (k.time ?? 0) > 1000 ? k.time / 1000 : (k.time ?? 0);
+                const time = k.timeSec;
                 const c = this._cursorAt(moves, time);
                 if (!c) return null;
-                const key = k.text.split('+').pop();
+                if (k.typed) {
+                    // Typing is the classic "zoom in here" moment; a lone stray key is not.
+                    return { time, x: c.x, y: c.y, weight: 0.7, strong: typingBurst(time), kind: 'type' };
+                }
+                const key = (k.text || '').split('+').pop();
                 const isNav = NAV_KEY.test(key);
                 // Shortcuts are deliberate actions; bare navigation keys only extend sessions.
                 return { time, x: c.x, y: c.y, weight: 0.6, strong: !isNav, kind: 'key' };
@@ -270,7 +280,7 @@ export class InteractionAnalyzer {
             targetX,
             targetY,
             zoomScale,
-            reason: anchors[0].kind === 'click' ? 'click' : anchors[0].kind,
+            reason: anchors[0].kind === 'click' ? 'click' : (anchors[0].kind === 'type' ? 'key' : anchors[0].kind),
             clickCount: sess.signals.filter(s => s.kind === 'click').length,
         };
     }

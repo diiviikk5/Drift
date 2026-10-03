@@ -179,3 +179,12 @@ test('resting cursor fades smoothly and wakes before moving again', async () => 
         prev = o;
     }
 });
+
+test('a burst of typing zooms in; a single stray key does not', () => {
+    const moves = path([[0, 0.2, 0.2], [800, 0.7, 0.3], [9000, 0.7, 0.3]]);
+    const burst = [2.0, 2.15, 2.3, 2.5, 2.7, 3.0].map(time => ({ time, text: '', typed: true }));
+    const segs = new InteractionAnalyzer().analyze([], moves, 10, burst);
+    assert.equal(segs.length, 1);
+    assert.ok(Math.abs(segs[0].targetX - 0.7) < 0.1);
+    assert.equal(new InteractionAnalyzer().analyze([], moves, 10, [{ time: 2, text: '', typed: true }]).length, 0);
+});

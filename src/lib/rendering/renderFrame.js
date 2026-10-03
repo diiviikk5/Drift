@@ -1221,6 +1221,7 @@ function _drawKeystrokeOverlay(ctx, keystrokes, timeSec, bounds) {
     let active = null;
     for (let i = keystrokes.length - 1; i >= 0; i--) {
         const k = keystrokes[i];
+        if (k.typed) continue; // anonymous typing activity, not a shortcut to show
         const t = (k.time > 1000 || k.t > 1000) ? (k.time || k.t) / 1000 : (k.time || k.t || 0);
         const dt = curSec - t;
         if (dt >= 0 && dt <= 1.6) {
