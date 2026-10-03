@@ -1,277 +1,322 @@
 /**
- * InteractionAnalyzer — Semantic Attention & Focus Track Generator
- * 
- * Inspired by Screen Studio & OpenScreen's interaction model.
- * Instead of chasing every raw cursor jitter, this analyzer clusters user
- * intent (clicks, dwell time, active form fields) into calm, semantic
- * FocusSegments with deadzone margins.
+ * InteractionAnalyzer — automatic zoom planner.
+ *
+ * Decides *when* to zoom, *how much* and *where*, the way Screen Studio and
+ * Cap do it, instead of zooming on every click:
+ *
+ *  1. Collect intent signals: clicks, keyboard shortcuts / navigation keys and
+ *     moments where the cursor settles after a deliberate move (dwell).
+ *  2. Group signals into work sessions. A session continues while signals keep
+ *     arriving (gap below `idleGap`) and stay in an area that still fits a
+ *     zoomed viewport. A spatial jump starts a new session that the camera
+ *     pans to; a long pause lets the camera return to the full frame.
+ *  3. Each session gets a zoom depth that fits everything that happened in it
+ *     (deeper for tight work like a form field, shallower when the work spans
+ *     a panel) and a focus at the weighted centre of that activity.
+ *  4. Sessions separated by a short gap are bridged so the camera never
+ *     zooms out and straight back in (no yo-yo); tiny sessions are dropped.
+ *
+ * Segments are emitted in the studio's focus-segment format. The camera track
+ * (cameraTrack.js) zooms in from `startTime`, follows the cursor calmly while
+ * the segment is active and zooms out after `endTime`.
  */
 
-import { clampFocusToScale } from './focusUtils.js';
-import { DEFAULT_ZOOM_SCALE, ZOOM_DYNAMICS } from './ZoomConstruct.js';
+import { DEFAULT_ZOOM_SCALE } from './ZoomConstruct.js';
+
+export const AUTO_ZOOM_DEFAULTS = Object.freeze({
+    preRoll: 0.55,          // start zooming this long before the first action so we arrive on time
+    holdAfter: 1.6,         // keep the zoom this long after the last action so viewers can read the result
+    idleGap: 2.6,           // a pause longer than this ends a session
+    bridgeGap: 1.6,         // sessions closer than this are joined by a pan instead of a zoom-out
+    minSegmentDuration: 1.4,
+    minZoom: 1.25,          // never bother with a zoom shallower than this
+    maxZoomBoost: 1.3,      // tight work may zoom up to preset * boost
+    fitMargin: 0.14,        // breathing room (normalized) around the session's activity box
+    maxSessionSpan: 0.45,   // activity spread (normalized) above which a session is split (fits at ~1.5x)
+    minActionTime: 0.35,    // ignore the click that starts the recording
+    endGuard: 0.35,         // stop planning this close to the end of the recording
+    dwellMinDuration: 0.7,  // cursor must settle this long to count as attention
+    dwellMaxDuration: 4.0,
+    dwellRadius: 0.012,
+    dwellMinTravel: 0.08,   // ...and only after it actually travelled somewhere
+});
+
+const NAV_KEY = /^(Enter|Tab|Esc|Backspace|Del|Space|↑|↓|←|→|PgUp|PgDn|Home|End)$/;
+
+function clamp(v, lo, hi) {
+    return v < lo ? lo : v > hi ? hi : v;
+}
+
+function quantile(sorted, q) {
+    if (!sorted.length) return 0;
+    const pos = (sorted.length - 1) * q;
+    const lo = Math.floor(pos);
+    const hi = Math.ceil(pos);
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+}
 
 export class InteractionAnalyzer {
     constructor(options = {}) {
         this.options = {
-            clickPaddingPre: options.clickPaddingPre ?? ZOOM_DYNAMICS.clickPaddingPre,    // seconds before click to begin anticipation zoom
-            clickPaddingPost: options.clickPaddingPost ?? ZOOM_DYNAMICS.clickPaddingPost,  // hold view long enough for viewer to read
-            clusterTimeGap: options.clusterTimeGap ?? ZOOM_DYNAMICS.clusterTimeGap,      // seconds threshold to group related clicks (3.5s)
-            clusterDistance: options.clusterDistance ?? ZOOM_DYNAMICS.clusterDistance,   // normalized screen distance for clustering
-            enableDwellZooms: options.enableDwellZooms ?? false, // only intentional clicks trigger auto-zoom by default
-            dwellMinDuration: options.dwellMinDuration ?? 1.2,   // mouse must be stationary for at least 1.2s
-            dwellRadius: options.dwellRadius ?? 0.03,            // tight radius for dwell
-            mergeGapThreshold: options.mergeGapThreshold ?? ZOOM_DYNAMICS.mergeGapThreshold, // seconds between segments to merge
-            minSegmentDuration: options.minSegmentDuration ?? ZOOM_DYNAMICS.minSegmentDuration, // minimum hold to prevent yo-yo zooming
-            defaultZoomScale: options.defaultZoomScale ?? DEFAULT_ZOOM_SCALE,             // 1.55x cinema balanced standard
-            deadzoneRadius: options.deadzoneRadius ?? ZOOM_DYNAMICS.deadzoneRadius,       // subtle margin to filter hand tremors while smoothly tracking cursor motion
-            sourceWidth: options.sourceWidth || 1920,
-            sourceHeight: options.sourceHeight || 1080,
-            minClickTime: options.minClickTime ?? 0.35,           // filter initial startup clicks (< 350ms)
+            ...AUTO_ZOOM_DEFAULTS,
+            defaultZoomScale: DEFAULT_ZOOM_SCALE,
+            enableDwellZooms: true,
+            sourceWidth: 1920,
+            sourceHeight: 1080,
             ...options,
         };
+        // Legacy option names
+        if (options.minClickTime != null) this.options.minActionTime = options.minClickTime;
     }
 
     /**
-     * Generate complete FocusTrack from recorded session telemetry
-     * @param {Array<{x: number, y: number, time: number}>} clicks - Raw click events (time in sec or ms)
-     * @param {Array<{x: number, y: number, t: number}>} mouseSamples - Continuous cursor telemetry
-     * @param {number} totalDurationSec - Total duration of the recording in seconds
-     * @returns {Array<Object>}
+     * @param {Array<{x:number,y:number,time:number}>} clicks time in ms (or seconds for short legacy inputs)
+     * @param {Array<{x:number,y:number,time:number}>} mouseSamples time in ms
+     * @param {number} totalDurationSec
+     * @param {Array<{time:number,text:string}>} keystrokes time in seconds
+     * @returns {Array<Object>} focus segments
      */
-    analyze(clicks = [], mouseSamples = [], totalDurationSec = 10) {
-        const srcW = this.options.sourceWidth || (typeof window !== 'undefined' ? (window.screen.width * (window.devicePixelRatio || 1)) : 1920);
-        const srcH = this.options.sourceHeight || (typeof window !== 'undefined' ? (window.screen.height * (window.devicePixelRatio || 1)) : 1080);
-
-        // Normalize click timestamps to seconds and coordinates to 0-1
-        const minClickTime = this.options.minClickTime ?? 0.35;
-        const clickList = clicks || [];
-        const maxClickRawTime = clickList.reduce((max, c) => Math.max(max, c.time ?? c.t ?? 0), 0);
-        const isMs = maxClickRawTime > totalDurationSec || maxClickRawTime >= 20 || clickList.some(c => (c.time ?? c.t ?? 0) > 10);
-
-        const normalizedClicks = clickList
-            .map(c => {
-                const rawTime = c.time ?? c.t ?? 0;
-                const timeSec = isMs ? rawTime / 1000 : rawTime;
-                const rawX = c.x ?? c.cx ?? 0.5;
-                const rawY = c.y ?? c.cy ?? 0.5;
-                return {
-                    time: timeSec,
-                    x: Math.max(0, Math.min(1, rawX > 1 ? rawX / srcW : rawX)),
-                    y: Math.max(0, Math.min(1, rawY > 1 ? rawY / srcH : rawY)),
-                };
-            })
-            .filter(c => c.time >= minClickTime)
+    analyze(clicks = [], mouseSamples = [], totalDurationSec = 10, keystrokes = []) {
+        const o = this.options;
+        const duration = Number.isFinite(totalDurationSec) && totalDurationSec > 0 ? totalDurationSec : 10;
+        const moves = this._normalizeMoves(mouseSamples);
+        const signals = [
+            ...this._clickSignals(clicks, duration),
+            ...this._keySignals(keystrokes, moves),
+            ...(o.enableDwellZooms ? this._dwellSignals(moves) : []),
+        ]
+            .filter(s => s.time >= o.minActionTime && s.time <= duration - o.endGuard)
             .sort((a, b) => a.time - b.time);
 
-        // Step 1: Cluster clicks into focal regions
-        const clickSegments = this._clusterClicks(normalizedClicks, totalDurationSec, minClickTime);
+        if (!signals.length) return [];
 
-        // Step 2: Detect dwell / attention anchors only if explicitly enabled
-        const dwellSegments = this.options.enableDwellZooms
-            ? this._detectDwells(mouseSamples, totalDurationSec, clickSegments, srcW, srcH)
-            : [];
+        const sessions = this._buildSessions(signals);
+        const planned = sessions
+            .filter(sess => sess.signals.some(s => s.strong))
+            .map(sess => this._planSession(sess, moves, duration));
 
-        // Step 3: Combine and sort all focus events
-        const combined = [...clickSegments, ...dwellSegments].sort((a, b) => a.startTime - b.startTime);
-
-        // Step 4: Merge adjacent or overlapping segments to prevent jarring zoom pumping
-        const merged = this._mergeSegments(combined, totalDurationSec);
-
-        // Step 5: Sanitize viewport bounds and deadzones without overlapping next segments
-        return merged.map((seg, idx, arr) => this._finalizeSegment(seg, idx, arr, totalDurationSec));
+        return this._finalize(planned, duration);
     }
 
-    /**
-     * Group nearby clicks in space and time
-     */
-    _clusterClicks(clicks, totalDurationSec, minClickTime = 1.5) {
-        if (!clicks.length) return [];
+    _normalizeX(v) {
+        return clamp(v > 1 ? v / (this.options.sourceWidth || 1920) : v, 0, 1);
+    }
 
-        const clusters = [];
-        let currentCluster = [clicks[0]];
+    _normalizeY(v) {
+        return clamp(v > 1 ? v / (this.options.sourceHeight || 1080) : v, 0, 1);
+    }
 
-        for (let i = 1; i < clicks.length; i++) {
-            const prev = currentCluster[currentCluster.length - 1];
-            const curr = clicks[i];
+    _normalizeMoves(samples) {
+        return (samples || [])
+            .map(s => ({
+                t: (s.timeMs ?? s.time ?? s.t ?? 0) / 1000,
+                x: this._normalizeX(s.cx ?? s.x ?? 0.5),
+                y: this._normalizeY(s.cy ?? s.y ?? 0.5),
+            }))
+            .filter(s => Number.isFinite(s.t) && Number.isFinite(s.x) && Number.isFinite(s.y))
+            .sort((a, b) => a.t - b.t);
+    }
 
-            const dt = curr.time - prev.time;
-            const dist = Math.hypot(curr.x - prev.x, curr.y - prev.y);
-
-            if (dt <= this.options.clusterTimeGap && dist <= this.options.clusterDistance) {
-                currentCluster.push(curr);
-            } else {
-                clusters.push(currentCluster);
-                currentCluster = [curr];
-            }
-        }
-        if (currentCluster.length) {
-            clusters.push(currentCluster);
-        }
-
-        const minZoomStart = Math.max(0, minClickTime - 0.35);
-
-        return clusters.map(cluster => {
-            const first = cluster[0];
-            const last = cluster[cluster.length - 1];
-
-            // Centroid target for cluster: weighted anchor for multi-click interactions
-            let targetX = first.x;
-            let targetY = first.y;
-            if (cluster.length > 1) {
-                targetX = cluster.reduce((sum, c) => sum + c.x, 0) / cluster.length;
-                targetY = cluster.reduce((sum, c) => sum + c.y, 0) / cluster.length;
-            }
-
-            const startTime = Math.max(minZoomStart, first.time - this.options.clickPaddingPre);
-            const endTime = Math.min(totalDurationSec, last.time + this.options.clickPaddingPost);
-
+    _clickSignals(clicks, duration) {
+        const list = clicks || [];
+        if (!list.length) return [];
+        // Recorder clicks are in ms; tolerate legacy second-based inputs.
+        const maxRaw = list.reduce((m, c) => Math.max(m, c.time ?? c.t ?? 0), 0);
+        const isMs = maxRaw > duration + 1 || maxRaw >= 20 || list.some(c => (c.time ?? c.t ?? 0) > 10);
+        return list.map(c => {
+            const raw = c.time ?? c.t ?? 0;
             return {
-                startTime,
-                endTime,
-                targetX,
-                targetY,
-                zoomScale: this.options.defaultZoomScale,
-                reason: 'click',
-                clickCount: cluster.length,
+                time: isMs ? raw / 1000 : raw,
+                x: this._normalizeX(c.x ?? c.cx ?? 0.5),
+                y: this._normalizeY(c.y ?? c.cy ?? 0.5),
+                weight: c.button === 'right' ? 0.8 : 1,
+                strong: true,
+                kind: 'click',
             };
         });
     }
 
-    /**
-     * Detect dwell regions where user is paused reading or hovering
-     */
-    _detectDwells(samples, totalDurationSec, existingSegments, srcW = 1920, srcH = 1080) {
-        if (!samples || samples.length < 10) return [];
-
-        const dwells = [];
-        let windowStart = 0;
-        const minDwellTime = this.options.minDwellTime ?? 1.0;
-
-        for (let i = 1; i < samples.length; i++) {
-            const startSample = samples[windowStart];
-            const currSample = samples[i];
-
-            const tStart = (startSample.time ?? startSample.t) / 1000;
-            const tCurr = (currSample.time ?? currSample.t) / 1000;
-            const dt = tCurr - tStart;
-
-            // Never create dwell anchors during initial recording startup (< minDwellTime)
-            if (tStart < minDwellTime) {
-                windowStart = i;
-                continue;
-            }
-
-            const rawStartX = startSample.x > 1 ? startSample.x / srcW : (startSample.cx ?? startSample.x ?? 0.5);
-            const rawStartY = startSample.y > 1 ? startSample.y / srcH : (startSample.cy ?? startSample.y ?? 0.5);
-            const rawCurrX = currSample.x > 1 ? currSample.x / srcW : (currSample.cx ?? currSample.x ?? 0.5);
-            const rawCurrY = currSample.y > 1 ? currSample.y / srcH : (currSample.cy ?? currSample.y ?? 0.5);
-
-            const dist = Math.hypot(rawCurrX - rawStartX, rawCurrY - rawStartY);
-
-            if (dist > this.options.dwellRadius) {
-                // Cursor moved out of dwell bubble
-                if (dt >= this.options.dwellMinDuration) {
-                    const midTime = (tStart + tCurr) / 2;
-                    // Check if already covered by an existing click segment
-                    const isCovered = existingSegments.some(
-                        s => midTime >= s.startTime - 0.5 && midTime <= s.endTime + 0.5
-                    );
-
-                    if (!isCovered) {
-                        dwells.push({
-                            startTime: Math.max(0, tStart - 0.2),
-                            endTime: Math.min(totalDurationSec, tCurr + 0.8),
-                            targetX: rawStartX,
-                            targetY: rawStartY,
-                            zoomScale: Math.min(this.options.defaultZoomScale, 1.5), // gentler zoom for dwell
-                            reason: 'dwell',
-                        });
-                    }
-                }
-                windowStart = i;
-            }
+    _cursorAt(moves, t) {
+        if (!moves.length) return null;
+        let lo = 0;
+        let hi = moves.length - 1;
+        while (lo < hi) {
+            const mid = (lo + hi + 1) >> 1;
+            if (moves[mid].t <= t) lo = mid; else hi = mid - 1;
         }
-
-        return dwells;
+        return moves[lo];
     }
 
-    /**
-     * Merge segments with small gaps between them to ensure calm sustained framing
-     */
-    _mergeSegments(segments, totalDurationSec) {
-        if (!segments.length) return [];
-
-        const merged = [segments[0]];
-        const chainedHorizon = ZOOM_DYNAMICS.chainedPanGapSec || 6.5;
-
-        for (let i = 1; i < segments.length; i++) {
-            const prev = merged[merged.length - 1];
-            const curr = segments[i];
-
-            const gap = curr.startTime - prev.endTime;
-            const dist = Math.hypot(curr.targetX - prev.targetX, curr.targetY - prev.targetY);
-
-            if ((gap <= this.options.mergeGapThreshold || gap <= 0) && dist <= 0.45) {
-                // Nearby clicks on related UI elements: extend hold time so camera stays calm
-                prev.endTime = Math.max(prev.endTime, curr.endTime);
-                prev.zoomScale = Math.max(prev.zoomScale, curr.zoomScale);
-                prev.targetX = prev.targetX * 0.40 + curr.targetX * 0.60;
-                prev.targetY = prev.targetY * 0.40 + curr.targetY * 0.60;
-            } else if (gap <= chainedHorizon) {
-                // Clicks within conversational horizon: bridge gap so camera glides continuously
-                // rather than dipping to overview
-                if (curr.startTime > prev.endTime) {
-                    prev.endTime = curr.startTime;
-                } else {
-                    // Resolve overlap: set prev.endTime strictly to curr.startTime
-                    prev.endTime = curr.startTime;
-                }
-                merged.push(curr);
-            } else {
-                merged.push(curr);
-            }
-        }
-
-        // Strict guarantee: no segment end exceeds next segment start (zero overlap)
-        for (let i = 0; i < merged.length - 1; i++) {
-            if (merged[i].endTime > merged[i + 1].startTime) {
-                merged[i].endTime = merged[i + 1].startTime;
-            }
-        }
-
-        return merged;
+    _keySignals(keystrokes, moves) {
+        if (!keystrokes || !keystrokes.length || !moves.length) return [];
+        return keystrokes
+            .filter(k => k && typeof k.text === 'string')
+            .map(k => {
+                const time = (k.time ?? 0) > 1000 ? k.time / 1000 : (k.time ?? 0);
+                const c = this._cursorAt(moves, time);
+                if (!c) return null;
+                const key = k.text.split('+').pop();
+                const isNav = NAV_KEY.test(key);
+                // Shortcuts are deliberate actions; bare navigation keys only extend sessions.
+                return { time, x: c.x, y: c.y, weight: 0.6, strong: !isNav, kind: 'key' };
+            })
+            .filter(Boolean);
     }
 
-    /**
-     * Clamp coordinates so camera doesn't show black margins
-     */
-    _finalizeSegment(seg, index, segments, totalDurationSec) {
-        const scale = seg.zoomScale || this.options.defaultZoomScale;
-        const clamped = clampFocusToScale({ cx: seg.targetX, cy: seg.targetY }, scale);
+    _dwellSignals(moves) {
+        const o = this.options;
+        if (moves.length < 8) return [];
+        const out = [];
+        let anchor = 0;
+        let travel = 0; // path length since the last accepted dwell
 
-        const nextSeg = segments && segments[index + 1];
-        const isChainedNext = nextSeg && (nextSeg.startTime - seg.endTime <= 0.05);
+        // The recorder only emits samples while the mouse moves, so a dwell
+        // ends at the timestamp of the first sample that leaves the bubble.
+        const consider = (leaveTime) => {
+            const a = moves[anchor];
+            const dur = leaveTime - a.t;
+            if (dur >= o.dwellMinDuration && dur <= o.dwellMaxDuration && travel >= o.dwellMinTravel) {
+                out.push({ time: a.t + Math.min(0.25, dur / 2), x: a.x, y: a.y, weight: 0.45, strong: false, kind: 'dwell' });
+                travel = 0;
+            }
+        };
 
-        let finalEnd = seg.endTime;
-        if (isChainedNext) {
-            finalEnd = nextSeg.startTime;
-        } else {
-            const desiredEnd = Math.max(seg.startTime + this.options.minSegmentDuration, seg.endTime);
-            finalEnd = Math.min(totalDurationSec, desiredEnd);
-            if (nextSeg) finalEnd = Math.min(nextSeg.startTime, finalEnd);
+        for (let i = 1; i < moves.length; i++) {
+            const a = moves[anchor];
+            const m = moves[i];
+            if (Math.hypot(m.x - a.x, m.y - a.y) > o.dwellRadius) {
+                consider(m.t);
+                travel += Math.hypot(m.x - moves[i - 1].x, m.y - moves[i - 1].y);
+                anchor = i;
+            }
         }
-        finalEnd = Math.max(seg.startTime + 0.1, finalEnd);
+        consider(moves[moves.length - 1].t);
+        return out;
+    }
+
+    _buildSessions(signals) {
+        const o = this.options;
+        const sessions = [];
+        let cur = null;
+
+        for (const sig of signals) {
+            if (cur) {
+                const gap = sig.time - cur.lastTime;
+                const minX = Math.min(cur.minX, sig.x);
+                const maxX = Math.max(cur.maxX, sig.x);
+                const minY = Math.min(cur.minY, sig.y);
+                const maxY = Math.max(cur.maxY, sig.y);
+                const span = Math.max(maxX - minX, maxY - minY);
+                if (gap <= o.idleGap && span <= o.maxSessionSpan) {
+                    cur.signals.push(sig);
+                    cur.lastTime = sig.time;
+                    Object.assign(cur, { minX, maxX, minY, maxY });
+                    continue;
+                }
+                sessions.push(cur);
+            }
+            cur = {
+                signals: [sig],
+                firstTime: sig.time,
+                lastTime: sig.time,
+                minX: sig.x, maxX: sig.x, minY: sig.y, maxY: sig.y,
+            };
+        }
+        if (cur) sessions.push(cur);
+        return sessions;
+    }
+
+    _planSession(sess, moves, duration) {
+        const o = this.options;
+        const strong = sess.signals.filter(s => s.strong);
+        const anchors = strong.length ? strong : sess.signals;
+
+        const startTime = Math.max(0, anchors[0].time - o.preRoll);
+        const lastAction = sess.signals[sess.signals.length - 1].time;
+        const endTime = Math.min(duration - o.endGuard * 0.5, lastAction + o.holdAfter);
+
+        // Activity box: action points plus where the cursor actually spent the
+        // session (robust 10-90% range so a stray flick doesn't widen the zoom).
+        const xs = sess.signals.map(s => s.x);
+        const ys = sess.signals.map(s => s.y);
+        const during = moves.filter(m => m.t >= anchors[0].time && m.t <= lastAction);
+        if (during.length >= 6) {
+            const mx = during.map(m => m.x).sort((a, b) => a - b);
+            const my = during.map(m => m.y).sort((a, b) => a - b);
+            xs.push(quantile(mx, 0.1), quantile(mx, 0.9));
+            ys.push(quantile(my, 0.1), quantile(my, 0.9));
+        }
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+
+        const wSum = sess.signals.reduce((a, s) => a + s.weight, 0) || 1;
+        const cx = sess.signals.reduce((a, s) => a + s.x * s.weight, 0) / wSum;
+        const cy = sess.signals.reduce((a, s) => a + s.y * s.weight, 0) / wSum;
+        // Blend weighted centre with the box centre so the whole box stays framed.
+        const targetX = clamp(cx * 0.5 + (minX + maxX) * 0.25, 0, 1);
+        const targetY = clamp(cy * 0.5 + (minY + maxY) * 0.25, 0, 1);
+
+        const span = Math.max(maxX - minX, maxY - minY) + o.fitMargin * 2;
+        // The preset is the typical depth; tight work (a field, a button) may go a bit deeper.
+        const maxZoom = Math.max(o.minZoom, o.defaultZoomScale * (o.maxZoomBoost ?? 1.3));
+        const fitZoom = span > 0 ? 1 / span : maxZoom;
+        const zoomScale = Math.round(clamp(fitZoom, o.minZoom, maxZoom) * 100) / 100;
 
         return {
-            id: `focus_seg_${index}_${Math.round(seg.startTime * 10)}`,
-            startTime: Math.max(0, seg.startTime),
-            endTime: finalEnd,
-            targetX: clamped.cx,
-            targetY: clamped.cy,
-            zoomScale: scale,
-            reason: seg.reason,
-            sceneMode: seg.sceneMode || 'zoom',
-            deadzoneRadius: this.options.deadzoneRadius,
+            startTime,
+            endTime,
+            targetX,
+            targetY,
+            zoomScale,
+            reason: anchors[0].kind === 'click' ? 'click' : anchors[0].kind,
+            clickCount: sess.signals.filter(s => s.kind === 'click').length,
         };
+    }
+
+    _finalize(planned, duration) {
+        const o = this.options;
+        const out = [];
+        for (const seg of planned.sort((a, b) => a.startTime - b.startTime)) {
+            const prev = out[out.length - 1];
+            if (prev) {
+                if (seg.startTime < prev.endTime) {
+                    // Overlap: hand over at the midpoint so both keep their lead-in/hold.
+                    const mid = Math.max(prev.startTime + 0.5, (prev.endTime + seg.startTime) / 2);
+                    prev.endTime = mid;
+                    seg.startTime = mid;
+                } else if (seg.startTime - prev.endTime < o.bridgeGap) {
+                    // Short gap: hold the previous framing until the camera pans over.
+                    prev.endTime = seg.startTime;
+                }
+            }
+            out.push(seg);
+        }
+
+        return out
+            .filter(seg => seg.clickCount > 0 || seg.endTime - seg.startTime >= 0.8)
+            .map(seg => {
+                if (seg.endTime - seg.startTime < o.minSegmentDuration) {
+                    seg.endTime = Math.min(duration, seg.startTime + o.minSegmentDuration);
+                }
+                return seg;
+            })
+            .map((seg, i, arr) => {
+                const next = arr[i + 1];
+                const endTime = next ? Math.min(seg.endTime, next.startTime) : seg.endTime;
+                return {
+                    id: `focus_seg_${i}_${Math.round(seg.startTime * 10)}`,
+                    startTime: Math.round(seg.startTime * 1000) / 1000,
+                    endTime: Math.round(Math.max(seg.startTime + 0.2, endTime) * 1000) / 1000,
+                    targetX: seg.targetX,
+                    targetY: seg.targetY,
+                    zoomScale: seg.zoomScale,
+                    reason: seg.reason,
+                    sceneMode: 'zoom',
+                    followCursor: true,
+                    auto: true,
+                };
+            });
     }
 }

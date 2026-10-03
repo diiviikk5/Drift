@@ -6,11 +6,9 @@
  * click ripple waves, and synthetic sub-pixel cursor.
  */
 
-import { findDominantRegion } from '../zoom/zoomRegionUtils.js';
-import { clampFocusToScale } from '../zoom/focusUtils.js';
 import { computeCursorSwayRotation } from '../zoom/cursorSway.js';
 import { getSmoothedCursorPath } from '../zoom/cursorPathSmoothing.js';
-import { ZOOM_DYNAMICS, DEFAULT_ZOOM_SCALE, easeChainedPan } from '../zoom/ZoomConstruct.js';
+import { getCameraTrack, sampleCameraTrack } from '../zoom/cameraTrack.js';
 
 // Gradient wallpaper palettes
 export const WALLPAPERS = {
@@ -38,59 +36,6 @@ export const WALLPAPERS = {
 };
 
 /**
- * Cap physical spring-mass-damper easing (k=200, d=40, m=2.25)
- */
-export function capSpringEase(t, stiffness = 200, damping = 40, mass = 2.25) {
-    if (t <= 0) return 0;
-    if (t >= 1) return 1;
-    const omega0 = Math.sqrt(stiffness / mass);
-    const zeta = damping / (2 * Math.sqrt(stiffness * mass));
-    if (zeta < 1) {
-        const omegaD = omega0 * Math.sqrt(1 - zeta * zeta);
-        const decay = Math.exp(-zeta * omega0 * t);
-        return 1 - decay * (Math.cos(omegaD * t) + (zeta * omega0 / omegaD) * Math.sin(omegaD * t));
-    } else {
-        const decay = Math.exp(-omega0 * t);
-        return 1 - decay * (1 + omega0 * t);
-    }
-}
-
-/**
- * OpenScreen / Screen Studio Cubic Bezier easing (0.1, 0.0, 0.2, 1.0)
- */
-export function cubicBezier(p1x, p1y, p2x, p2y, t) {
-    if (t <= 0) return 0;
-    if (t >= 1) return 1;
-    const ax = 1 - 3 * p2x + 3 * p1x;
-    const bx = 3 * p2x - 6 * p1x;
-    const cx = 3 * p1x;
-    const sampleCurveX = (u) => ((ax * u + bx) * u + cx) * u;
-    const sampleCurveY = (u) => (((1 - 3 * p2y + 3 * p1y) * u + (3 * p2y - 6 * p1y)) * u + 3 * p1y) * u;
-
-    let u = t;
-    for (let i = 0; i < 6; i++) {
-        const x = sampleCurveX(u) - t;
-        if (Math.abs(x) < 1e-4) break;
-        const d = (3 * ax * u + 2 * bx) * u + cx;
-        if (Math.abs(d) < 1e-5) break;
-        u -= x / d;
-    }
-    return Math.max(0, Math.min(1, sampleCurveY(u)));
-}
-
-export function easeOutScreenStudio(t) {
-    return cubicBezier(0.1, 0.0, 0.2, 1.0, Math.max(0, Math.min(1, t)));
-}
-
-export function easeInOutCinema(t) {
-    return cubicBezier(0.42, 0.0, 0.18, 1.0, Math.max(0, Math.min(1, t)));
-}
-
-export function easeConnectedPan(t) {
-    return easeChainedPan(t);
-}
-
-/**
  * Reactive Webcam Scaling (from OpenScreen / Recordly)
  * Inversely scales the webcam PiP so deep zoom keeps the camera out of the way.
  */
@@ -115,371 +60,38 @@ export function calculate3DTilt(cameraX, cameraY, scale, maxTiltDeg = 3.5) {
 }
 
 /**
- * Smooth Hermite / Quintic interpolation fallback
- */
-function smoothstep(edge0, edge1, x) {
-    const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
-    return t * t * t * (t * (t * 6 - 15) + 10);
-}
-
-/**
- * Real-time viewport adjustment to guarantee cursor is always inside the visible viewport.
- * Ported from proven reference architecture with 15% inner safety margin.
- * When zoomed in, shifts viewport center if cursor exceeds safe zone, and slightly scales zoom
- * near screen edges to guarantee cursor is 100% visible.
- */
-export function ensureCursorVisible(focusX, focusY, scale, cursorX, cursorY, marginRatio = 0.15) {
-    if (scale <= 1.001) return { x: 0.5, y: 0.5, scale: 1.0 };
-    const currentZoom = scale;
-    const vSize = 1.0 / currentZoom;
-    const margin = vSize * marginRatio;
-
-    let vLeft = focusX - vSize / 2;
-    let vTop = focusY - vSize / 2;
-
-    const innerLeft = vLeft + margin;
-    const innerRight = vLeft + vSize - margin;
-    const innerTop = vTop + margin;
-    const innerBottom = vTop + vSize - margin;
-
-    // Fast path: cursor is inside calm safe zone
-    if (cursorX >= innerLeft && cursorX <= innerRight && cursorY >= innerTop && cursorY <= innerBottom) {
-        return { x: focusX, y: focusY, scale: currentZoom };
-    }
-
-    let newLeft = vLeft;
-    let newTop = vTop;
-
-    if (cursorX < innerLeft) {
-        newLeft = cursorX - margin;
-    } else if (cursorX > innerRight) {
-        newLeft = cursorX - vSize + margin;
-    }
-
-    if (cursorY < innerTop) {
-        newTop = cursorY - margin;
-    } else if (cursorY > innerBottom) {
-        newTop = cursorY - vSize + margin;
-    }
-
-    newLeft = Math.max(0, Math.min(1.0 - vSize, newLeft));
-    newTop = Math.max(0, Math.min(1.0 - vSize, newTop));
-
-    const curVisible = cursorX >= newLeft && cursorX <= newLeft + vSize && cursorY >= newTop && cursorY <= newTop + vSize;
-    if (curVisible) {
-        return { x: newLeft + vSize / 2, y: newTop + vSize / 2, scale: currentZoom };
-    }
-
-    // Extreme screen edge guard: dynamically adjust zoom scale just enough so cursor has margin
-    const distLeft = Math.max(0, cursorX - 0.05);
-    const distRight = Math.max(0, 1.0 - cursorX - 0.05);
-    const distTop = Math.max(0, cursorY - 0.05);
-    const distBottom = Math.max(0, 1.0 - cursorY - 0.05);
-    const maxZx = 0.5 / Math.max(0.001, Math.min(distLeft, distRight));
-    const maxZy = 0.5 / Math.max(0.001, Math.min(distTop, distBottom));
-    const effectiveZoom = Math.max(1.0, Math.min(currentZoom, Math.min(maxZx, maxZy)));
-    const newVSize = 1.0 / effectiveZoom;
-    const finalLeft = Math.max(0, Math.min(1.0 - newVSize, cursorX - newVSize / 2));
-    const finalTop = Math.max(0, Math.min(1.0 - newVSize, cursorY - newVSize / 2));
-    return { x: finalLeft + newVSize / 2, y: finalTop + newVSize / 2, scale: effectiveZoom };
-}
-
-/**
- * Evaluate camera target and zoom at precise timestamp
- * Implements OpenScreen's dominant region tracking, connected zoom pans, and safe viewport bounds
+ * Evaluate the camera at a timestamp.
+ *
+ * Samples the precomputed spring-smoothed camera track (see zoom/cameraTrack.js),
+ * so the result is deterministic, continuous across segment boundaries and
+ * identical between preview and export.
+ *
+ * @returns {{x:number, y:number, scale:number, rotateX:number, rotateY:number, activeSeg:Object|null}}
  */
 export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples = [], options = {}) {
-    const zoomMultiplier = options.zoomMultiplier ?? 1.0;
-    let rampInDuration = options.transitionDuration ?? ZOOM_DYNAMICS.rampInDuration ?? 0.90; // 0.90s calm cinematic anticipation
-    let rampOutDuration = ZOOM_DYNAMICS.rampOutDuration ?? 1.05; // 1.05s zero-velocity overview landing
-    let panDuration = 0.85;
-    if (options.springProfile === 'snappy' || options.springProfile === 'punchy') {
-        rampInDuration = 0.45;
-        rampOutDuration = 0.55;
-        panDuration = 0.50;
-    } else if (options.springProfile === 'cinematic') {
-        rampInDuration = 0.95;
-        rampOutDuration = 1.05;
-        panDuration = 0.85;
-    } else if (options.springProfile === 'gentle' || options.springProfile === 'natural') {
-        rampInDuration = 0.75;
-        rampOutDuration = 0.90;
-        panDuration = 0.75;
-    }
-    const transitionDuration = rampInDuration;
-    const CHAINED_PAN_GAP_SEC = ZOOM_DYNAMICS.chainedPanGapSec; // Chained pan threshold
-
     if (!focusSegments || focusSegments.length === 0) {
         return { x: 0.5, y: 0.5, scale: 1.0, rotateX: 0, rotateY: 0, activeSeg: null };
     }
 
-    // Sort segments chronologically
-    const sorted = [...focusSegments].sort((a, b) => a.startTime - b.startTime);
-
-    // 1. Check if we are inside a connected transition between two consecutive zoom regions
-    for (let i = 0; i < sorted.length - 1; i++) {
-        const segA = sorted[i];
-        const segB = sorted[i + 1];
-        const gap = segB.startTime - segA.endTime;
-
-        const isConnectable = options.connectedZooms !== false &&
-            gap <= CHAINED_PAN_GAP_SEC &&
-            !['overview', 'spotlight', 'full-camera'].includes(segA.sceneMode) &&
-            !['overview', 'spotlight', 'full-camera'].includes(segB.sceneMode);
-
-        if (isConnectable) {
-            const panDur = Math.min(
-                panDuration,
-                0.85,
-                Math.max(0.15, (segA.endTime - segA.startTime) * 0.7),
-                Math.max(0.15, (segB.endTime - segB.startTime) * 0.7)
-            );
-
-            let tranStart, tranEnd;
-            if (gap <= panDur) {
-                const tJunction = (segA.endTime + segB.startTime) / 2;
-                tranStart = tJunction - panDur / 2;
-                tranEnd = tJunction + panDur / 2;
-            } else {
-                tranStart = segB.startTime - panDur;
-                tranEnd = segB.startTime;
-
-                // Hold calm focus on segA during pre-pan gap instead of lethargic crawling or dropping to overview
-                if (timeSec >= segA.endTime && timeSec < tranStart) {
-                    let holdX = segA.targetX ?? 0.5;
-                    let holdY = segA.targetY ?? 0.5;
-                    let scaleA = (segA.zoomScale ?? DEFAULT_ZOOM_SCALE) * zoomMultiplier;
-                    if (options.trackCursor !== false && mouseSamples && mouseSamples.length > 0) {
-                        const cursor = getInterpolatedCursor(timeSec, mouseSamples);
-                        if (cursor && Number.isFinite(cursor.x) && Number.isFinite(cursor.y)) {
-                            const dx = cursor.x - holdX;
-                            const dy = cursor.y - holdY;
-                            const dist = Math.hypot(dx, dy);
-                            const dz = segA.deadzoneRadius ?? ZOOM_DYNAMICS.deadzoneRadius;
-                            if (dist > dz) {
-                                const rOuter = Math.max(dz + 0.12, dz * 2.2);
-                                const t = Math.min(1.0, (dist - dz) / (rOuter - dz));
-                                const hermite = t * t * (3 - 2 * t);
-                                const pull = ((dist - dz) / dist) * hermite;
-                                const damping = ZOOM_DYNAMICS.trackDamping ?? 0.35;
-                                holdX += dx * pull * damping;
-                                holdY += dy * pull * damping;
-                            }
-                            if (scaleA > 1.05) {
-                                const adj = ensureCursorVisible(holdX, holdY, scaleA, cursor.x, cursor.y);
-                                holdX = adj.x;
-                                holdY = adj.y;
-                                scaleA = adj.scale;
-                            }
-                        }
-                    }
-                    const clamped = clampFocusToScale({ cx: holdX, cy: holdY }, scaleA);
-                    const tilt = calculate3DTilt(clamped.cx, clamped.cy, scaleA, options.tiltAngle ?? 0);
-                    return {
-                        x: clamped.cx,
-                        y: clamped.cy,
-                        scale: scaleA,
-                        rotateX: tilt.rotateX,
-                        rotateY: tilt.rotateY,
-                        activeSeg: segA,
-                        isConnectedPan: false,
-                    };
-                }
-            }
-
-            if (timeSec >= tranStart && timeSec <= tranEnd) {
-                const span = tranEnd - tranStart;
-                const panProgress = span <= 0.001 ? 1 : Math.max(0, Math.min(1, (timeSec - tranStart) / span));
-                const easedPan = easeConnectedPan(panProgress);
-
-                const scaleA = (segA.zoomScale ?? DEFAULT_ZOOM_SCALE) * zoomMultiplier;
-                const scaleB = (segB.zoomScale ?? DEFAULT_ZOOM_SCALE) * zoomMultiplier;
-                const connectedScale = scaleA + (scaleB - scaleA) * easedPan;
-
-                // Sample focus at transition start including dynamic tracking so there is zero position jump
-                let startX = segA.targetX ?? 0.5;
-                let startY = segA.targetY ?? 0.5;
-                if (options.trackCursor !== false && mouseSamples && mouseSamples.length > 0) {
-                    const cursorAtStart = getInterpolatedCursor(tranStart, mouseSamples);
-                    if (cursorAtStart && Number.isFinite(cursorAtStart.x) && Number.isFinite(cursorAtStart.y)) {
-                        const dx = cursorAtStart.x - startX;
-                        const dy = cursorAtStart.y - startY;
-                        const dist = Math.hypot(dx, dy);
-                        const dz = segA.deadzoneRadius ?? ZOOM_DYNAMICS.deadzoneRadius;
-                        if (dist > dz) {
-                            const rOuter = Math.max(dz + 0.12, dz * 2.2);
-                            const t = Math.min(1.0, (dist - dz) / (rOuter - dz));
-                            const hermite = t * t * (3 - 2 * t);
-                            const pull = ((dist - dz) / dist) * hermite;
-                            const damping = ZOOM_DYNAMICS.trackDamping ?? 0.35;
-                            startX += dx * pull * damping;
-                            startY += dy * pull * damping;
-                        }
-                    }
-                }
-
-                // Sample focus at transition end including dynamic tracking for seamless landing
-                let endX = segB.targetX ?? 0.5;
-                let endY = segB.targetY ?? 0.5;
-                if (options.trackCursor !== false && mouseSamples && mouseSamples.length > 0) {
-                    const cursorAtEnd = getInterpolatedCursor(tranEnd, mouseSamples);
-                    if (cursorAtEnd && Number.isFinite(cursorAtEnd.x) && Number.isFinite(cursorAtEnd.y)) {
-                        const dx = cursorAtEnd.x - endX;
-                        const dy = cursorAtEnd.y - endY;
-                        const dist = Math.hypot(dx, dy);
-                        const dz = segB.deadzoneRadius ?? ZOOM_DYNAMICS.deadzoneRadius;
-                        if (dist > dz) {
-                            const rOuter = Math.max(dz + 0.12, dz * 2.2);
-                            const t = Math.min(1.0, (dist - dz) / (rOuter - dz));
-                            const hermite = t * t * (3 - 2 * t);
-                            const pull = ((dist - dz) / dist) * hermite;
-                            const damping = ZOOM_DYNAMICS.trackDamping ?? 0.35;
-                            endX += dx * pull * damping;
-                            endY += dy * pull * damping;
-                        }
-                    }
-                }
-
-                const startFocus = clampFocusToScale({ cx: startX, cy: startY }, scaleA);
-                const endFocus = clampFocusToScale({ cx: endX, cy: endY }, scaleB);
-
-                const panX = startFocus.cx + (endFocus.cx - startFocus.cx) * easedPan;
-                const panY = startFocus.cy + (endFocus.cy - startFocus.cy) * easedPan;
-
-                const clampedFocus = clampFocusToScale({ cx: panX, cy: panY }, connectedScale);
-                const tilt = calculate3DTilt(clampedFocus.cx, clampedFocus.cy, connectedScale, options.tiltAngle ?? 0);
-
-                return {
-                    x: clampedFocus.cx,
-                    y: clampedFocus.cy,
-                    scale: connectedScale,
-                    rotateX: tilt.rotateX,
-                    rotateY: tilt.rotateY,
-                    activeSeg: panProgress < 0.5 ? segA : segB,
-                    isConnectedPan: true,
-                };
-            }
-        }
-    }
-
-    // 2. Find active focus segment
-    let activeSeg = null;
-    let blendWeight = 0;
-    let isRampingDown = false;
-    let rampDownStartTime = 0;
-
-    for (let i = 0; i < sorted.length; i++) {
-        const seg = sorted[i];
-        const nextSeg = sorted[i + 1];
-        const prevSeg = sorted[i - 1];
-
-        const canConnect = (a, b) => options.connectedZooms !== false && a && b &&
-            (b.startTime - a.endTime <= CHAINED_PAN_GAP_SEC) &&
-            !['overview', 'spotlight', 'full-camera'].includes(a.sceneMode) &&
-            !['overview', 'spotlight', 'full-camera'].includes(b.sceneMode);
-
-        const hasConnectedNext = canConnect(seg, nextSeg);
-        const hasConnectedPrevious = canConnect(prevSeg, seg);
-        const rampUpDuration = Math.min(rampInDuration, (seg.endTime - seg.startTime) / 2);
-        const rampDownDuration = Math.min(rampOutDuration, (seg.endTime - seg.startTime) / 2);
-
-        const leadIn = seg.startTime;
-        const rampUpEnd = seg.startTime + rampUpDuration;
-        const rampDownStart = seg.endTime - rampDownDuration;
-        const leadOut = seg.endTime;
-
-        if (timeSec >= leadIn && timeSec <= leadOut) {
-            activeSeg = seg;
-            rampDownStartTime = rampDownStart;
-            if (timeSec < rampUpEnd && !hasConnectedPrevious) {
-                // Zooming in with cinema cubic bezier easing
-                const progress = Math.max(0, Math.min(1, (timeSec - leadIn) / rampUpDuration));
-                blendWeight = easeOutScreenStudio(progress);
-            } else if (timeSec > rampDownStart && !hasConnectedNext) {
-                // Silky zoom out returning to overview: zero-velocity landing
-                isRampingDown = true;
-                const progress = Math.max(0, Math.min(1, (timeSec - rampDownStart) / rampDownDuration));
-                blendWeight = 1 - easeOutScreenStudio(progress);
-            } else {
-                // Fully zoomed in or connected transition hold
-                blendWeight = 1.0;
-            }
-            break;
-        }
-    }
-
-    if (!activeSeg || blendWeight <= 0.001) {
-        return { x: 0.5, y: 0.5, scale: 1.0, rotateX: 0, rotateY: 0, activeSeg: null };
-    }
-
-    // Scene Mode: Spotlight and Overview keep screen framing unzoomed
-    if (activeSeg.sceneMode === 'spotlight' || activeSeg.sceneMode === 'overview' || activeSeg.sceneMode === 'full-camera') {
-        return {
-            x: 0.5,
-            y: 0.5,
-            scale: 1.0,
-            rotateX: 0,
-            rotateY: 0,
-            activeSeg,
-        };
-    }
-
-    // Target zoom scale
-    let targetScale = 1.0 + (Math.max(1, (activeSeg.zoomScale ?? DEFAULT_ZOOM_SCALE) * zoomMultiplier) - 1.0) * blendWeight;
-
-    // Anchor focus point
-    let focusX = activeSeg.targetX ?? 0.5;
-    let focusY = activeSeg.targetY ?? 0.5;
-
-    // Calm S-tier cursor framing during active zoom (no sloppy handheld shake)
-    if (options.trackCursor !== false && mouseSamples && mouseSamples.length > 0 && blendWeight > 0.02) {
-        // Freeze tracking at rampDownStart so zoom-out glides straight to overview without snapping back
-        const sampleTime = isRampingDown ? rampDownStartTime : timeSec;
-        const cursor = getInterpolatedCursor(sampleTime, mouseSamples);
-        if (cursor && Number.isFinite(cursor.x) && Number.isFinite(cursor.y)) {
-            const dx = cursor.x - focusX;
-            const dy = cursor.y - focusY;
-            const dist = Math.hypot(dx, dy);
-            // Calm wide deadzone: cursor moves freely within center of screen without camera shake
-            const deadzone = activeSeg.deadzoneRadius ?? ZOOM_DYNAMICS.deadzoneRadius;
-            if (dist > deadzone) {
-                const rOuter = Math.max(deadzone + 0.12, deadzone * 2.2);
-                const t = Math.min(1.0, (dist - deadzone) / (rOuter - deadzone));
-                const hermite = t * t * (3 - 2 * t);
-                const pull = ((dist - deadzone) / dist) * hermite;
-                // Heavy studio damping: steady cinematic reframing, zero wobbly float
-                const damping = ZOOM_DYNAMICS.trackDamping ?? 0.35;
-                const trackInfluence = Math.min(damping, (isRampingDown ? damping : blendWeight * damping));
-                focusX += dx * pull * trackInfluence;
-                focusY += dy * pull * trackInfluence;
-            }
-
-            // Real-time viewport constraint: guarantee cursor is 100% visible inside safe zone
-            if (targetScale > 1.05 && blendWeight > 0.1) {
-                const adjusted = ensureCursorVisible(focusX, focusY, targetScale, cursor.x, cursor.y);
-                focusX = adjusted.x;
-                focusY = adjusted.y;
-                targetScale = adjusted.scale;
-            }
-        }
-    }
-
-    // Blend camera position from neutral 0.5 to focusX, focusY by blendWeight
-    const curX = 0.5 + (focusX - 0.5) * blendWeight;
-    const curY = 0.5 + (focusY - 0.5) * blendWeight;
-
-    // Strict boundary clamping so screen background is never exposed
-    const clampedFocus = clampFocusToScale({ cx: curX, cy: curY }, targetScale);
-
-    const tilt = calculate3DTilt(clampedFocus.cx, clampedFocus.cy, targetScale, options.tiltAngle ?? 0);
+    const track = getCameraTrack(focusSegments, mouseSamples, {
+        springProfile: options.springProfile,
+        zoomMultiplier: options.zoomMultiplier ?? 1.0,
+        connectedZooms: options.connectedZooms,
+        trackCursor: options.trackCursor,
+        duration: options.duration,
+    });
+    const cam = sampleCameraTrack(track, timeSec);
+    const tilt = calculate3DTilt(cam.x, cam.y, cam.scale, options.tiltAngle ?? 0);
 
     return {
-        x: clampedFocus.cx,
-        y: clampedFocus.cy,
-        scale: targetScale,
+        x: cam.x,
+        y: cam.y,
+        scale: cam.scale,
+        focusX: cam.focusX,
+        focusY: cam.focusY,
         rotateX: tilt.rotateX,
         rotateY: tilt.rotateY,
-        activeSeg,
+        activeSeg: cam.activeSeg,
     };
 }
 

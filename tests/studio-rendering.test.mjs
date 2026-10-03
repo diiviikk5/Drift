@@ -15,19 +15,24 @@ test('connected zoom stays continuous when entering the next segment', () => {
     assert.ok(Math.abs(before.x - after.x) < 0.001);
 });
 
-test('disabling connected zoom returns to overview in the gap', () => {
-    assert.equal(evaluateCameraAtTime(2.5, segments, [], { connectedZooms: false }).scale, 1);
+test('disabling connected zoom eases out in the gap instead of holding', () => {
+    const held = evaluateCameraAtTime(2.6, segments);
+    const released = evaluateCameraAtTime(2.6, segments, [], { connectedZooms: false });
+    assert.ok(held.scale > 1.9, `connected zoom should hold, got ${held.scale}`);
+    assert.ok(released.scale < held.scale - 0.2, `disconnected zoom should ease out, got ${released.scale}`);
 });
 
 test('overview scenes do not join zoom chains', () => {
     const scenes = [segments[0], { ...segments[1], sceneMode: 'overview' }];
-    assert.equal(evaluateCameraAtTime(2.5, scenes).scale, 1);
-    assert.equal(evaluateCameraAtTime(3.5, scenes).scale, 1);
+    const chained = evaluateCameraAtTime(2.6, segments);
+    assert.ok(evaluateCameraAtTime(2.6, scenes).scale < chained.scale - 0.2);
+    assert.ok(evaluateCameraAtTime(4.9, scenes).scale < 1.05);
 });
 
 test('short zooms return smoothly to overview', () => {
     const short = [{ ...segments[0], endTime: 0.4 }];
-    assert.ok(evaluateCameraAtTime(0.39999, short).scale < 1.001);
+    assert.ok(evaluateCameraAtTime(0.4, short).scale < 2);
+    assert.equal(evaluateCameraAtTime(4, short).scale, 1);
 });
 
 test('cursor interpolation accepts recorder timestamps, including zero', () => {
@@ -201,24 +206,25 @@ test('renderFrame renders animated keystroke overlay without throwing', () => {
     assert.ok(textRendered, 'Keystroke text should be rendered');
 });
 
-test('evaluateCameraAtTime smoothly decelerates to overview with zero exit velocity and no snap', () => {
+test('evaluateCameraAtTime eases out after the segment with no snap and lands at rest', () => {
     const singleZoom = [
         { startTime: 1.0, endTime: 4.0, zoomScale: 2.0, targetX: 0.3, targetY: 0.4 },
     ];
-    // rampDownStart is around 4.0 - 0.7 = 3.3s
-    const midExit = evaluateCameraAtTime(3.65, singleZoom);
-    const nearExit = evaluateCameraAtTime(3.95, singleZoom);
-    const postExit = evaluateCameraAtTime(4.01, singleZoom);
+    const held = evaluateCameraAtTime(3.9, singleZoom);
+    assert.ok(held.scale > 1.97, `expected full zoom before exit, got ${held.scale}`);
 
-    // Zoom should be gradually decreasing
-    assert.ok(midExit.scale < 2.0 && midExit.scale > 1.0);
-    assert.ok(nearExit.scale < midExit.scale && nearExit.scale > 1.0);
-    // Near exit should be extremely close to 1.0 (smooth landing without abrupt drop)
-    assert.ok(nearExit.scale < 1.08, `Expected near-exit scale < 1.08, got ${nearExit.scale}`);
-    assert.equal(postExit.scale, 1.0);
-    // Position should also smoothly blend back to neutral (0.5, 0.5)
-    assert.ok(Math.abs(nearExit.x - 0.5) < 0.05);
-    assert.ok(Math.abs(nearExit.y - 0.5) < 0.05);
+    let prev = held.scale;
+    let maxStep = 0;
+    for (let t = 3.9; t <= 6.5; t += 1 / 60) {
+        const cam = evaluateCameraAtTime(t, singleZoom);
+        assert.ok(cam.scale <= prev + 1e-6, `zoom-out must be monotonic (t=${t.toFixed(3)})`);
+        maxStep = Math.max(maxStep, prev - cam.scale);
+        prev = cam.scale;
+    }
+    assert.ok(maxStep < 0.05, `per-frame scale change too large: ${maxStep}`);
+    const landed = evaluateCameraAtTime(6.5, singleZoom);
+    assert.ok(landed.scale < 1.01);
+    assert.ok(Math.abs(landed.x - 0.5) < 0.01 && Math.abs(landed.y - 0.5) < 0.01);
 });
 
 test('ZoomConstruct provides global presets and resolves subtle, cinema, and focus levels', async () => {

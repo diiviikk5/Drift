@@ -100,7 +100,7 @@ export class StudioEngine {
         this.focusSegments = (options.focusSegments && options.focusSegments.length > 0)
             ? options.focusSegments
             : (this.autoZoomOnClicks
-                ? this.interactionAnalyzer.analyze(this.clicks, this.mouseMoves, this.explicitDuration || 10)
+                ? this.interactionAnalyzer.analyze(this.clicks, this.mouseMoves, this.explicitDuration || 10, this.keystrokes)
                 : []
             );
 
@@ -152,62 +152,25 @@ export class StudioEngine {
             this.tauriInvoke = invoke;
             console.log('[Studio] Tauri mode — using Rust zoom engine');
 
-            // Generate zoom segments in Rust only if user explicitly enabled auto-zoom on clicks
-            if (this.autoZoomOnClicks) {
-                await this._generateSegments();
-            } else {
-                this.zoomSegments = [];
-            }
             this.tauriReady = true;
         } catch {
             console.log('[Studio] Browser fallback — no Tauri available');
         }
     }
 
+    /**
+     * Re-run the automatic zoom planner over the session telemetry.
+     * Manual segments the user added are preserved.
+     */
     async _generateSegments() {
-        if (!this.tauriInvoke) return;
-
-        try {
-            const clickEvents = this.clicks.map(c => ({
-                time: c.time,
-                x: c.x,
-                y: c.y,
-                down: true,
-            }));
-
-            const moveEvents = (this.mouseMoves || []).map(m => ({
-                time: m.time,
-                x: m.x,
-                y: m.y,
-            }));
-
-            const durationMs = (this.explicitDuration || 10) * 1000;
-
-            this.zoomSegments = await this.tauriInvoke('generate_zoom_segments', {
-                clicks: clickEvents,
-                moves: moveEvents,
-                durationMs: durationMs,
-            });
-
-            if (this.zoomSegments && this.zoomSegments.length > 0 && (!this.focusSegments || this.focusSegments.length === 0)) {
-                this.focusSegments = this.zoomSegments.map((s, idx) => ({
-                    id: `focus_seg_${idx}_${Math.round(s.start * 10)}`,
-                    startTime: s.start,
-                    endTime: s.end,
-                    targetX: s.target_x ?? 0.5,
-                    targetY: s.target_y ?? 0.5,
-                    zoomScale: s.amount || DEFAULT_ZOOM_SCALE,
-                    reason: 'click',
-                    sceneMode: 'zoom',
-                    deadzoneRadius: 0.18,
-                }));
-            }
-
-            console.log('[Studio] Rust generated', this.zoomSegments.length, 'zoom segments');
-        } catch (e) {
-            console.error('[Studio] Segment generation failed:', e);
-            this.zoomSegments = [];
-        }
+        const dur = this.videoDuration || this.explicitDuration || 10;
+        const auto = this.interactionAnalyzer.analyze(this.clicks, this.mouseMoves, dur, this.keystrokes);
+        const manual = (this.focusSegments || []).filter(s => !s.auto);
+        const kept = manual.length
+            ? auto.filter(a => !manual.some(m => a.startTime < m.endTime && a.endTime > m.startTime))
+            : auto;
+        this.setFocusSegments([...manual, ...kept].sort((a, b) => a.startTime - b.startTime));
+        return this.focusSegments;
     }
 
     init() {
@@ -532,10 +495,8 @@ export class StudioEngine {
         this.autoZoomOnClicks = Boolean(enabled);
         if (this.autoZoomOnClicks) {
             const dur = this.videoDuration || this.explicitDuration || 10;
-            this.focusSegments = this.interactionAnalyzer.analyze(this.clicks, this.mouseMoves, dur);
-            if (this.isTauri) {
-                await this._generateSegments();
-            }
+            this.focusSegments = this.interactionAnalyzer.analyze(this.clicks, this.mouseMoves, dur, this.keystrokes);
+            this.setFocusSegments(this.focusSegments);
         } else {
             this.resetToOverview();
         }
@@ -556,6 +517,7 @@ export class StudioEngine {
     updateClick(index, updates) {
         if (index < 0 || index >= this.clicks.length) return;
         Object.assign(this.clicks[index], updates);
+        if (!this.autoZoomOnClicks) return;
         this._generateSegments().then(() => {
             if (!this.isPlaying) {
                 this.updateCamera();
@@ -869,10 +831,18 @@ export class StudioEngine {
     }
 
     setZoomLevel(level) {
+        const prevLevel = this.zoomLevel || DEFAULT_ZOOM_SCALE;
         this.zoomLevel = Math.max(1.0, Math.min(4.0, Number(level) || DEFAULT_ZOOM_SCALE));
+        this.interactionAnalyzer.options.defaultZoomScale = this.zoomLevel;
         if (this.focusSegments && this.focusSegments.length > 0) {
             this.focusSegments.forEach(s => {
-                s.zoomScale = this.zoomLevel;
+                if (s.auto && Number.isFinite(s.zoomScale)) {
+                    // Auto zooms keep their fitted depth relative to the preset.
+                    const scaled = s.zoomScale * (this.zoomLevel / prevLevel);
+                    s.zoomScale = Math.round(Math.max(1.15, Math.min(this.zoomLevel, scaled)) * 100) / 100;
+                } else {
+                    s.zoomScale = this.zoomLevel;
+                }
             });
             this.zoomSegments = this.focusSegments.map(s => ({
                 start: s.startTime,
@@ -1107,7 +1077,6 @@ export class StudioEngine {
         this.video.pause();
         this.video.currentTime = this.trimStart || 0;
         this.camera = { x: 0.5, y: 0.5, scale: 1 };
-        await this._generateSegments();
         await new Promise(r => setTimeout(r, 300));
 
         const effectiveDuration = this.videoDuration || this.explicitDuration || this.video?.duration || 10;
@@ -1553,7 +1522,6 @@ export class StudioEngine {
         this.video.pause();
         this.video.currentTime = this.trimStart || 0;
         this.camera = { x: 0.5, y: 0.5, scale: 1 };
-        await this._generateSegments();
         await new Promise(r => setTimeout(r, 300));
 
         const exportDuration = (this.trimEnd || this.videoDuration) - (this.trimStart || 0);
