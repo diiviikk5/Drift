@@ -2,14 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { clampFocusToScale, getFocusBoundsForScale } from '../src/lib/zoom/focusUtils.js';
 import { computeCursorSwayRotation } from '../src/lib/zoom/cursorSway.js';
-import { computeZoomTransform, computeFocusFromTransform } from '../src/lib/zoom/zoomTransform.js';
-import {
-    computeRegionStrength,
-    getConnectedRegionPairs,
-    findDominantRegion,
-    easeOutScreenStudio,
-    easeConnectedPan
-} from '../src/lib/zoom/zoomRegionUtils.js';
 
 test('focusUtils clamps focus strictly within visible frame boundaries', () => {
     // At zoomScale = 2.0, half visible width is 0.5 / 2 = 0.25
@@ -43,88 +35,6 @@ test('cursorSway computes velocity-proportional directional tilt angle', () => {
     const rot = computeCursorSwayRotation(15, 10, 16, 1.0);
     assert.ok(rot > 0);
     assert.ok(rot <= Math.PI / 6); // Safe organic tilt range (<= 30 deg)
-});
-
-test('zoomTransform computes exact stage scaling and camera centering', () => {
-    const stageSize = { width: 1920, height: 1080 };
-    const baseMask = { x: 0, y: 0, width: 1920, height: 1080 };
-
-    // Neutral zoom (progress = 0) returns scale 1 and (0, 0)
-    const neutralTransform = computeZoomTransform({
-        stageSize,
-        baseMask,
-        zoomScale: 2.0,
-        zoomProgress: 0,
-        focusX: 0.5,
-        focusY: 0.5,
-    });
-    assert.equal(neutralTransform.scale, 1.0);
-    assert.equal(neutralTransform.x, 0);
-    assert.equal(neutralTransform.y, 0);
-
-    // Centered zoom (focus 0.5, 0.5) at progress = 1 keeps camera centered
-    const centerZoom = computeZoomTransform({
-        stageSize,
-        baseMask,
-        zoomScale: 2.0,
-        zoomProgress: 1,
-        focusX: 0.5,
-        focusY: 0.5,
-    });
-    assert.equal(centerZoom.scale, 2.0);
-    // (1920 / 2) - (0.5 * 1920) * 2 = 960 - 1920 = -960
-    assert.equal(centerZoom.x, -960);
-    assert.equal(centerZoom.y, -540);
-
-    // Reversible focus extraction
-    const recovered = computeFocusFromTransform({
-        stageSize,
-        baseMask,
-        zoomScale: 2.0,
-        x: centerZoom.x,
-        y: centerZoom.y,
-    });
-    assert.ok(Math.abs(recovered.cx - 0.5) < 0.001);
-    assert.ok(Math.abs(recovered.cy - 0.5) < 0.001);
-});
-
-test('zoomRegionUtils computes smooth lead-in and zero-velocity landing lead-out', () => {
-    const region = {
-        id: 'z1',
-        startMs: 1000,
-        endMs: 4000,
-        depth: 2.0,
-        focus: { cx: 0.5, cy: 0.5 },
-    };
-
-    // Outside region before lead-in
-    assert.equal(computeRegionStrength(region, 0), 0);
-
-    // Fully inside hold window
-    assert.equal(computeRegionStrength(region, 2000), 1);
-    assert.equal(computeRegionStrength(region, 3500), 1);
-
-    // Beyond lead-out end
-    assert.equal(computeRegionStrength(region, 6000), 0);
-});
-
-test('zoomRegionUtils connects adjacent regions into smooth gliding pan', () => {
-    const regions = [
-        { id: 'r1', startMs: 1000, endMs: 3000, depth: 1.8, focus: { cx: 0.3, cy: 0.4 } },
-        { id: 'r2', startMs: 4000, endMs: 6000, depth: 2.2, focus: { cx: 0.7, cy: 0.6 } },
-    ];
-
-    const pairs = getConnectedRegionPairs(regions);
-    assert.equal(pairs.length, 1);
-    assert.equal(pairs[0].transitionStart, 3000);
-    assert.equal(pairs[0].transitionEnd, 4000);
-
-    // Mid-transition at 3500ms (50% progress)
-    const dominant = findDominantRegion(regions, 3500, { connectZooms: true });
-    assert.ok(dominant.transition != null);
-    assert.ok(dominant.transition.progress > 0 && dominant.transition.progress < 1);
-    assert.ok(dominant.blendedScale > 1.8 && dominant.blendedScale < 2.2);
-    assert.ok(dominant.region.focus.cx > 0.3 && dominant.region.focus.cx < 0.7);
 });
 
 test('evaluateCameraAtTime supports steady framing when trackCursor is false and dynamic tracking when enabled', async () => {

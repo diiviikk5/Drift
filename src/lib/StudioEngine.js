@@ -6,7 +6,7 @@ import { isTauri } from './tauri-bridge.js';
 import { InteractionAnalyzer } from './zoom/InteractionAnalyzer.js';
 import { renderFrame, getFrameMetrics, evaluateCameraAtTime, getInterpolatedCursor } from './rendering/renderFrame.js';
 import { getSmoothedCursorPath } from './zoom/cursorPathSmoothing.js';
-import { ZOOM_PRESETS, DEFAULT_ZOOM_SCALE, ZOOM_DYNAMICS, resolveZoomPreset } from './zoom/ZoomConstruct.js';
+import { ZOOM_PRESETS, DEFAULT_ZOOM_SCALE, resolveZoomPreset } from './zoom/ZoomConstruct.js';
 
 const FRAME_SCALE = 0.82;
 const TITLE_BAR_HEIGHT = 36;
