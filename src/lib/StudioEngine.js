@@ -1484,14 +1484,16 @@ export class StudioEngine {
                         return;
                     }
 
+                    this.video.addEventListener('seeked', onSeeked, { once: true });
                     this.video.currentTime = targetTime;
                     if (this.webcamVideo) {
-                        this.webcamVideo.currentTime = targetTime;
+                        this.webcamVideo.currentTime = Math.max(0, targetTime + (this.webcamOffset || 0));
                     }
 
-                    this.video.addEventListener('seeked', onSeeked, { once: true });
-                    // Safety timeout in case seeked event hangs on boundary frames
-                    timeoutId = setTimeout(() => finishFrame(), 150);
+                    // Safety net only for a seek that never reports back. Long-GOP H.264
+                    // seeks routinely exceed 150 ms; giving up early encoded stale video
+                    // frames under a moving camera (visible stutter in exports).
+                    timeoutId = setTimeout(() => finishFrame(), 2500);
                 });
             };
 
