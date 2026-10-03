@@ -635,6 +635,7 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
             videoH,
             cameraScale: camera.scale,
             borderRadius: radius,
+            unit,
         });
     }
 
@@ -729,13 +730,50 @@ function _drawSquirclePath(ctx, x, y, size) {
 /**
  * Draw Webcam Picture-in-Picture with sleek styling & clipping
  */
-function _drawWebcamPiP(ctx, webcamSource, settings, bounds) {
+let _webcamHold = null;
+let _webcamHoldSource = null;
+
+/**
+ * Webcam frame to draw this tick. A <video> that is mid-seek or buffering has
+ * no frame to give (readyState < 2), which used to make the PiP blink out in
+ * playback and vanish from exports; instead we keep showing the last good frame.
+ */
+function _stableWebcamFrame(source) {
+    const isVideo = typeof source.readyState === 'number';
+    const ready = !isVideo || (source.readyState >= 2 && source.videoWidth > 0);
+    if (ready) {
+        if (isVideo && (typeof OffscreenCanvas !== 'undefined' || typeof document !== 'undefined')) {
+            try {
+                const vw = source.videoWidth;
+                const vh = source.videoHeight;
+                const w = Math.min(vw, 720);
+                const h = Math.round(vh * (w / vw));
+                if (!_webcamHold || _webcamHold.width !== w || _webcamHold.height !== h) {
+                    _webcamHold = typeof OffscreenCanvas !== 'undefined'
+                        ? new OffscreenCanvas(w, h)
+                        : Object.assign(document.createElement('canvas'), { width: w, height: h });
+                }
+                _webcamHold.getContext('2d').drawImage(source, 0, 0, w, h);
+                _webcamHoldSource = source;
+            } catch {
+                // keep previous hold frame
+            }
+        }
+        return source;
+    }
+    return _webcamHold && _webcamHoldSource === source ? _webcamHold : null;
+}
+
+function _drawWebcamPiP(ctx, webcamSourceIn, settings, bounds) {
+    const webcamSource = _stableWebcamFrame(webcamSourceIn);
+    if (!webcamSource) return;
+    const unit = bounds.unit || 1;
     const {
         shape = 'circle',
         position = 'bottom-right',
         size: sizeRatio = 0.22,
         mirrored = false,
-        borderWidth: defaultBorderWidth = 3,
+        borderWidth: defaultBorderWidth = 3 * unit,
         borderColor: defaultBorderColor = 'rgba(255, 255, 255, 0.25)',
     } = settings || {};
 
@@ -774,7 +812,7 @@ function _drawWebcamPiP(ctx, webcamSource, settings, bounds) {
         renderH = size;
         x = bounds.padX + (bounds.frameW - size) / 2;
         y = bounds.padY + (bounds.videoH - size) / 2;
-        borderWidth = 3.5;
+        borderWidth = 3.5 * unit;
         borderColor = '#DCFE50';
     } else if (position === 'top-left') {
         x = bounds.padX + margin;
@@ -812,8 +850,8 @@ function _drawWebcamPiP(ctx, webcamSource, settings, bounds) {
     // Ambient drop shadow behind webcam
     ctx.save();
     ctx.shadowColor = isSpotlight ? 'rgba(220, 254, 80, 0.45)' : 'rgba(0, 0, 0, 0.55)';
-    ctx.shadowBlur = isSpotlight ? 38 : 24;
-    ctx.shadowOffsetY = isSpotlight ? 4 : 10;
+    ctx.shadowBlur = (isSpotlight ? 38 : 24) * unit;
+    ctx.shadowOffsetY = (isSpotlight ? 4 : 10) * unit;
     ctx.fillStyle = '#000000';
     drawShape();
     ctx.fill();

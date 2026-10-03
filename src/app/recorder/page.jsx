@@ -1009,11 +1009,28 @@ export default function RecorderPage() {
                     // Finalize native webcam recording if active
                     if (nativeWebcamRecorderRef.current) {
                         try {
-                            if (nativeWebcamRecorderRef.current.state !== 'inactive') {
-                                nativeWebcamRecorderRef.current.stop();
+                            const rec = nativeWebcamRecorderRef.current;
+                            if (rec.state !== 'inactive') {
+                                // Wait for the final dataavailable chunk; building the blob
+                                // right after stop() dropped the end of the webcam track.
+                                await new Promise((resolve) => {
+                                    rec.addEventListener('stop', resolve, { once: true });
+                                    rec.stop();
+                                    setTimeout(resolve, 3000);
+                                });
                             }
                             if (nativeWebcamChunksRef.current.length > 0) {
-                                const camBlob = new Blob(nativeWebcamChunksRef.current, { type: 'video/webm' });
+                                let camBlob = new Blob(nativeWebcamChunksRef.current, { type: 'video/webm' });
+                                // MediaRecorder WebM has no duration/cues; without them seeking is
+                                // unreliable, which made the webcam flicker or vanish in exports.
+                                try {
+                                    const { fixWebmDuration } = await import('@fix-webm-duration/fix');
+                                    const durMs = result.duration_ms || (Date.now() - (nativeSessionStartRef.current || Date.now()));
+                                    const fixed = await fixWebmDuration(camBlob, durMs);
+                                    if (fixed && fixed.size > 0) camBlob = fixed;
+                                } catch (fixErr) {
+                                    console.warn('[Drift] Webcam duration fix notice:', fixErr);
+                                }
                                 setRecordedWebcamBlob(camBlob);
                                 setWebcamSettings(prev => ({ ...prev, enabled: true }));
                             }
@@ -1404,6 +1421,7 @@ export default function RecorderPage() {
         try {
             studioRef.current.trimStart = trimStart;
             studioRef.current.trimEnd = trimEnd;
+            studioRef.current.lastExportWarning = null;
 
             const videoBlob = await studioRef.current.exportVideo((pct) => {
                 const scaled = Math.round(Math.min(Math.max(pct || 0, 0), 1) * 92);
@@ -1458,7 +1476,8 @@ export default function RecorderPage() {
                         const fileBytes = new Uint8Array(await finalBlob.arrayBuffer());
                         await drift.saveFile(savePath, fileBytes);
                         setExportProgress(100);
-                        setNotice(`Exported ${ext.toUpperCase()} video successfully to ${savePath}`);
+                        const warn = studioRef.current?.lastExportWarning;
+                        setNotice(`Exported ${ext.toUpperCase()} video successfully to ${savePath}${warn ? ` (${warn})` : ''}`);
                     }
                 } catch (e) {
                     console.error('[Export] Save failed, fallback download:', e);

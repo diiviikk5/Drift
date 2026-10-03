@@ -230,14 +230,30 @@ export class StudioEngine {
             }
             this.drawFrame();
         };
-        this.video.ontimeupdate = () => {
-            if (this.webcamVideo && Math.abs(this.webcamVideo.currentTime - (this.video.currentTime + (this.webcamOffset || 0))) > 0.25) {
-                this.webcamVideo.currentTime = Math.max(0, this.video.currentTime + (this.webcamOffset || 0));
-            }
-        };
+        this.video.ontimeupdate = () => this._syncWebcam();
 
         if (this.video.readyState >= 1) {
             onFrameReady();
+        }
+    }
+
+    /**
+     * Keep the webcam in sync during playback without visible hitches: small
+     * drift is absorbed by nudging its playback rate; only a large jump seeks.
+     */
+    _syncWebcam() {
+        const cam = this.webcamVideo;
+        if (!cam || !this.video) return;
+        const target = Math.max(0, this.video.currentTime + (this.webcamOffset || 0));
+        const drift = cam.currentTime - target;
+        const base = this.video.playbackRate || 1;
+        if (Math.abs(drift) > 0.6 || this.video.paused) {
+            if (Math.abs(drift) > 0.04) cam.currentTime = target;
+            cam.playbackRate = base;
+        } else if (Math.abs(drift) > 0.03) {
+            cam.playbackRate = base * (drift > 0 ? 0.94 : 1.06);
+        } else {
+            cam.playbackRate = base;
         }
     }
 
@@ -784,7 +800,16 @@ export class StudioEngine {
         const v = this.video;
         const curTimeSec = v?.currentTime || 0;
 
-        const isVideoReady = v && (v.readyState >= 1 || v.videoWidth > 0 || (v.duration > 0 && v.currentTime >= 0));
+        // A <video> mid-seek/buffering has no frame (readyState < 2) and draws as
+        // nothing, which flashed the dark backdrop. Keep the previous frame on
+        // screen instead, unless the canvas was resized (e.g. export setup).
+        const sizeKey = `${this.canvas.width}x${this.canvas.height}`;
+        if (v && v.readyState < 2 && this._hasDrawnVideo && this._lastDrawSize === sizeKey) {
+            return;
+        }
+        this._lastDrawSize = sizeKey;
+        const isVideoReady = v && v.readyState >= 2 && v.videoWidth > 0;
+        if (isVideoReady) this._hasDrawnVideo = true;
 
         renderFrame(
             ctx,
@@ -812,7 +837,7 @@ export class StudioEngine {
                 tiltAngle: this.tiltAngle ?? 0,
                 connectedZooms: this.connectedZooms !== false,
                 frameFit: this.frameFit || 'contain',
-                webcamSource: this.webcamVideo && this.webcamVideo.readyState >= 2 ? this.webcamVideo : null,
+                webcamSource: this.webcamVideo || null,
                 webcamSettings: {
                     ...this.webcamSettings,
                     reactiveScale: this.reactiveWebcam !== false,
@@ -1059,12 +1084,20 @@ export class StudioEngine {
             return await this._exportWebM(onProgress, resolution, options);
         }
 
-        // Try WebCodecs MP4 first (no ffmpeg, hardware-accelerated)
+        // Frame-accurate WebCodecs MP4 first. Hardware encoders occasionally
+        // accept a config and then fail mid-stream, so retry once in software
+        // before dropping to the real-time WebM path (which can't be as smooth).
         if (typeof VideoEncoder !== 'undefined') {
             try {
                 return await this._exportMP4(onProgress, resolution, options);
             } catch (e) {
-                console.warn('[Studio] WebCodecs MP4 export failed, falling back to WebM:', e.message);
+                console.warn('[Studio] Hardware MP4 export failed, retrying with software encoder:', e?.message || e);
+                try {
+                    return await this._exportMP4(onProgress, resolution, { ...options, forceSoftware: true });
+                } catch (e2) {
+                    console.warn('[Studio] WebCodecs MP4 export failed, falling back to WebM:', e2?.message || e2);
+                    this.lastExportWarning = `MP4 encoder unavailable (${e2?.message || e2}); exported WebM instead`;
+                }
             }
         }
         // Fallback: WebM via MediaRecorder
@@ -1075,7 +1108,7 @@ export class StudioEngine {
     async _exportMP4(onProgress, resolution = '1080p', options = {}) {
         const { Muxer, ArrayBufferTarget } = await import('mp4-muxer');
 
-        this.video.pause();
+        this.pause();
         this.video.currentTime = this.trimStart || 0;
         this.camera = { x: 0.5, y: 0.5, scale: 1 };
         await new Promise(r => setTimeout(r, 300));
@@ -1155,7 +1188,7 @@ export class StudioEngine {
 
         let codecConfig = null;
         // Priority 1: Hardware acceleration with variable bitrate
-        for (const codec of candidateProfiles) {
+        for (const codec of (options.forceSoftware ? [] : candidateProfiles)) {
             try {
                 const support = await VideoEncoder.isConfigSupported({
                     codec,
@@ -1176,7 +1209,7 @@ export class StudioEngine {
         }
 
         // Priority 2: Fallback to no-preference
-        if (!codecConfig) {
+        if (!codecConfig && !options.forceSoftware) {
             for (const codec of candidateProfiles) {
                 try {
                     const support = await VideoEncoder.isConfigSupported({
@@ -1425,65 +1458,53 @@ export class StudioEngine {
             let frameIndex = 0;
             this.video.currentTime = this.trimStart || 0;
 
-            const seekAndRender = () => {
-                return new Promise((seekResolve, seekReject) => {
-                    const targetTime = (this.trimStart || 0) + (frameIndex / fps) * baseSpeed;
-                    if (targetTime >= (this.trimEnd || effectiveDuration) || frameIndex >= totalFrames) {
-                        seekResolve(false);
-                        return;
-                    }
+            // Seek a media element and resolve once its frame at `time` is ready.
+            // The timeout is only a safety net for a seek that never reports back.
+            const seekTo = (el, time) => new Promise((resolve) => {
+                if (!el) return resolve();
+                const t = Number.isFinite(el.duration) ? Math.min(time, Math.max(0, el.duration - 0.001)) : time;
+                if (Math.abs(el.currentTime - t) < 0.0005 && el.readyState >= 2) return resolve();
+                let done = false;
+                const finish = () => {
+                    if (done) return;
+                    done = true;
+                    clearTimeout(timer);
+                    el.removeEventListener('seeked', finish);
+                    resolve();
+                };
+                const timer = setTimeout(finish, 2500);
+                el.addEventListener('seeked', finish);
+                el.currentTime = t;
+            });
 
-                    let handled = false;
-                    let timeoutId = null;
+            const seekAndRender = async () => {
+                const targetTime = (this.trimStart || 0) + (frameIndex / fps) * baseSpeed;
+                if (targetTime >= (this.trimEnd || effectiveDuration) || frameIndex >= totalFrames) {
+                    return false;
+                }
 
-                    const finishFrame = () => {
-                        if (handled) return;
-                        handled = true;
-                        if (timeoutId) clearTimeout(timeoutId);
-                        this.video.removeEventListener('seeked', onSeeked);
+                // Wait for the screen AND the webcam to land on this frame, so the
+                // webcam is never missing or a frame behind in the export.
+                await Promise.all([
+                    seekTo(this.video, targetTime),
+                    seekTo(this.webcamVideo, Math.max(0, targetTime + (this.webcamOffset || 0))),
+                ]);
 
-                        try {
-                            this.drawFrame();
-
-                            const timestamp = Math.round(frameIndex * frameDurationUs);
-                            const frame = new VideoFrame(this.canvas, {
-                                timestamp,
-                                duration: Math.round(frameDurationUs),
-                            });
-                            // Keyframe every 1 second
-                            encoder.encode(frame, { keyFrame: frameIndex % fps === 0 });
-                            frame.close();
-
-                            frameIndex++;
-                            if (onProgress) {
-                                const p = Math.min(frameIndex / totalFrames, 1);
-                                if (isFinite(p)) onProgress(p);
-                            }
-                            seekResolve(true);
-                        } catch (renderErr) {
-                            seekReject(renderErr);
-                        }
-                    };
-
-                    const onSeeked = () => finishFrame();
-
-                    // If video is already positioned at targetTime, encode immediately without waiting for seek event
-                    if (Math.abs(this.video.currentTime - targetTime) < 0.002) {
-                        finishFrame();
-                        return;
-                    }
-
-                    this.video.addEventListener('seeked', onSeeked, { once: true });
-                    this.video.currentTime = targetTime;
-                    if (this.webcamVideo) {
-                        this.webcamVideo.currentTime = Math.max(0, targetTime + (this.webcamOffset || 0));
-                    }
-
-                    // Safety net only for a seek that never reports back. Long-GOP H.264
-                    // seeks routinely exceed 150 ms; giving up early encoded stale video
-                    // frames under a moving camera (visible stutter in exports).
-                    timeoutId = setTimeout(() => finishFrame(), 2500);
+                this.drawFrame();
+                const frame = new VideoFrame(this.canvas, {
+                    timestamp: Math.round(frameIndex * frameDurationUs),
+                    duration: Math.round(frameDurationUs),
                 });
+                // Keyframe every second
+                encoder.encode(frame, { keyFrame: frameIndex % fps === 0 });
+                frame.close();
+
+                frameIndex++;
+                if (onProgress) {
+                    const p = Math.min(frameIndex / totalFrames, 1);
+                    if (isFinite(p)) onProgress(p);
+                }
+                return true;
             };
 
             const processFrames = async () => {
@@ -1522,7 +1543,7 @@ export class StudioEngine {
 
     // --- WebM fallback via MediaRecorder ---
     async _exportWebM(onProgress, resolution = '1080p', options = {}) {
-        this.video.pause();
+        this.pause();
         this.video.currentTime = this.trimStart || 0;
         this.camera = { x: 0.5, y: 0.5, scale: 1 };
         await new Promise(r => setTimeout(r, 300));
@@ -1597,17 +1618,22 @@ export class StudioEngine {
 
             rec.start();
             this.video.play();
+            if (this.webcamVideo) {
+                this.webcamVideo.currentTime = Math.max(0, this.video.currentTime + (this.webcamOffset || 0));
+                this.webcamVideo.play().catch(() => {});
+            }
             this.isPlaying = true;
             let frameIndex = 0;
 
             const renderExport = () => {
                 if (this.video.ended || this.video.currentTime >= (this.trimEnd || this.videoDuration)) {
                     this.isPlaying = false;
-                    this.video.pause();
+                    this.pause();
                     rec.stop();
                     return;
                 }
 
+                this._syncWebcam();
                 this.drawFrame();
                 frameIndex++;
 
