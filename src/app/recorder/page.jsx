@@ -125,6 +125,9 @@ export default function RecorderPage() {
     // showCursor defaults to FALSE to completely prevent double cursor!
     const [showCursor, setShowCursor] = useState(false);
     const [frameFit, setFrameFit] = useState('contain');
+    // Screen-capture fallback recordings have the real OS cursor baked into the
+    // video; a synthetic cursor on top of those shows two pointers.
+    const [cursorBakedIn, setCursorBakedIn] = useState(false);
     const [cursorTheme, setCursorTheme] = useState('macos');
     const [cursorScale, setCursorScale] = useState(1.0);
     const [splineSmoothing, setSplineSmoothing] = useState(true);
@@ -334,6 +337,7 @@ export default function RecorderPage() {
                 // In window/browser capture, the OS bakes the hardware cursor into the video frames.
                 // Default synthetic cursor to false to avoid double cursor.
                 setShowCursor(false);
+                setCursorBakedIn(true);
                 if (meta.webcamBlob) {
                     setRecordedWebcamBlob(meta.webcamBlob);
                 }
@@ -1041,6 +1045,7 @@ export default function RecorderPage() {
                     }
 
                     setShowCursor(true);
+                    setCursorBakedIn(false);
                     recDurationRef.current = (result.duration_ms || (Date.now() - (nativeSessionStartRef.current || Date.now()))) / 1000;
                     setViewMode('studio');
                 } catch (err) {
@@ -1561,7 +1566,7 @@ export default function RecorderPage() {
                 focusSegments: studioRef.current?.getFocusSegments() ?? focusSegments,
                 annotations, captions, captionsEnabled, background,
                 customBackground: customImage?.src ?? null,
-                zoomLevel, showCursor, cursorTheme, cursorScale, splineSmoothing, aspectRatio, frameFit,
+                zoomLevel, showCursor, cursorBakedIn, cursorTheme, cursorScale, splineSmoothing, aspectRatio, frameFit,
                 systemAudioVolume, micAudioVolume, isSystemAudioMuted, isMicAudioMuted, autoDuck,
                 insetPadding, borderRadius, windowChrome, springProfile, playbackSpeed, showKeystrokes,
                 tiltAngle, connectedZooms, reactiveWebcam, webcamSettings, trimStart, trimEnd,
@@ -1623,6 +1628,7 @@ export default function RecorderPage() {
             setCustomImage(image);
             setZoomLevel(project.zoomLevel ?? 1.55);
             setShowCursor(project.showCursor ?? false);
+            setCursorBakedIn(Boolean(project.cursorBakedIn));
             setFrameFit(project.frameFit === 'fill' ? 'fill' : 'contain');
             setCursorTheme(project.cursorTheme ?? 'macos');
             setCursorScale(project.cursorScale ?? 1);
@@ -1889,6 +1895,7 @@ export default function RecorderPage() {
                                 }
                             }}
                             showCursor={showCursor}
+                            cursorBakedIn={cursorBakedIn}
                             onToggleCursor={() => {
                                 setShowCursor(prev => {
                                     const next = !prev;

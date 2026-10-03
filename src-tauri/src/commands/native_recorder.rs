@@ -180,7 +180,9 @@ impl Default for NativeSessionManager {
 pub fn is_native_capture_supported() -> bool {
     #[cfg(windows)]
     {
-        GraphicsCaptureApi::is_supported().unwrap_or(false)
+        let supported = GraphicsCaptureApi::is_supported().unwrap_or(false);
+        log::info!("[NativeRecorder] Windows Graphics Capture supported: {}", supported);
+        supported
     }
     #[cfg(not(windows))]
     {
@@ -424,6 +426,7 @@ pub async fn start_native_session(
         let control = match ScreenRecorderHandler::start_free_threaded(settings) {
             Ok(c) => c,
             Err(e) => {
+                log::error!("[NativeRecorder] Failed to start Windows Graphics Capture: {:?}", e);
                 state.is_recording.store(false, Ordering::Relaxed);
                 *state.start_time.lock() = None;
                 if let Some(stop_tx) = state.audio_stop_sender.lock().take() {
@@ -434,6 +437,7 @@ pub async fn start_native_session(
         };
 
         *state.capture_control.lock() = Some(control);
+        log::info!("[NativeRecorder] Recording monitor {} at {}x{}@{} (cursor hidden: {})", config.monitor_index, width, height, fps, without_cursor);
 
         Ok(session_uuid)
     }

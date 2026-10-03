@@ -36,6 +36,7 @@ export default function InspectorPanel({
     zoomLevel,
     onChangeZoomLevel,
     showCursor,
+    cursorBakedIn = false,
     onToggleCursor,
     cursorTheme = 'macos',
     onChangeCursorTheme,
@@ -630,11 +631,17 @@ export default function InspectorPanel({
                             <div className="flex items-center justify-between">
                                 <div>
                                     <div className="text-xs font-semibold text-[var(--text-app)]">Synthetic Cursor Overlay</div>
-                                    <div className="text-[10px] text-[var(--text-app-muted)]">Off by default to avoid double cursor</div>
+                                    <div className="text-[10px] text-[var(--text-app-muted)]">
+                                        {cursorBakedIn
+                                            ? 'This recording already contains the system cursor'
+                                            : 'Smooth, resizable pointer drawn over the recording'}
+                                    </div>
                                 </div>
                                 <button
                                     onClick={onToggleCursor}
-                                    className={`w-9 h-5 rounded-full transition-all relative ${
+                                    disabled={cursorBakedIn && !showCursor}
+                                    title={cursorBakedIn ? 'This recording was made with screen capture, which records the real cursor. Record with a display (native capture) to use the synthetic cursor.' : undefined}
+                                    className={`w-9 h-5 rounded-full transition-all relative disabled:opacity-40 disabled:cursor-not-allowed ${
                                         showCursor ? 'bg-[var(--accent-app)]' : 'bg-gray-600'
                                     }`}
                                 >
