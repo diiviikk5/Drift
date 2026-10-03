@@ -529,12 +529,33 @@ export default function InspectorPanel({
                             </div>
                         </div>
 
-                        {/* Connected Zooms */}
+                        {/* Smart Auto-Zoom */}
                         <div className="pt-2 border-t border-[var(--border-app)] space-y-2">
                             <div className="flex items-center justify-between">
                                 <div>
+                                    <div className="text-xs font-semibold text-[var(--text-app)]">Smart Auto-Zoom</div>
+                                    <div className="text-[10px] text-[var(--text-app-muted)]">Zooms into where you work, follows calmly, zooms out when idle</div>
+                                </div>
+                                <button
+                                    onClick={() => onToggleAutoZoomOnClicks && onToggleAutoZoomOnClicks(!autoZoomOnClicks)}
+                                    title={autoZoomOnClicks ? 'Turn off and keep the full frame' : 'Plan zooms automatically from clicks, shortcuts and cursor activity'}
+                                    className={`w-9 h-5 rounded-full transition-all relative ${
+                                        autoZoomOnClicks ? 'bg-[var(--accent-app)]' : 'bg-gray-600'
+                                    }`}
+                                >
+                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                                        autoZoomOnClicks ? 'left-[18px]' : 'left-0.5'
+                                    }`} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Connected Zooms */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <div>
                                     <div className="text-xs font-semibold text-[var(--text-app)]">Connected Zooms</div>
-                                    <div className="text-[10px] text-[var(--text-app-muted)]">Glide camera between consecutive clicks without zooming out</div>
+                                    <div className="text-[10px] text-[var(--text-app-muted)]">Pan between nearby zooms instead of zooming out and back in</div>
                                 </div>
                                 <button
                                     onClick={() => onToggleConnectedZooms && onToggleConnectedZooms(!connectedZooms)}

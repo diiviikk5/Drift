@@ -506,9 +506,7 @@ export class StudioEngine {
     async setAutoZoomOnClicks(enabled) {
         this.autoZoomOnClicks = Boolean(enabled);
         if (this.autoZoomOnClicks) {
-            const dur = this.videoDuration || this.explicitDuration || 10;
-            this.focusSegments = this.interactionAnalyzer.analyze(this.clicks, this.mouseMoves, dur, this.keystrokes);
-            this.setFocusSegments(this.focusSegments);
+            await this._generateSegments();
         } else {
             this.resetToOverview();
         }
