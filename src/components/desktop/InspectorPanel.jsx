@@ -25,7 +25,7 @@ import {
     AppWindow,
     Gauge
 } from 'lucide-react';
-import { WALLPAPERS, meshCss } from '@/lib/rendering/stage';
+import WallpaperPicker from './WallpaperPicker';
 
 export default function InspectorPanel({
     background,
@@ -238,32 +238,12 @@ export default function InspectorPanel({
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-1.5 max-h-72 overflow-y-auto pr-1">
-                                {Object.entries(backgrounds).map(([key, val]) => {
-                                    const isSelected = background === key && (!customImage || customImage._bgKey === key);
-                                    const bgStyle = val.src
-                                        ? { backgroundImage: `url(${val.src})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-                                        : { background: meshCss(WALLPAPERS[key] || val.colors) };
-
-                                    return (
-                                        <button
-                                            key={key}
-                                            onClick={() => onChangeBackground(key)}
-                                            className={`p-1.5 rounded-lg border flex items-center gap-2 transition-all text-left ${
-                                                isSelected
-                                                    ? 'border-[var(--accent-app)] bg-[var(--bg-card-subtle)] font-bold shadow-xs'
-                                                    : 'border-[var(--border-app)] hover:border-[var(--border-app-hover)]'
-                                            }`}
-                                        >
-                                            <div
-                                                className="w-6 h-6 rounded-md shadow-xs flex-shrink-0 border border-white/10"
-                                                style={bgStyle}
-                                            />
-                                            <span className="text-xs text-[var(--text-app)] truncate">{val.name}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            <WallpaperPicker
+                                background={background}
+                                customImage={customImage}
+                                photos={backgrounds}
+                                onChange={onChangeBackground}
+                            />
 
                             {customImage && !customImage._bgKey && (
                                 <div className="p-2.5 rounded-lg bg-[var(--bg-card-subtle)] border border-[var(--accent-app)] flex items-center justify-between text-xs">

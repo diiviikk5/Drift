@@ -9,6 +9,7 @@ import { encodeProject, decodeProject } from '@/lib/project-file';
 import { parseEditInstruction } from '@/lib/ai/nl-editor';
 import { getAIClient } from '@/lib/ai/openrouter-client';
 import { focusForCenter } from '@/lib/zoom/cameraTrack';
+import { WALLPAPER_LIBRARY } from '@/lib/rendering/wallpapers';
 
 // Modular Shadcn Desktop Components
 import DesktopHeader from '@/components/desktop/DesktopHeader';
@@ -35,15 +36,8 @@ const BACKGROUNDS = {
     neonDusk: { name: 'Neon Dusk', src: '/gradients/neon-dusk.jpg', colors: ['#f12711', '#f5af19', '#8e0e00'] },
     abstractFluid: { name: 'Abstract Fluid', src: '/gradients/abstract-fluid.jpg', colors: ['#654ea3', '#eaafc8', '#5b247a'] },
 
-    // Classic Studio Presets
-    midnight: { name: 'Midnight', colors: ['#0A0B10', '#121420', '#1C2035'] },
-    neonDrift: { name: 'Drift Lime', colors: ['#08090E', '#16190B', '#262D0B', '#DCFE50'] },
-    bigSur: { name: 'Big Sur', colors: ['#ff6b9d', '#c44569', '#6c5ce7', '#0c3483'] },
-    monterey: { name: 'Monterey', colors: ['#00b894', '#00cec9', '#0984e3', '#6c5ce7'] },
-    ventura: { name: 'Ventura', colors: ['#e17055', '#d63031', '#fd79a8', '#a855f7'] },
-    bloom: { name: 'Bloom', colors: ['#74b9ff', '#0984e3', '#6c5ce7', '#a855f7'] },
-    sonoma: { name: 'Sonoma', colors: ['#fdcb6e', '#f39c12', '#e74c3c', '#9b59b6'] },
-    emerald: { name: 'Emerald', colors: ['#059669', '#10b981', '#064e3b', '#022c22'] }
+    // Procedural library (macOS-style, nature, gradients, minimal)
+    ...Object.fromEntries(WALLPAPER_LIBRARY.map(w => [w.id, { name: w.name, category: w.category }])),
 };
 
 export default function RecorderPage() {

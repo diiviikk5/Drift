@@ -9,7 +9,8 @@
 import { computeCursorSwayRotation } from '../zoom/cursorSway.js';
 import { getSmoothedCursorPath } from '../zoom/cursorPathSmoothing.js';
 import { getCameraTrack, sampleCameraTrack, viewportCenter } from '../zoom/cameraTrack.js';
-import { WALLPAPERS, computeStageLayout, drawMeshBackground, getGrainPattern } from './stage.js';
+import { WALLPAPERS, computeStageLayout, getGrainPattern } from './stage.js';
+import { drawWallpaper } from './wallpapers.js';
 
 export { WALLPAPERS };
 
@@ -349,7 +350,7 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         if (customBackgroundImage && (customBackgroundImage.complete !== false)) {
             _drawCoverImage(bCtx, customBackgroundImage, 0, 0, width, height);
         } else {
-            drawMeshBackground(bCtx, width, height, WALLPAPERS[background] || WALLPAPERS.bigSur);
+            drawWallpaper(bCtx, width, height, background);
         }
 
         const grain = getGrainPattern(bCtx);
