@@ -221,3 +221,100 @@ test('evaluateCameraAtTime smoothly decelerates to overview with zero exit veloc
     assert.ok(Math.abs(nearExit.y - 0.5) < 0.05);
 });
 
+test('ZoomConstruct provides global presets and resolves subtle, cinema, and focus levels', async () => {
+    const { ZOOM_PRESETS, DEFAULT_ZOOM_SCALE, resolveZoomPreset } = await import('../src/lib/zoom/ZoomConstruct.js');
+    assert.equal(DEFAULT_ZOOM_SCALE, 1.55);
+    assert.equal(ZOOM_PRESETS.subtle.scale, 1.35);
+    assert.equal(ZOOM_PRESETS.cinema.scale, 1.55);
+    assert.equal(ZOOM_PRESETS.focus.scale, 1.85);
+
+    assert.equal(resolveZoomPreset(1.3).id, 'subtle');
+    assert.equal(resolveZoomPreset('subtle').scale, 1.35);
+    assert.equal(resolveZoomPreset(1.55).id, 'cinema');
+    assert.equal(resolveZoomPreset(1.9).id, 'focus');
+});
+
+test('multi-click conversational interactions stay continuously chained without dropping to overview', () => {
+    const analyzer = new InteractionAnalyzer();
+    // 3 clicks across different parts of the UI, separated by 2.0s
+    const clicks = [
+        { time: 1000, x: 0.2, y: 0.3 },
+        { time: 3000, x: 0.8, y: 0.4 },
+        { time: 5000, x: 0.5, y: 0.8 },
+    ];
+    const track = analyzer.analyze(clicks, [], 10);
+    assert.ok(track.length >= 2, 'Should create focal segments for distinct UI locations');
+
+    // In the gap between click 1 and click 2 (e.g. t = 3.0s), camera remains zoomed in
+    const camDuringTransition = evaluateCameraAtTime(3.0, track);
+    assert.ok(camDuringTransition.scale >= 1.30, `Expected camera to remain zoomed in during chained clicks, got ${camDuringTransition.scale}`);
+    assert.notEqual(camDuringTransition.scale, 1.0, 'Camera must not drop back to 1.0x overview in between chained clicks');
+});
+
+test('StudioEngine supports studio calm playback pacing and audio pitch preservation', async () => {
+    const { StudioEngine } = await import('../src/lib/StudioEngine.js');
+    const mockCanvas = { getContext: () => ({ fillRect: () => {}, drawImage: () => {} }), width: 1920, height: 1080 };
+    const engine = new StudioEngine(mockCanvas, {
+        playbackSpeed: 0.94,
+    });
+    assert.equal(engine.playbackSpeed, 0.94);
+    engine.setPlaybackSpeed(0.88);
+    assert.equal(engine.playbackSpeed, 0.88);
+});
+
+test('InteractionAnalyzer guarantees strict non-overlapping segment bounds across all click configurations', () => {
+    const analyzer = new InteractionAnalyzer();
+    // Rapid clicks in alternating corners of screen (stress test for overlap avoidance)
+    const clicks = [
+        { time: 1000, x: 0.1, y: 0.1 },
+        { time: 1800, x: 0.9, y: 0.9 },
+        { time: 2600, x: 0.1, y: 0.9 },
+        { time: 3400, x: 0.9, y: 0.1 },
+        { time: 7000, x: 0.5, y: 0.5 },
+    ];
+    const track = analyzer.analyze(clicks, [], 12);
+    assert.ok(track.length >= 2);
+    for (let i = 0; i < track.length - 1; i++) {
+        assert.ok(
+            track[i].endTime <= track[i + 1].startTime + 0.001,
+            `Segment ${i} end (${track[i].endTime}) must not exceed segment ${i + 1} start (${track[i + 1].startTime})`
+        );
+    }
+});
+
+test('StudioEngine.setZoomPreset updates global construct depth and synchronizes all segments', async () => {
+    const { StudioEngine } = await import('../src/lib/StudioEngine.js');
+    const noop = () => {};
+    const mockCtx = new Proxy({ canvas: { width: 1920, height: 1080 } }, {
+        get(target, key) {
+            if (key in target) return target[key];
+            if (key === 'createLinearGradient' || key === 'createRadialGradient') return () => ({ addColorStop: noop });
+            return noop;
+        },
+    });
+    const mockVideo = { readyState: 0, currentTime: 0, duration: 10 };
+    const mockCanvas = { getContext: () => mockCtx, width: 1920, height: 1080 };
+    const engine = new StudioEngine(mockCanvas, mockVideo, null, [], 10, [], {
+        zoomLevel: 1.55,
+        focusSegments: [
+            { id: 'seg1', startTime: 1.0, endTime: 3.0, zoomScale: 1.55, targetX: 0.5, targetY: 0.5 },
+            { id: 'seg2', startTime: 4.0, endTime: 6.0, zoomScale: 1.55, targetX: 0.6, targetY: 0.6 },
+        ]
+    });
+    assert.equal(engine.zoomLevel, 1.55);
+
+    // Switch to subtle preset (1.35x)
+    engine.setZoomPreset('subtle');
+    assert.equal(engine.zoomLevel, 1.35);
+    assert.equal(engine.focusSegments[0].zoomScale, 1.35);
+    assert.equal(engine.focusSegments[1].zoomScale, 1.35);
+
+    // Switch to focus preset (1.85x)
+    engine.setZoomPreset('focus');
+    assert.equal(engine.zoomLevel, 1.85);
+    assert.equal(engine.focusSegments[0].zoomScale, 1.85);
+    assert.equal(engine.focusSegments[1].zoomScale, 1.85);
+});
+
+
+

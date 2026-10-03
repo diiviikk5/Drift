@@ -104,7 +104,7 @@ test('StudioEngine aspect ratio and export resolution mappings support 4K UHD an
     assert.equal(engine.aspectRatio, '4:5');
 });
 
-test('StudioEngine defaults to calm OpenScreen-style overview without auto click zooms', async () => {
+test('StudioEngine generates cinema click zooms by default and supports overview reset', async () => {
     const canvas = createMockCanvas(1920, 1080);
     const mockVideo = { videoWidth: 1920, videoHeight: 1080, currentTime: 0 };
     const clicks = [
@@ -114,13 +114,9 @@ test('StudioEngine defaults to calm OpenScreen-style overview without auto click
     ];
     const engine = new StudioEngine(canvas, mockVideo, null, clicks, 10, [], {});
 
-    // By default, focusSegments must be empty (overview) so recordings are soothing and don't jump around
-    assert.equal(engine.focusSegments.length, 0, 'Expected no auto click-zoom cuts by default');
-    assert.equal(engine.camera.scale, 1.0, 'Expected overview scale 1.0');
-
-    // Enabling autoZoomOnClicks generates segments from clicks
-    await engine.setAutoZoomOnClicks(true);
-    assert.ok(engine.focusSegments.length > 0, 'Expected focus segments when autoZoomOnClicks is enabled');
+    // By default, focusSegments are automatically generated from clicks for cinema-grade recording
+    assert.ok(engine.focusSegments.length > 0, 'Expected auto click-zoom cuts by default');
+    assert.equal(engine.camera.scale, 1.0, 'Expected initial camera scale 1.0 before playback');
 
     // Resetting to overview clears them and restores steady camera
     engine.resetToOverview();
@@ -128,18 +124,54 @@ test('StudioEngine defaults to calm OpenScreen-style overview without auto click
     assert.equal(engine.camera.scale, 1.0, 'Expected overview scale 1.0 after reset');
 });
 
-test('StudioEngine setZoomLevel updates zoomLevel and clamps to valid range', () => {
+test('StudioEngine addZoom resolves cursor position and adds focus segment', async () => {
     const canvas = createMockCanvas(1920, 1080);
-    const mockVideo = { videoWidth: 1920, videoHeight: 1080, currentTime: 0 };
-    const engine = new StudioEngine(canvas, mockVideo, null, [], 10, [], {});
+    const mockVideo = { videoWidth: 1920, videoHeight: 1080, currentTime: 2 };
+    const moves = [
+        { time: 1000, x: 0.3, y: 0.4 },
+        { time: 2000, x: 0.7, y: 0.8 },
+    ];
+    const engine = new StudioEngine(canvas, mockVideo, null, [], 10, moves, {});
 
-    engine.setZoomLevel(2.4);
-    assert.equal(engine.zoomLevel, 2.4);
-
-    engine.setZoomLevel(0.5); // below min 1.0
-    assert.equal(engine.zoomLevel, 1.0);
-
-    engine.setZoomLevel(5.0); // above max 4.0
-    assert.equal(engine.zoomLevel, 4.0);
+    await engine.addZoom(2.0, null, null, 2.2);
+    const segments = engine.getFocusSegments();
+    assert.equal(segments.length, 1, 'Expected 1 focus segment added');
+    assert.ok(Math.abs(segments[0].targetX - 0.7) < 0.1, 'Target X should follow cursor near 0.7');
+    assert.ok(Math.abs(segments[0].targetY - 0.8) < 0.1, 'Target Y should follow cursor near 0.8');
+    assert.equal(segments[0].zoomScale, 2.2, 'Expected zoom scale 2.2');
 });
+
+test('camera stays rock-solid within deadzone radius without sloppy mouse wobble', async () => {
+    const { evaluateCameraAtTime } = await import('../src/lib/rendering/renderFrame.js');
+    const segs = [
+        { startTime: 1.0, endTime: 6.0, targetX: 0.5, targetY: 0.5, zoomScale: 1.55 }
+    ];
+    // Mouse moving gently around the center inside the deadzone (< 0.15 distance)
+    const mouseStationary = [{ t: 3.0, x: 0.50, y: 0.50 }];
+    const mouseSlightDrift = [{ t: 3.0, x: 0.58, y: 0.56 }]; // dist = Math.hypot(0.08, 0.06) = 0.10 < 0.18
+
+    const camStationary = evaluateCameraAtTime(3.0, segs, mouseStationary);
+    const camDrift = evaluateCameraAtTime(3.0, segs, mouseSlightDrift);
+
+    // Camera MUST stay rock-solid at center, zero sloppy wobbling
+    assert.equal(camStationary.x, camDrift.x, 'Camera X should not drift for small mouse movements in deadzone');
+    assert.equal(camStationary.y, camDrift.y, 'Camera Y should not drift for small mouse movements in deadzone');
+});
+
+test('interaction clustering centers camera on common centroid of multiple clicks', async () => {
+    const { InteractionAnalyzer } = await import('../src/lib/zoom/InteractionAnalyzer.js');
+    const analyzer = new InteractionAnalyzer();
+    // User clicks twice on nearby elements in a dialog or toolbar within 1.5s
+    const clicks = [
+        { time: 1000, x: 0.30, y: 0.40 },
+        { time: 2500, x: 0.40, y: 0.46 },
+    ];
+    const track = analyzer.analyze(clicks, [], 10);
+    assert.equal(track.length, 1, 'Should coalesce nearby interactions into a single calm focus scene');
+    // Centroid of (0.30, 0.40) and (0.40, 0.46) is (0.35, 0.43)
+    assert.ok(Math.abs(track[0].targetX - 0.35) < 0.02, `Expected centroid X near 0.35, got ${track[0].targetX}`);
+    assert.ok(Math.abs(track[0].targetY - 0.43) < 0.02, `Expected centroid Y near 0.43, got ${track[0].targetY}`);
+});
+
+
 

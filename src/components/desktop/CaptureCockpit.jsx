@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Monitor, Mic, MicOff, Timer, Camera, ExternalLink, Sparkles, Check, Play, Square } from 'lucide-react';
+import { Monitor, Mic, MicOff, Timer, Camera, ExternalLink, Sparkles, Check, Play, Square, AppWindow } from 'lucide-react';
 import AudioLevelMeter from './AudioLevelMeter';
 import { createAudioLevelMeter } from '@/lib/audio/audioMix';
 
@@ -57,14 +57,21 @@ export default function CaptureCockpit({
         return () => cancelAnimationFrame(frame);
     }, [micEnabled, micStream]);
 
-    const activeSource = sources.find(s => s.id === selectedSource) || sources[0] || {
-        name: 'Primary Display',
-        width: 1920,
-        height: 1080,
-        is_primary: true
-    };
+    const isWindowMode = selectedSource === 'browser-source';
 
-    const thumb = activeSource ? (sourceThumbnails[activeSource.id] || activeSource.thumbnailDataUrl) : null;
+    const activeSource = !isWindowMode
+        ? (sources.find(s => s.id === selectedSource) || sources[0] || {
+            name: 'Primary Display',
+            width: 1920,
+            height: 1080,
+            is_primary: true
+        })
+        : {
+            name: 'Application Window',
+            is_window: true,
+        };
+
+    const thumb = (!isWindowMode && activeSource) ? (sourceThumbnails[activeSource.id] || activeSource.thumbnailDataUrl) : null;
 
     return (
         <div className="max-w-2xl w-full mx-auto my-auto p-6 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-app)] shadow-2xl space-y-6 transition-all duration-200">
@@ -72,23 +79,59 @@ export default function CaptureCockpit({
             <div className="space-y-3">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <Monitor className="w-4 h-4 text-[var(--accent-app)]" />
                         <span className="text-xs font-semibold text-[var(--text-app)] uppercase tracking-wider font-mono">
                             Capture Target
                         </span>
                     </div>
 
+                    {isWindowMode && hasActiveStream && (
+                        <button
+                            onClick={onSelectBrowserSource}
+                            className="flex items-center gap-1.5 text-xs text-[var(--accent-app)] hover:underline transition-colors cursor-pointer"
+                        >
+                            <span>Switch Window</span>
+                            <ExternalLink className="w-3 h-3" />
+                        </button>
+                    )}
+                </div>
+
+                {/* Target Type Selector: Display vs Specific Window */}
+                <div className="grid grid-cols-2 p-1 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] gap-1">
                     <button
-                        onClick={onSelectBrowserSource}
-                        className="flex items-center gap-1.5 text-xs text-[var(--text-app-muted)] hover:text-[var(--text-app)] transition-colors"
+                        type="button"
+                        onClick={() => {
+                            if (sources.length > 0) {
+                                const primary = sources.find(s => s.is_primary) || sources[0];
+                                onSelectSource(primary.id);
+                            } else {
+                                onSelectSource('screen:0');
+                            }
+                        }}
+                        className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                            !isWindowMode
+                                ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] shadow-xs'
+                                : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
+                        }`}
                     >
-                        <span>Window / App Picker</span>
-                        <ExternalLink className="w-3 h-3" />
+                        <Monitor className="w-4 h-4" />
+                        <span>Entire Display</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onSelectBrowserSource}
+                        className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                            isWindowMode
+                                ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] shadow-xs'
+                                : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
+                        }`}
+                    >
+                        <AppWindow className="w-4 h-4" />
+                        <span>Window / Application</span>
                     </button>
                 </div>
 
-                {/* Display Selector Pills (if multiple displays) */}
-                {sources.length > 1 && (
+                {/* Display Selector Pills (if multiple displays and in display mode) */}
+                {!isWindowMode && sources.length > 1 && (
                     <div className="flex items-center gap-2 overflow-x-auto pb-1">
                         {sources.map((src, i) => {
                             const isSelected = (selectedSource === src.id) || (!selectedSource && i === 0);
@@ -96,7 +139,7 @@ export default function CaptureCockpit({
                                 <button
                                     key={src.id}
                                     onClick={() => onSelectSource(src.id)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all flex items-center gap-2 flex-shrink-0 ${
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all flex items-center gap-2 flex-shrink-0 cursor-pointer ${
                                         isSelected
                                             ? 'bg-[var(--bg-card-subtle)] border-[var(--border-app-hover)] text-[var(--text-app)] font-semibold'
                                             : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
@@ -112,6 +155,19 @@ export default function CaptureCockpit({
                                 </button>
                             );
                         })}
+                    </div>
+                )}
+
+                {/* Active Window Status Banner when in window mode */}
+                {isWindowMode && (
+                    <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400">
+                        <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="font-medium">
+                                {hasActiveStream ? 'Selected Window Ready to Record' : 'Click below to pick a specific window'}
+                            </span>
+                        </div>
+                        <span className="text-[11px] text-emerald-500/80">Only the chosen window is recorded</span>
                     </div>
                 )}
 
@@ -143,23 +199,23 @@ export default function CaptureCockpit({
                     ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center text-[var(--text-app-muted)] gap-3 p-6 text-center">
                             <div className="w-12 h-12 rounded-2xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] flex items-center justify-center text-[var(--accent-app)] shadow-md">
-                                <Monitor className="w-6 h-6" />
+                                {isWindowMode ? <AppWindow className="w-6 h-6" /> : <Monitor className="w-6 h-6" />}
                             </div>
                             <div>
                                 <p className="text-xs font-semibold text-[var(--text-app)]">
-                                    {activeSource.name || 'Primary Display'}
+                                    {isWindowMode ? (hasActiveStream ? 'Application Window Selected' : 'No Window Selected') : (activeSource.name || 'Primary Display')}
                                 </p>
                                 <p className="text-[11px] text-[var(--text-app-muted)] font-mono mt-0.5">
-                                    {activeSource.width ? `${activeSource.width} × ${activeSource.height}` : '1920 × 1080'} • 60 FPS
+                                    {isWindowMode ? 'Capture only the chosen app or tab' : `${activeSource.width ? `${activeSource.width} × ${activeSource.height}` : '1920 × 1080'} • 60 FPS`}
                                 </p>
                             </div>
                             <button
                                 type="button"
-                                onClick={onStartPreview || onSelectBrowserSource}
+                                onClick={onSelectBrowserSource || onStartPreview}
                                 className="px-3.5 py-1.5 rounded-lg bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-semibold text-xs flex items-center gap-1.5 shadow-lg hover:brightness-110 active:scale-95 transition-all cursor-pointer"
                             >
-                                <Play className="w-3.5 h-3.5 fill-current" />
-                                <span>Preview Screen / Window</span>
+                                {isWindowMode ? <AppWindow className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                                <span>{isWindowMode ? 'Choose Window to Record' : 'Preview Screen'}</span>
                             </button>
                         </div>
                     ))}
@@ -178,24 +234,6 @@ export default function CaptureCockpit({
                             {hasActiveStream ? (isRecording ? 'LIVE RECORDING' : 'LIVE PREVIEW') : 'READY'}
                         </span>
                     </div>
-
-                    {/* Floating Live Webcam PiP preview overlay on top of screen preview */}
-                    {webcamEnabled && webcamStream && (
-                        <div className="absolute bottom-14 right-4 w-20 h-20 rounded-full overflow-hidden border-2 border-[var(--accent-app)] shadow-2xl z-20 pointer-events-none bg-black">
-                            <video
-                                ref={(el) => {
-                                    if (el && el.srcObject !== webcamStream) {
-                                        el.srcObject = webcamStream;
-                                        el.play().catch(() => {});
-                                    }
-                                }}
-                                autoPlay
-                                playsInline
-                                muted
-                                className="w-full h-full object-cover scale-x-[-1]"
-                            />
-                        </div>
-                    )}
 
                     <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between bg-black/75 backdrop-blur-md px-3 py-2 rounded-lg border border-white/10 text-xs text-white pointer-events-none">
                         <span className="truncate max-w-[300px] font-medium">{activeSource.name}</span>
@@ -290,27 +328,6 @@ export default function CaptureCockpit({
                         </span>
                     </div>
 
-                    {/* Live Camera Preview Feed */}
-                    {webcamEnabled && webcamStream && (
-                        <div className="relative w-full h-16 rounded-lg overflow-hidden border border-white/10 bg-black">
-                            <video
-                                ref={(el) => {
-                                    if (el && el.srcObject !== webcamStream) {
-                                        el.srcObject = webcamStream;
-                                        el.play().catch(() => {});
-                                    }
-                                }}
-                                autoPlay
-                                playsInline
-                                muted
-                                className="w-full h-full object-cover scale-x-[-1]"
-                            />
-                            <div className="absolute top-1 left-1.5 px-1.5 py-0.5 rounded bg-black/70 backdrop-blur-xs text-[9px] font-mono text-emerald-400 font-semibold flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                <span>LIVE CAM</span>
-                            </div>
-                        </div>
-                    )}
 
                     {/* Camera Device Dropdown */}
                     {webcamEnabled && videoDevices.length > 1 ? (

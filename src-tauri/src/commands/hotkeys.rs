@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tauri::{command, AppHandle, Manager};
+use tauri::{command, AppHandle};
 use tauri_plugin_store::StoreExt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

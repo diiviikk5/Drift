@@ -96,22 +96,47 @@ struct EncoderConfig {
 }
 
 fn find_ffmpeg() -> Result<PathBuf, String> {
-    let locations = [
-        "ffmpeg",
-        "ffmpeg.exe",
-        r"C:\ffmpeg\bin\ffmpeg.exe",
-        r"C:\Program Files\ffmpeg\bin\ffmpeg.exe",
-    ];
+    let mut candidates: Vec<PathBuf> = Vec::new();
 
-    for loc in &locations {
+    // 1. AppData Local Drift bin
+    if let Some(local_dir) = dirs_next::data_local_dir() {
+        candidates.push(local_dir.join("Drift").join("bin").join("ffmpeg.exe"));
+    }
+
+    // 2. Next to running drift.exe
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(parent) = exe_path.parent() {
+            candidates.push(parent.join("ffmpeg.exe"));
+            candidates.push(parent.join("bin").join("ffmpeg.exe"));
+        }
+    }
+
+    // 3. User profile and VS Code extensions
+    if let Ok(user_profile) = std::env::var("USERPROFILE") {
+        let profile_dir = PathBuf::from(&user_profile);
+        candidates.push(profile_dir.join(r".vscode\extensions\kilocode.kilo-code-7.5.15-win32-x64\bin\ffmpeg.exe"));
+        candidates.push(profile_dir.join(r"AppData\Local\Drift\bin\ffmpeg.exe"));
+        candidates.push(profile_dir.join(r"AppData\Local\Programs\ffmpeg\bin\ffmpeg.exe"));
+    }
+
+    // 4. Standard system locations
+    candidates.push(PathBuf::from("ffmpeg"));
+    candidates.push(PathBuf::from("ffmpeg.exe"));
+    candidates.push(PathBuf::from(r"C:\ffmpeg\bin\ffmpeg.exe"));
+    candidates.push(PathBuf::from(r"C:\Program Files\ffmpeg\bin\ffmpeg.exe"));
+
+    for loc in &candidates {
+        if loc.is_file() {
+            return Ok(loc.clone());
+        }
         if let Ok(output) = Command::new(loc).arg("-version").output() {
             if output.status.success() {
-                return Ok(PathBuf::from(loc));
+                return Ok(loc.clone());
             }
         }
     }
 
-    Err("ffmpeg not found. Install ffmpeg and add it to PATH.".to_string())
+    Err("ffmpeg not found. Please install ffmpeg or place ffmpeg.exe in %LOCALAPPDATA%\\Drift\\bin.".to_string())
 }
 
 /// Detect available hardware encoder, fallback to libx264

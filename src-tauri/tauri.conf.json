@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Drift",
+  "productName": "Drift Studio",
   "version": "2.0.0",
-  "identifier": "com.drift.desktop",
+  "identifier": "com.drift.studio",
   "build": {
     "frontendDist": "../out",
     "devUrl": "http://localhost:3000",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Drift",
+        "title": "Drift Studio",
         "url": "/recorder/",
         "width": 1280,
         "height": 800,

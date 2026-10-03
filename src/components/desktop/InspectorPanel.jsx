@@ -21,7 +21,9 @@ import {
     VolumeX,
     Mic,
     MicOff,
-    Activity
+    Activity,
+    AppWindow,
+    Gauge
 } from 'lucide-react';
 
 export default function InspectorPanel({
@@ -88,6 +90,9 @@ export default function InspectorPanel({
     autoZoomOnClicks = false,
     onToggleAutoZoomOnClicks,
     onResetToOverview,
+    onChangeFramingPreset,
+    playbackSpeed = 0.94,
+    onChangePlaybackSpeed,
 }) {
     const [activeTab, setActiveTab] = useState('style');
     const fileInputRef = useRef(null);
@@ -99,6 +104,7 @@ export default function InspectorPanel({
         { id: '9:16', label: '9:16', desc: 'Vertical (TikTok, Shorts)' },
         { id: '1:1', label: '1:1', desc: 'Square (LinkedIn, Feed)' },
         { id: '4:5', label: '4:5', desc: 'Portrait (Instagram)' },
+        { id: 'native', label: 'Fit Video', desc: 'Native Dimensions' },
     ];
 
     const handleFileChange = (e) => {
@@ -108,15 +114,20 @@ export default function InspectorPanel({
         }
     };
 
-    const handleAISubmit = (e) => {
+    const handleAISubmit = async (e) => {
         e.preventDefault();
         if (!aiInput.trim()) return;
-        if (onApplyAICommand) {
-            const res = onApplyAICommand(aiInput.trim());
-            setAiNotice(res || 'Edit command applied to timeline');
-            setTimeout(() => setAiNotice(''), 3500);
-        }
+        const text = aiInput.trim();
         setAiInput('');
+        if (onApplyAICommand) {
+            try {
+                const res = await onApplyAICommand(text);
+                setAiNotice(res || 'Edit command applied to timeline');
+            } catch (err) {
+                setAiNotice(`Failed: ${err.message}`);
+            }
+            setTimeout(() => setAiNotice(''), 4500);
+        }
     };
 
     return (
@@ -241,6 +252,80 @@ export default function InspectorPanel({
                             )}
                         </div>
 
+                        {/* Framing & Presentation Presets */}
+                        <div className="space-y-2 pt-2 border-t border-[var(--border-app)]">
+                            <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
+                                Framing & Presentation
+                            </label>
+                            <div className="grid grid-cols-3 gap-1.5">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (onChangeFramingPreset) {
+                                            onChangeFramingPreset('full');
+                                        } else {
+                                            onChangeInsetPadding && onChangeInsetPadding(0);
+                                            onChangeBorderRadius && onChangeBorderRadius(0);
+                                            onToggleWindowChrome && onToggleWindowChrome(false);
+                                        }
+                                    }}
+                                    className={`p-2 rounded-lg border text-xs text-center transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                                        insetPadding <= 0.001 && !windowChrome && borderRadius === 0
+                                            ? 'border-[var(--accent-app)] bg-[var(--bg-card-subtle)] font-bold shadow-xs text-[var(--text-app)]'
+                                            : 'border-[var(--border-app)] hover:border-[var(--border-app-hover)] text-[var(--text-app-muted)]'
+                                    }`}
+                                >
+                                    <Square className="w-3.5 h-3.5 text-[var(--accent-app)]" />
+                                    <span>Full Frame</span>
+                                    <span className="text-[9px] text-[var(--text-app-muted)]">Edge-to-edge</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (onChangeFramingPreset) {
+                                            onChangeFramingPreset('studio');
+                                        } else {
+                                            onChangeInsetPadding && onChangeInsetPadding(0.05);
+                                            onChangeBorderRadius && onChangeBorderRadius(14);
+                                            onToggleWindowChrome && onToggleWindowChrome(false);
+                                        }
+                                    }}
+                                    className={`p-2 rounded-lg border text-xs text-center transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                                        insetPadding > 0.001 && !windowChrome
+                                            ? 'border-[var(--accent-app)] bg-[var(--bg-card-subtle)] font-bold shadow-xs text-[var(--text-app)]'
+                                            : 'border-[var(--border-app)] hover:border-[var(--border-app-hover)] text-[var(--text-app-muted)]'
+                                    }`}
+                                >
+                                    <RectangleHorizontal className="w-3.5 h-3.5 text-[var(--accent-app)]" />
+                                    <span>Studio</span>
+                                    <span className="text-[9px] text-[var(--text-app-muted)]">Floating canvas</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (onChangeFramingPreset) {
+                                            onChangeFramingPreset('mockup');
+                                        } else {
+                                            onChangeInsetPadding && onChangeInsetPadding(0.08);
+                                            onChangeBorderRadius && onChangeBorderRadius(18);
+                                            onToggleWindowChrome && onToggleWindowChrome(true);
+                                        }
+                                    }}
+                                    className={`p-2 rounded-lg border text-xs text-center transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                                        windowChrome
+                                            ? 'border-[var(--accent-app)] bg-[var(--bg-card-subtle)] font-bold shadow-xs text-[var(--text-app)]'
+                                            : 'border-[var(--border-app)] hover:border-[var(--border-app-hover)] text-[var(--text-app-muted)]'
+                                    }`}
+                                >
+                                    <AppWindow className="w-3.5 h-3.5 text-[var(--accent-app)]" />
+                                    <span>Mockup</span>
+                                    <span className="text-[9px] text-[var(--text-app-muted)]">Titlebar dots</span>
+                                </button>
+                            </div>
+                        </div>
+
                         {/* Canvas Inset / Padding */}
                         <div className="space-y-2 pt-2 border-t border-[var(--border-app)]">
                             <div className="flex items-center justify-between">
@@ -311,64 +396,58 @@ export default function InspectorPanel({
                 {/* ═══ ZOOM TAB ═══ */}
                 {activeTab === 'camera' && (
                     <>
-                        {/* Overview Mode Banner & Reset */}
-                        <div className="p-3 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] space-y-2.5">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <div className="text-xs font-semibold text-[var(--text-app)] flex items-center gap-1.5">
-                                        <span>📺 Full Overview</span>
-                                    </div>
-                                    <div className="text-[10px] text-[var(--text-app-muted)] mt-0.5">
-                                        Calm, steady framing without sudden click-zooms
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={onResetToOverview}
-                                    title="Clear all zoom cuts and stay in steady overview"
-                                    className="px-2.5 py-1 text-[10px] font-mono font-medium rounded-md bg-white/5 border border-white/10 hover:bg-[var(--accent-app)] hover:text-[var(--accent-app-fg)] transition-all cursor-pointer"
-                                >
-                                    Reset
-                                </button>
-                            </div>
 
-                            <div className="pt-2 border-t border-[var(--border-app)] flex items-center justify-between">
-                                <div>
-                                    <div className="text-xs font-semibold text-[var(--text-app)]">Auto-Zoom on Clicks</div>
-                                    <div className="text-[10px] text-[var(--text-app-muted)]">Automatically zoom camera into mouse clicks</div>
-                                </div>
-                                <button
-                                    onClick={() => onToggleAutoZoomOnClicks && onToggleAutoZoomOnClicks(!autoZoomOnClicks)}
-                                    className={`w-9 h-5 rounded-full transition-all relative cursor-pointer ${
-                                        autoZoomOnClicks ? 'bg-[var(--accent-app)]' : 'bg-gray-600'
-                                    }`}
-                                >
-                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                                        autoZoomOnClicks ? 'left-[18px]' : 'left-0.5'
-                                    }`} />
-                                </button>
+                        {/* Global Core Zoom Construct Presets */}
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
+                                Zoom Construct Depth
+                            </label>
+                            <div className="grid grid-cols-3 gap-1.5">
+                                {[
+                                    { id: 'subtle', scale: 1.35, label: 'Subtle', desc: '1.35× • Lil Zoom' },
+                                    { id: 'cinema', scale: 1.55, label: 'Cinema', desc: '1.55× • Balanced' },
+                                    { id: 'focus', scale: 1.85, label: 'Focus', desc: '1.85× • Detail' },
+                                ].map((preset) => {
+                                    const isSelected = Math.abs((zoomLevel || 1.55) - preset.scale) < 0.05;
+                                    return (
+                                        <button
+                                            key={preset.id}
+                                            onClick={() => onChangeZoomLevel(preset.scale)}
+                                            className={`py-2 px-1.5 rounded-lg border text-center transition-all flex flex-col items-center justify-center gap-0.5 ${
+                                                isSelected
+                                                    ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] border-[var(--accent-app)] font-bold shadow-xs'
+                                                    : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)] bg-black/10 hover:border-white/20'
+                                            }`}
+                                        >
+                                            <span className="text-xs font-semibold">{preset.label}</span>
+                                            <span className="text-[9px] opacity-80 font-mono">{preset.desc}</span>
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
 
-                        <div className="space-y-3">
+                        {/* Fine-Tune Slider */}
+                        <div className="space-y-2 pt-1">
                             <div className="flex items-center justify-between">
-                                <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
-                                    Zoom Depth
-                                </label>
-                                <span className="text-xs font-mono font-bold text-[var(--accent-app)]">{zoomLevel}×</span>
+                                <span className="text-[10px] text-[var(--text-app-muted)] font-mono">
+                                    Fine-Tune Depth
+                                </span>
+                                <span className="text-xs font-mono font-bold text-[var(--accent-app)]">{(zoomLevel || 1.55).toFixed(2)}×</span>
                             </div>
                             <input
                                 type="range"
-                                min="1.2"
-                                max="3.0"
-                                step="0.1"
-                                value={zoomLevel}
+                                min="1.15"
+                                max="2.8"
+                                step="0.05"
+                                value={zoomLevel || 1.55}
                                 onChange={(e) => onChangeZoomLevel(parseFloat(e.target.value))}
                                 className="w-full accent-[var(--accent-app)] cursor-pointer"
                             />
                             <div className="flex justify-between text-[10px] text-[var(--text-app-muted)] font-mono">
-                                <span>1.2×</span>
-                                <span>2.0×</span>
-                                <span>3.0×</span>
+                                <span>1.15× (Overview)</span>
+                                <span>1.55× (Cinema)</span>
+                                <span>2.80× (Deep)</span>
                             </div>
                         </div>
 
@@ -395,6 +474,58 @@ export default function InspectorPanel({
                                         {p.label}
                                     </button>
                                 ))}
+                            </div>
+                        </div>
+
+                        {/* Recording Tempo & Pacing (Cinema Aesthetic Slowness) */}
+                        <div className="space-y-2 pt-2 border-t border-[var(--border-app)]">
+                            <div className="flex items-center justify-between">
+                                <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono flex items-center gap-1.5">
+                                    <Gauge className="w-3.5 h-3.5 text-[var(--accent-app)]" />
+                                    <span>Pacing & Tempo</span>
+                                </label>
+                                <span className="text-xs font-mono font-bold text-[var(--accent-app)]">
+                                    {(playbackSpeed || 0.94).toFixed(2)}×
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-1.5">
+                                {[
+                                    { speed: 0.88, label: 'Cinema', desc: '0.88× • Deliberate' },
+                                    { speed: 0.94, label: 'Studio', desc: '0.94× • Aesthetic' },
+                                    { speed: 1.00, label: 'Realtime', desc: '1.00× • Exact 1:1' },
+                                ].map((p) => {
+                                    const isSelected = Math.abs((playbackSpeed || 0.94) - p.speed) < 0.02;
+                                    return (
+                                        <button
+                                            key={p.label}
+                                            onClick={() => onChangePlaybackSpeed && onChangePlaybackSpeed(p.speed)}
+                                            className={`py-2 px-1 rounded-lg border text-center transition-all flex flex-col items-center justify-center gap-0.5 ${
+                                                isSelected
+                                                    ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] border-[var(--accent-app)] font-bold shadow-xs'
+                                                    : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)] bg-black/10 hover:border-white/20'
+                                            }`}
+                                        >
+                                            <span className="text-xs font-semibold">{p.label}</span>
+                                            <span className="text-[9px] opacity-80 font-mono">{p.desc}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <input
+                                type="range"
+                                min="0.75"
+                                max="1.25"
+                                step="0.01"
+                                value={playbackSpeed || 0.94}
+                                onChange={(e) => onChangePlaybackSpeed && onChangePlaybackSpeed(parseFloat(e.target.value))}
+                                className="w-full accent-[var(--accent-app)] cursor-pointer"
+                            />
+                            <div className="flex justify-between text-[10px] text-[var(--text-app-muted)] font-mono">
+                                <span>0.75× (Relaxed)</span>
+                                <span>0.94× (Studio)</span>
+                                <span>1.25× (Brisk)</span>
                             </div>
                         </div>
 

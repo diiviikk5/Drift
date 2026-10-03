@@ -24,24 +24,24 @@ impl Default for SpringConfig {
 
 /// Configurable presets for different use cases
 impl SpringConfig {
-    /// Smooth cursor following (default)
+    /// Smooth cursor following — tuned to OpenScreen motionSmoothing (stiffness 540, mass 0.70, damping 38)
     pub fn cursor_default() -> Self {
-        Self { tension: 100.0, mass: 1.0, friction: 20.0 }
+        Self { tension: 540.0, mass: 0.70, friction: 38.0 }
     }
 
     /// Snappy response near click events  
     pub fn cursor_snappy() -> Self {
-        Self { tension: 700.0, mass: 1.0, friction: 30.0 }
+        Self { tension: 700.0, mass: 0.70, friction: 36.0 }
     }
 
     /// Slower response during drag operations
     pub fn cursor_drag() -> Self {
-        Self { tension: 80.0, mass: 1.2, friction: 26.0 }
+        Self { tension: 340.0, mass: 1.0, friction: 40.0 }
     }
 
-    /// Screen-level zoom movement spring
+    /// Screen-level zoom movement spring — tuned to OpenScreen getZoomSpringConfig (stiffness 320, mass 0.92, damping 40)
     pub fn screen_movement() -> Self {
-        Self { tension: 200.0, mass: 2.25, friction: 40.0 }
+        Self { tension: 320.0, mass: 0.92, friction: 40.0 }
     }
 
     /// Scale this config by multipliers

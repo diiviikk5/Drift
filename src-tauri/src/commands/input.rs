@@ -174,19 +174,28 @@ fn is_special_key(key: &Key) -> bool {
     )
 }
 
+static LISTENER_SPAWNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// Start listening for global mouse and keyboard events
 #[tauri::command]
 pub fn start_global_listener(app: AppHandle) {
     let state = app.state::<InputListenerState>();
-    let mut listening = state.is_listening.lock();
-
-    if *listening {
-        return; // Already listening
-    }
-    *listening = true;
+    *state.is_listening.lock() = true;
     state.session_samples.lock().clear();
     state.session_keystrokes.lock().clear();
-    drop(listening);
+
+    // Ensure the OS-level low-level hook thread is spawned strictly once per process lifetime
+    if LISTENER_SPAWNED
+        .compare_exchange(
+            false,
+            true,
+            std::sync::atomic::Ordering::SeqCst,
+            std::sync::atomic::Ordering::SeqCst,
+        )
+        .is_err()
+    {
+        return; // Hook thread already running and listening
+    }
 
     let is_listening = state.is_listening.clone();
     let is_recording = state.is_recording.clone();
@@ -394,6 +403,41 @@ pub fn restore_window(app: AppHandle) {
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
+    }
+}
+
+/// Ensure the Windows OS hardware cursor is visible inside Drift
+#[tauri::command]
+pub fn hide_os_cursor() -> bool {
+    // NOTE: Win32 ShowCursor affects only the calling thread's message queue (the Drift app window).
+    // It does NOT hide the cursor across other applications or the screen.
+    // Screen recording without cursor is natively handled by Windows Graphics Capture
+    // via CursorCaptureSettings::WithoutCursor.
+    // We guarantee that the OS cursor is ALWAYS visible inside the Drift app.
+    #[cfg(target_os = "windows")]
+    {
+        use windows_sys::Win32::UI::WindowsAndMessaging::ShowCursor;
+        unsafe {
+            while ShowCursor(1) < 0 {}
+        }
+    }
+    true
+}
+
+/// Restore and guarantee the Windows OS hardware cursor visibility inside Drift
+#[tauri::command]
+pub fn show_os_cursor() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        use windows_sys::Win32::UI::WindowsAndMessaging::ShowCursor;
+        unsafe {
+            while ShowCursor(1) < 0 {}
+        }
+        true
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        true
     }
 }
 

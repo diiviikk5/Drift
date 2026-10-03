@@ -12,11 +12,12 @@ export function ThemeProvider({ children }) {
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
-        // Check localStorage only - default to light
-        const stored = localStorage.getItem("drift-theme");
-        if (stored) {
-            setTheme(stored);
-        }
+        try {
+            const stored = localStorage.getItem("drift-theme");
+            if (stored) {
+                setTheme(stored);
+            }
+        } catch (e) {}
         setMounted(true);
     }, []);
 
@@ -40,11 +41,7 @@ export function ThemeProvider({ children }) {
         setTheme((prev) => (prev === "dark" ? "light" : "dark"));
     };
 
-    // Prevent flash of wrong theme
-    if (!mounted) {
-        return <div style={{ visibility: "hidden" }}>{children}</div>;
-    }
-
+    // Always render children so the UI is immediately visible without white screens
     return (
         <ThemeContext.Provider value={{ theme, toggleTheme }}>
             {children}

@@ -166,10 +166,10 @@ Available commands:
 - trim: {"action": "trim", "startTime": <ms>, "endTime": <ms>}
 - speed: {"action": "speed", "startTime": <ms>, "endTime": <ms>, "factor": <0.25-4>}
 - addCaption: {"action": "addCaption", "time": <ms>, "text": "<text>", "duration": <ms>}
-- setCrop: {"action": "setCrop", "x": <0-1>, "y": <0-1>, "width": <0-1>, "height": <0-1>}
-- setBackground: {"action": "setBackground", "name": "<bigSur|monterey|ventura|bloom|sonoma|midnight>"}
+- setBackground: {"action": "setBackground", "name": "<cosmicMesh|sunsetPrism|auroraFlow|oceanBreeze|deepSpace|hyperGlow|pastelDream|velvetHaze|neonDusk|abstractFluid|midnight|neonDrift|bigSur|monterey|ventura|bloom|sonoma|emerald>"}
 - setZoomLevel: {"action": "setZoomLevel", "level": <1.2-3>}
 - setSpeed: {"action": "setSpeed", "preset": "<slow|normal|fast>"}
+- clearZooms: {"action": "clearZooms"}
 
 Parse time references like "at 23 seconds" → 23000ms, "the first 10 seconds" → 0-10000ms.
 Return an array of commands.`,

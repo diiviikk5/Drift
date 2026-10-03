@@ -61,9 +61,10 @@ export class DriftEngine {
         this.zoomEnabled = false; // OpenScreen soothing recording: steady camera overview without live click zooms
 
         // Capture source resolution (for normalizing mouse coordinates)
-        // Updated when a stream is selected — defaults to screen dimensions
-        this._sourceWidth = window.screen.width || 1920;
-        this._sourceHeight = window.screen.height || 1080;
+        // Defaults to physical screen pixels taking display scaling (DPI) into account
+        const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+        this._sourceWidth = typeof window !== 'undefined' ? Math.round((window.screen.width || 1920) * dpr) : 1920;
+        this._sourceHeight = typeof window !== 'undefined' ? Math.round((window.screen.height || 1080) * dpr) : 1080;
 
         // Track platform
         this._isTauri = drift.isTauri();
@@ -91,8 +92,10 @@ export class DriftEngine {
                 if (!this.isRecording) return;
                 const t = Date.now() - this.startTime;
                 // Normalize to 0-1 using actual source/screen resolution
-                const nx = data.x / this._sourceWidth;
-                const ny = data.y / this._sourceHeight;
+                const srcW = this._sourceWidth || (window.screen.width * (window.devicePixelRatio || 1)) || 1920;
+                const srcH = this._sourceHeight || (window.screen.height * (window.devicePixelRatio || 1)) || 1080;
+                const nx = Math.max(0, Math.min(1, data.x / srcW));
+                const ny = Math.max(0, Math.min(1, data.y / srcH));
                 this.clicks.push({ time: t, x: nx, y: ny });
 
                 // Feed into Cinema Zoom Engine (live zoom preview)
@@ -110,8 +113,10 @@ export class DriftEngine {
             this._globalMoveUnlisten = await drift.onGlobalMouseMove((data) => {
                 if (!this.isRecording) return;
                 const t = Date.now() - this.startTime;
-                const nx = data.x / this._sourceWidth;
-                const ny = data.y / this._sourceHeight;
+                const srcW = this._sourceWidth || (window.screen.width * (window.devicePixelRatio || 1)) || 1920;
+                const srcH = this._sourceHeight || (window.screen.height * (window.devicePixelRatio || 1)) || 1080;
+                const nx = Math.max(0, Math.min(1, data.x / srcW));
+                const ny = Math.max(0, Math.min(1, data.y / srcH));
                 this.mouseMoves.push({ time: t, x: nx, y: ny });
 
                 // Feed cursor position into zoom engine (for camera following)
@@ -574,10 +579,16 @@ export class DriftEngine {
                         : await drift.getSessionTelemetry();
 
                     if (nativeSamples && nativeSamples.length > 0) {
+                        const srcW = this._sourceWidth || (window.screen.width * (window.devicePixelRatio || 1)) || 1920;
+                        const srcH = this._sourceHeight || (window.screen.height * (window.devicePixelRatio || 1)) || 1080;
+                        const isPixelSpace = nativeSamples.some(s => s.x > 1.0 || s.y > 1.0);
+                        const normX = (val) => Math.max(0, Math.min(1, isPixelSpace ? val / srcW : (val > 1 ? val / srcW : val)));
+                        const normY = (val) => Math.max(0, Math.min(1, isPixelSpace ? val / srcH : (val > 1 ? val / srcH : val)));
+
                         this.mouseMoves = nativeSamples.map(s => ({
                             time: s.t,
-                            x: s.x > 1 ? s.x / this._sourceWidth : s.x,
-                            y: s.y > 1 ? s.y / this._sourceHeight : s.y,
+                            x: normX(s.x),
+                            y: normY(s.y),
                             click: s.click,
                         }));
 
@@ -585,8 +596,8 @@ export class DriftEngine {
                         if (clickSamples.length > 0) {
                             this.clicks = clickSamples.map(s => ({
                                 time: s.t,
-                                x: s.x > 1 ? s.x / this._sourceWidth : s.x,
-                                y: s.y > 1 ? s.y / this._sourceHeight : s.y,
+                                x: normX(s.x),
+                                y: normY(s.y),
                                 button: s.click,
                             }));
                         }

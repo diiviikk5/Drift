@@ -53,8 +53,5 @@ windows-sys = { version = "0.59", features = [
 ] }
 
 [profile.release]
-opt-level = "s"          # Optimize for size
-lto = true                # Link-time optimization — strips unused code
-codegen-units = 1         # Single codegen unit — slower compile, smaller binary
-panic = "abort"           # No unwind tables
-strip = true              # Strip symbols from binary
+opt-level = 2
+strip = false

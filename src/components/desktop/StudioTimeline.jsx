@@ -25,6 +25,8 @@ export default function StudioTimeline({
     onChangeTrimEnd,
     onAddFocusSegment,
     onSplitSegment,
+    zoomLevel = 1.55,
+    onChangeZoomLevel,
 }) {
     const trackRef = useRef(null);
 
@@ -155,6 +157,31 @@ export default function StudioTimeline({
                         </button>
                     </div>
 
+                    {/* Global Zoom Construct Presets */}
+                    <div className="flex items-center bg-[var(--bg-card-subtle)] border border-[var(--border-app)] rounded-lg p-0.5 gap-0.5 text-[11px] font-mono">
+                        {[
+                            { id: 'subtle', scale: 1.35, label: 'Subtle 1.35×' },
+                            { id: 'cinema', scale: 1.55, label: 'Cinema 1.55×' },
+                            { id: 'focus', scale: 1.85, label: 'Focus 1.85×' },
+                        ].map((preset) => {
+                            const isCurrent = Math.abs((zoomLevel || 1.55) - preset.scale) < 0.05;
+                            return (
+                                <button
+                                    key={preset.id}
+                                    onClick={() => onChangeZoomLevel && onChangeZoomLevel(preset.scale)}
+                                    className={`px-2 py-1 rounded-md transition-all font-semibold ${
+                                        isCurrent
+                                            ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] shadow-xs font-bold'
+                                            : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:bg-[var(--bg-card)]'
+                                    }`}
+                                    title={`Set global recording zoom depth to ${preset.label}`}
+                                >
+                                    {preset.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+
                     <div className="flex items-center gap-1.5 text-xs text-[var(--text-app-muted)] bg-[var(--bg-card-subtle)] px-2.5 py-1.5 rounded-lg border border-[var(--border-app)]">
                         <ZoomIn className="w-3.5 h-3.5 text-[var(--accent-app)]" />
                         <span className="font-mono font-bold text-[var(--text-app)]">{focusSegments?.length || clicks.length}</span>
@@ -237,17 +264,22 @@ export default function StudioTimeline({
                             Depth:
                         </span>
                         <div className="flex gap-1">
-                            {[1.4, 1.8, 2.2, 2.8].map((z) => (
+                            {[
+                                { scale: 1.35, label: '1.35x' },
+                                { scale: 1.55, label: '1.55x' },
+                                { scale: 1.85, label: '1.85x' },
+                                { scale: 2.40, label: '2.40x' },
+                            ].map(({ scale: z, label }) => (
                                 <button
                                     key={z}
                                     onClick={() => onUpdateSegment && onUpdateSegment(selectedSeg.id, { zoomScale: z })}
                                     className={`px-2 py-0.5 rounded-md font-mono text-[10px] transition-all ${
-                                        (selectedSeg.zoomScale || 1.8) === z
+                                        Math.abs((selectedSeg.zoomScale || 1.55) - z) < 0.05
                                             ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold'
                                             : 'bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
                                     }`}
                                 >
-                                    {z}x
+                                    {label}
                                 </button>
                             ))}
                         </div>
@@ -362,11 +394,25 @@ export default function StudioTimeline({
                     />
                 )}
 
-                {/* Focus Segment Blocks */}
+                {/* Focus Segment Blocks — Unified continuous camera track ribbon */}
                 {duration > 0 && focusSegments && focusSegments.length > 0 && focusSegments.map((seg, idx) => {
                     const leftPct = (seg.startTime / duration) * 100;
-                    const widthPct = Math.max(3, ((seg.endTime - seg.startTime) / duration) * 100);
+                    const widthPct = Math.max(2, ((seg.endTime - seg.startTime) / duration) * 100);
                     const isSelected = selectedSegmentId === seg.id;
+
+                    const prevSeg = idx > 0 ? focusSegments[idx - 1] : null;
+                    const nextSeg = idx < focusSegments.length - 1 ? focusSegments[idx + 1] : null;
+
+                    const isConnectedPrev = prevSeg && (seg.startTime - prevSeg.endTime <= 0.35);
+                    const isConnectedNext = nextSeg && (nextSeg.startTime - seg.endTime <= 0.35);
+
+                    const roundedClass = (isConnectedPrev && isConnectedNext)
+                        ? 'rounded-none border-l-0 border-r-0'
+                        : isConnectedPrev
+                        ? 'rounded-r-lg rounded-l-none border-l-0'
+                        : isConnectedNext
+                        ? 'rounded-l-lg rounded-r-none border-r-0'
+                        : 'rounded-lg';
 
                     return (
                         <div
@@ -377,18 +423,25 @@ export default function StudioTimeline({
                                 onSeek(seg.startTime);
                             }}
                             style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
-                            className={`group/seg absolute top-1.5 bottom-1.5 rounded-lg flex items-center justify-between px-2 cursor-pointer z-10 transition-all border ${
+                            className={`group/seg absolute top-1.5 bottom-1.5 ${roundedClass} flex items-center justify-between px-1.5 cursor-pointer z-10 transition-all border ${
                                 isSelected
                                     ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] border-[var(--accent-app)] shadow-md font-bold'
                                     : 'bg-[var(--accent-app)]/20 text-[var(--text-app)] border-[var(--accent-app)]/50 hover:bg-[var(--accent-app)]/35'
                             }`}
-                            title={`Focus: ${formatTime(seg.startTime)} - ${formatTime(seg.endTime)} (${seg.zoomScale}x, speed ${seg.speed || 1}x)`}
+                            title={`Camera: ${formatTime(seg.startTime)} - ${formatTime(seg.endTime)} (${seg.zoomScale}x, focus [${Math.round((seg.targetX ?? 0.5) * 100)}%, ${Math.round((seg.targetY ?? 0.5) * 100)}%])`}
                         >
+                            {/* Waypoint Divider for Connected Sequences */}
+                            {isConnectedPrev && (
+                                <div className="absolute -left-1 top-0 bottom-0 w-2 flex items-center justify-center z-25 pointer-events-none">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-app)] border border-black/40 shadow-xs" title="Camera Glide Junction" />
+                                </div>
+                            )}
+
                             {/* Left Trim Handle */}
                             <div
                                 onMouseDown={(e) => handleResizeStart(e, seg, 'start')}
-                                className="absolute left-0 top-0 bottom-0 w-2.5 cursor-ew-resize hover:bg-white/40 rounded-l flex items-center justify-center opacity-0 group-hover/seg:opacity-100 transition-opacity z-20"
-                                title="Drag to trim start time"
+                                className={`absolute left-0 top-0 bottom-0 w-2.5 cursor-ew-resize hover:bg-white/40 ${isConnectedPrev ? 'rounded-none' : 'rounded-l'} flex items-center justify-center opacity-0 group-hover/seg:opacity-100 transition-opacity z-20`}
+                                title={isConnectedPrev ? "Drag to adjust glide timing" : "Drag to trim start time"}
                             >
                                 <div className="w-0.5 h-3 bg-white/70 rounded-full" />
                             </div>
@@ -397,18 +450,25 @@ export default function StudioTimeline({
                                 {seg.sceneMode === 'spotlight' ? '🎙️ Spotlight' :
                                  seg.sceneMode === 'overview' ? '🖥️ Overview' :
                                  seg.sceneMode === 'speed' ? `⏩ ${seg.speed || 2}x Speed` :
-                                 `${seg.reason === 'dwell' ? '👁' : '⚡'} ${seg.zoomScale}x ${seg.speed && seg.speed !== 1 ? `(${seg.speed}x)` : ''}`}
+                                 isConnectedPrev ? (
+                                     <span className="opacity-90 flex items-center gap-0.5">
+                                         <span>→</span>
+                                         <span>🎯 {Math.round((seg.targetX ?? 0.5) * 100)}%</span>
+                                     </span>
+                                 ) : (
+                                     `${seg.reason === 'dwell' ? '👁' : '⚡'} ${seg.zoomScale}x ${seg.speed && seg.speed !== 1 ? `(${seg.speed}x)` : ''}`
+                                 )}
                             </span>
 
-                            <div className="flex items-center pr-1">
+                            <div className="flex items-center pr-0.5">
                                 {onDeleteSegment && (
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             onDeleteSegment(seg.id);
                                         }}
-                                        className="opacity-60 hover:opacity-100 hover:text-red-400 text-xs font-bold ml-1 px-1 transition-opacity"
-                                        title="Delete focus segment"
+                                        className="opacity-0 group-hover/seg:opacity-80 hover:!opacity-100 hover:text-red-400 text-xs font-bold ml-1 px-1 transition-opacity"
+                                        title={isConnectedPrev ? "Remove waypoint" : "Delete focus segment"}
                                     >
                                         ×
                                     </button>
@@ -418,8 +478,8 @@ export default function StudioTimeline({
                             {/* Right Trim Handle */}
                             <div
                                 onMouseDown={(e) => handleResizeStart(e, seg, 'end')}
-                                className="absolute right-0 top-0 bottom-0 w-2.5 cursor-ew-resize hover:bg-white/40 rounded-r flex items-center justify-center opacity-0 group-hover/seg:opacity-100 transition-opacity z-20"
-                                title="Drag to trim end time"
+                                className={`absolute right-0 top-0 bottom-0 w-2.5 cursor-ew-resize hover:bg-white/40 ${isConnectedNext ? 'rounded-none' : 'rounded-r'} flex items-center justify-center opacity-0 group-hover/seg:opacity-100 transition-opacity z-20`}
+                                title={isConnectedNext ? "Drag to adjust glide timing" : "Drag to trim end time"}
                             >
                                 <div className="w-0.5 h-3 bg-white/70 rounded-full" />
                             </div>
@@ -440,22 +500,23 @@ export default function StudioTimeline({
                     );
                 })}
 
-                {/* Individual Click Keyframe Pins */}
-                {duration > 0 && (!focusSegments || focusSegments.length === 0) && clicks.map((click, idx) => {
-                    const clickTime = click.time / 1000;
+                {/* Subtle Mouse Click Telemetry Ticks (independent of zoom segments) */}
+                {duration > 0 && clicks.map((click, idx) => {
+                    const clickTime = (click.time > 10000 || click.time < 0.001) ? click.time / 1000 : (click.time > 100 ? click.time / 1000 : click.time);
+                    if (clickTime < 0.6) return null; // hide startup button click
                     const posPct = (clickTime / duration) * 100;
 
                     return (
                         <div
                             key={idx}
                             style={{ left: `${posPct}%` }}
-                            className="absolute top-0 bottom-0 w-1 bg-[var(--accent-app)] shadow-sm group/pin pointer-events-auto"
-                            title={`Zoom Keyframe ${idx + 1} at ${formatTime(clickTime)}`}
-                        >
-                            <div className="absolute -top-1 -left-2 w-4 h-4 rounded-full bg-[var(--accent-app)] text-[var(--accent-app-fg)] text-[8px] font-mono font-black flex items-center justify-center shadow-md transform group-hover/pin:scale-125 transition-transform">
-                                {idx + 1}
-                            </div>
-                        </div>
+                            className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-white/30 hover:bg-[var(--accent-app)] transition-colors pointer-events-auto cursor-pointer"
+                            title={`Mouse Click at ${formatTime(clickTime)}`}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (onSeek) onSeek(clickTime);
+                            }}
+                        />
                     );
                 })}
 

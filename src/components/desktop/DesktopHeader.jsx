@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Monitor, Film, Keyboard, Sun, Moon, Sparkles, Palette, Check, Laptop, FileText, FolderOpen, Save } from 'lucide-react';
+import { Monitor, Film, Keyboard, Sun, Moon, Sparkles, Palette, Check, Laptop, FileText, FolderOpen, Save, Settings } from 'lucide-react';
 
 export default function DesktopHeader({
     viewMode,
@@ -9,6 +9,7 @@ export default function DesktopHeader({
     platform,
     hookStatus,
     onOpenHotkeys,
+    onOpenSettings,
     onNewRecording,
     onOpenProject,
     onSaveProject,
@@ -169,6 +170,16 @@ export default function DesktopHeader({
                 >
                     <Keyboard className="w-3.5 h-3.5" />
                     <span>Shortcuts</span>
+                </button>
+
+                {/* AI / App Settings Button */}
+                <button
+                    onClick={onOpenSettings}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-[var(--text-app-muted)] hover:text-[var(--text-app)] bg-[var(--bg-card)] border border-[var(--border-app)] hover:border-[var(--border-app-hover)] transition-all"
+                    title="AI & App Settings (Cerebras, Hotkeys, Preferences)"
+                >
+                    <Settings className="w-3.5 h-3.5" />
+                    <span>Settings</span>
                 </button>
             </div>
         </header>

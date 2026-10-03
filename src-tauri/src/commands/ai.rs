@@ -9,7 +9,7 @@ pub struct AIConfig {
 }
 
 /// Proxy AI requests through Rust to avoid CORS issues in the webview
-/// This calls OpenRouter's API from the Rust backend
+/// Supports Cerebras Ultra-Fast AI (https://api.cerebras.ai) and OpenRouter
 #[command]
 pub async fn ai_completion(
     api_key: String,
@@ -17,6 +17,7 @@ pub async fn ai_completion(
     messages: Vec<serde_json::Value>,
     max_tokens: Option<u32>,
     temperature: Option<f64>,
+    endpoint: Option<String>,
 ) -> Result<String, String> {
     let client = reqwest::Client::new();
 
@@ -32,12 +33,21 @@ pub async fn ai_completion(
         body["temperature"] = serde_json::json!(temp);
     }
 
-    let response = client
-        .post("https://openrouter.ai/api/v1/chat/completions")
+    let url = endpoint.unwrap_or_else(|| "https://openrouter.ai/api/v1/chat/completions".to_string());
+
+    let mut req = client
+        .post(&url)
         .header("Authorization", format!("Bearer {}", api_key))
         .header("Content-Type", "application/json")
-        .header("HTTP-Referer", "https://getdrift.app")
-        .header("X-Title", "Drift Screen Recorder")
+        .header("User-Agent", "DriftStudio/2.0 (Windows NT 10.0; Win64; x64)");
+
+    if url.contains("openrouter.ai") {
+        req = req
+            .header("HTTP-Referer", "https://getdrift.app")
+            .header("X-Title", "Drift Screen Recorder");
+    }
+
+    let response = req
         .json(&body)
         .send()
         .await

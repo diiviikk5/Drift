@@ -12,6 +12,7 @@ import { generateCaptions, toSRT } from '@/lib/ai/captions';
 import { detectScenes } from '@/lib/ai/scene-detection';
 import { generateTitleAndThumbnail } from '@/lib/ai/metadata';
 import { parseEditInstruction, executeCommands } from '@/lib/ai/nl-editor';
+import { getAIClient } from '@/lib/ai/openrouter-client';
 import { getAISettings } from '../settings/AISettings';
 
 const AI_TOOLS = [
@@ -72,6 +73,7 @@ export default function AISidebar({
     const [nlLog, setNlLog] = useState([]);
 
     const settings = getAISettings();
+    const isCerebras = settings.provider === 'cerebras';
 
     const runTool = useCallback(async (toolId) => {
         if (!studioEngine) return;
@@ -93,7 +95,9 @@ export default function AISidebar({
                         scale: kf.scale,
                         speed: kf.speed || 'normal',
                     }));
-                    result = { keyframes: keyframes.length, message: `Generated ${keyframes.length} smart zoom keyframes` };
+                    const metrics = getAIClient().lastMetrics;
+                    const latency = metrics?.latencyMs ? ` (${metrics.latencyMs}ms ⚡ ${metrics.provider === 'cerebras' ? 'Cerebras' : ''})` : '';
+                    result = { keyframes: keyframes.length, message: `Generated ${keyframes.length} smart zoom keyframes${latency}` };
                     break;
                 }
                 case 'smartCrop': {
@@ -144,7 +148,9 @@ export default function AISidebar({
         try {
             const parsed = await parseEditInstruction(nlInput);
             const applied = executeCommands(parsed.commands, studioEngine, studioEngine.zoomEngine);
-            setNlLog(prev => [...prev, { role: 'ai', text: `Applied: ${applied.map(a => a.action).join(', ')}` }]);
+            const metrics = getAIClient().lastMetrics;
+            const latencyStr = metrics?.latencyMs ? ` ⚡ ${metrics.latencyMs}ms (${metrics.provider === 'cerebras' ? 'Cerebras' : 'AI'})` : '';
+            setNlLog(prev => [...prev, { role: 'ai', text: `Applied: ${applied.map(a => a.action).join(', ')}${latencyStr}` }]);
             setNlStatus('idle');
         } catch (err) {
             setNlLog(prev => [...prev, { role: 'ai', text: `Error: ${err.message}`, error: true }]);
@@ -183,9 +189,21 @@ export default function AISidebar({
                     >
                         {/* Header */}
                         <div className="flex items-center gap-2 p-4 border-b border-zinc-800">
-                            <Sparkles className="w-5 h-5 text-purple-400" />
+                            {isCerebras ? (
+                                <Zap className="w-5 h-5 text-amber-400 fill-current" />
+                            ) : (
+                                <Sparkles className="w-5 h-5 text-purple-400" />
+                            )}
                             <h3 className="text-sm font-bold text-white">AI Studio</h3>
-                            <span className="ml-auto px-2 py-0.5 text-[10px] font-bold rounded-full bg-green-500/20 text-green-400">FREE</span>
+                            {isCerebras ? (
+                                <span className="ml-auto px-2 py-0.5 text-[10px] font-mono font-bold rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                    ⚡ 2,000 tok/s
+                                </span>
+                            ) : (
+                                <span className="ml-auto px-2 py-0.5 text-[10px] font-bold rounded-full bg-green-500/20 text-green-400">
+                                    FREE
+                                </span>
+                            )}
                         </div>
 
                         {/* Tool buttons */}

@@ -7,11 +7,11 @@
   "main": "electron/main.js",
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "clean": "npx rimraf dist out",
-    "build:tauri": "next build",
+    "build:tauri": "cross-env NEXT_PUBLIC_IS_DESKTOP=true TAURI_ENV_PLATFORM=windows next build",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",

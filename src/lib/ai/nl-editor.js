@@ -3,8 +3,8 @@
  * Translates natural language instructions into edit commands
  */
 
-import { getAIClient } from './openrouter-client';
-import { nlEditPrompt } from './prompts';
+import { getAIClient } from './openrouter-client.js';
+import { nlEditPrompt } from './prompts.js';
 
 /**
  * Parse a natural language editing instruction into structured commands
@@ -49,38 +49,66 @@ export async function parseEditInstruction(instruction, timelineState) {
 function parseLocally(instruction, state) {
     const lower = instruction.toLowerCase().trim();
 
-    // "set background to <name>"
-    const bgMatch = lower.match(/(?:set|change|use)\s+background\s+(?:to\s+)?(\w+)/);
-    if (bgMatch) {
-        const names = ['bigsur', 'monterey', 'ventura', 'bloom', 'sonoma', 'midnight'];
-        const name = names.find(n => bgMatch[1].includes(n)) || bgMatch[1];
-        return [{ action: 'setBackground', name }];
+    // "set background to <name>" or "use <name> background"
+    const bgNames = [
+        'cosmicmesh', 'cosmic mesh', 'sunsetprism', 'sunset prism', 'auroraflow', 'aurora flow',
+        'oceanbreeze', 'ocean breeze', 'deepspace', 'deep space', 'hyperglow', 'hyper glow',
+        'pasteldream', 'pastel dream', 'velvethaze', 'velvet haze', 'neondusk', 'neon dusk',
+        'abstractfluid', 'abstract fluid', 'neondrift', 'drift lime', 'midnight', 'bigsur',
+        'big sur', 'monterey', 'ventura', 'bloom', 'sonoma', 'emerald'
+    ];
+    const foundBg = bgNames.find(n => lower.includes(n));
+    if (foundBg && (lower.includes('background') || lower.includes('wallpaper') || lower.includes('theme') || lower.includes('set') || lower.includes('use') || lower.includes('change'))) {
+        const canonical = foundBg.replace(/\s+/g, '');
+        return [{ action: 'setBackground', name: canonical }];
     }
 
-    // "zoom level <number>"
-    const zoomLevelMatch = lower.match(/zoom\s+level\s+(\d+\.?\d*)/);
-    if (zoomLevelMatch) {
+    // "zoom level <number>" or "zoom <number>x"
+    const zoomLevelMatch = lower.match(/zoom\s+(?:level\s+)?(\d+\.?\d*)x?/);
+    if (zoomLevelMatch && (lower.includes('level') || lower.includes('depth') || lower.match(/^zoom\s+\d/))) {
         return [{ action: 'setZoomLevel', level: parseFloat(zoomLevelMatch[1]) }];
     }
 
     // "speed <preset>"
-    const speedMatch = lower.match(/(?:set\s+)?speed\s+(?:to\s+)?(slow|normal|fast|instant)/);
+    const speedMatch = lower.match(/(?:set\s+)?speed\s+(?:to\s+)?(slow|normal|fast|instant|gentle|punchy|cinematic)/);
     if (speedMatch) {
         return [{ action: 'setSpeed', preset: speedMatch[1] }];
     }
 
-    // "remove all zooms"
-    if (lower.includes('remove all zoom') || lower.includes('clear zoom') || lower.includes('delete all zoom')) {
+    // "remove all zooms" / "clear zoom" / "zoom out"
+    if (
+        ((lower.includes('clear') || lower.includes('remove') || lower.includes('delete')) && (lower.includes('zoom') || lower.includes('camera'))) ||
+        lower.includes('reset') || lower.includes('overview') || lower.includes('zoom out') || lower.includes('unzoom')
+    ) {
         return [{ action: 'clearZooms' }];
     }
 
-    // "zoom at <time>"
-    const zoomAtMatch = lower.match(/zoom\s+(?:at|to)\s+(?:(\d+):)?(\d+)\s*(?:seconds?|s)?/);
-    if (zoomAtMatch) {
-        const minutes = parseInt(zoomAtMatch[1] || '0');
-        const seconds = parseInt(zoomAtMatch[2]);
-        const timeMs = (minutes * 60 + seconds) * 1000;
-        return [{ action: 'addZoom', time: timeMs, x: 0.5, y: 0.5, scale: state.zoomLevel || 1.5, duration: 800 }];
+    // "zoom [into ...] [at <time>]"
+    if (lower.includes('zoom') || lower.includes('focus')) {
+        let timeMs = 0;
+        const timeMatch = lower.match(/(?:at|from|after)?\s*(\d+(?:\.\d+)?)\s*(?:seconds?|s\b)/i) || lower.match(/at\s+(\d+)/i);
+        if (timeMatch) {
+            timeMs = Math.round(parseFloat(timeMatch[1]) * 1000);
+        }
+
+        let x = 0.5;
+        let y = 0.5;
+        if (lower.includes('top') && lower.includes('left')) { x = 0.25; y = 0.25; }
+        else if (lower.includes('top') && lower.includes('right')) { x = 0.75; y = 0.25; }
+        else if (lower.includes('bottom') && lower.includes('left')) { x = 0.25; y = 0.75; }
+        else if (lower.includes('bottom') && lower.includes('right')) { x = 0.75; y = 0.75; }
+        else if (lower.includes('left')) { x = 0.25; y = 0.5; }
+        else if (lower.includes('right')) { x = 0.75; y = 0.5; }
+        else if (lower.includes('top')) { x = 0.5; y = 0.25; }
+        else if (lower.includes('bottom')) { x = 0.5; y = 0.75; }
+
+        let scale = state?.zoomLevel || 2.0;
+        const scaleMatch = lower.match(/(\d+(?:\.\d+)?)\s*x/i);
+        if (scaleMatch) {
+            scale = parseFloat(scaleMatch[1]);
+        }
+
+        return [{ action: 'addZoom', time: timeMs, x, y, scale, duration: 800 }];
     }
 
     return null; // Can't parse locally
@@ -89,33 +117,74 @@ function parseLocally(instruction, state) {
 /**
  * Validate and clean up AI-generated commands
  */
-function validateCommands(commands, state) {
+function validateCommands(rawCommands, state) {
+    let commands = rawCommands;
     if (!Array.isArray(commands)) {
-        return [];
+        if (commands && typeof commands === 'object') {
+            commands = [commands];
+        } else {
+            return [];
+        }
     }
 
-    const validActions = ['addZoom', 'removeZoom', 'trim', 'speed', 'addCaption', 'setCrop', 'setBackground', 'setZoomLevel', 'setSpeed', 'clearZooms'];
+    const durationMs = state?.duration || 10000;
 
-    return commands.filter(cmd => {
-        if (!cmd || !cmd.action) return false;
-        if (!validActions.includes(cmd.action)) return false;
+    return commands.map(cmd => {
+        if (!cmd) return null;
+        let action = cmd.action || cmd.type || cmd.effect;
+        if (!action) return null;
 
-        // Validate specific commands
-        switch (cmd.action) {
-            case 'addZoom':
-                return typeof cmd.time === 'number' && cmd.time >= 0 && cmd.time <= state.duration;
-            case 'trim':
-                return typeof cmd.startTime === 'number' && typeof cmd.endTime === 'number';
-            case 'speed':
-                return typeof cmd.factor === 'number' && cmd.factor > 0 && cmd.factor <= 4;
-            case 'setZoomLevel':
-                return typeof cmd.level === 'number' && cmd.level >= 1 && cmd.level <= 4;
-            case 'setSpeed':
-                return ['slow', 'normal', 'fast', 'instant'].includes(cmd.preset);
-            default:
-                return true;
+        const actLower = String(action).toLowerCase().replace(/[-_]/g, '');
+        if (['zoom', 'addzoom', 'zoomin', 'focus', 'zoompoint'].includes(actLower)) {
+            action = 'addZoom';
+        } else if (['clearzoom', 'clearzooms', 'removeallzooms', 'resetzoom', 'resetcamera', 'zoomout', 'overview'].includes(actLower)) {
+            action = 'clearZooms';
+        } else if (['removezoom', 'deletezoom'].includes(actLower)) {
+            action = 'removeZoom';
+        } else if (['setbackground', 'background', 'wallpaper', 'theme'].includes(actLower)) {
+            action = 'setBackground';
+        } else if (['setzoomlevel', 'zoomlevel', 'zoomdepth', 'scale'].includes(actLower)) {
+            action = 'setZoomLevel';
+        } else if (['setspeed', 'speed', 'tempo'].includes(actLower)) {
+            action = 'setSpeed';
         }
-    });
+
+        // Normalize time: convert seconds to ms if < 100
+        let time = cmd.time ?? cmd.timestamp ?? cmd.start ?? cmd.startTime ?? 0;
+        if (typeof time === 'number' && time > 0 && time < 100 && durationMs > 100) {
+            time = time * 1000;
+        }
+
+        // Normalize target position
+        let x = cmd.x;
+        let y = cmd.y;
+        if (cmd.focus || cmd.target || cmd.position) {
+            const pos = String(cmd.focus || cmd.target || cmd.position).toLowerCase();
+            if (pos.includes('top') && pos.includes('left')) { x = 0.25; y = 0.25; }
+            else if (pos.includes('top') && pos.includes('right')) { x = 0.75; y = 0.25; }
+            else if (pos.includes('bottom') && pos.includes('left')) { x = 0.25; y = 0.75; }
+            else if (pos.includes('bottom') && pos.includes('right')) { x = 0.75; y = 0.75; }
+            else if (pos.includes('center') || pos.includes('middle')) { x = 0.5; y = 0.5; }
+            else if (pos.includes('left')) { x = 0.25; y = 0.5; }
+            else if (pos.includes('right')) { x = 0.75; y = 0.5; }
+            else if (pos.includes('top')) { x = 0.5; y = 0.25; }
+            else if (pos.includes('bottom')) { x = 0.5; y = 0.75; }
+        }
+
+        const normX = (typeof x === 'number' && Number.isFinite(x)) ? Math.max(0, Math.min(1, x)) : 0.5;
+        const normY = (typeof y === 'number' && Number.isFinite(y)) ? Math.max(0, Math.min(1, y)) : 0.5;
+        const scale = Number(cmd.scale || cmd.amount || cmd.level || 2.0);
+
+        return {
+            ...cmd,
+            action,
+            time: typeof time === 'number' ? time : 0,
+            x: normX,
+            y: normY,
+            scale: Math.max(1.0, Math.min(4.0, scale)),
+            name: cmd.name || cmd.value || cmd.color || '',
+        };
+    }).filter(cmd => cmd !== null);
 }
 
 /**

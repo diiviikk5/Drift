@@ -7,7 +7,15 @@ use commands::native_recorder::NativeSessionManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
+        .plugin(
+            tauri_plugin_log::Builder::default()
+                .targets([
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                ])
+                .level(log::LevelFilter::Info)
+                .build(),
+        )
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
@@ -19,19 +27,21 @@ pub fn run() {
         .manage(NativeSessionManager::default())
         .setup(|app| {
             use tauri::Manager;
-            let _ = app.handle().plugin(
-                tauri_plugin_log::Builder::default()
-                    .level(log::LevelFilter::Info)
-                    .build(),
-            );
-            if let Some(window) = app.get_webview_window("main") {
-                #[cfg(debug_assertions)]
-                {
-                    let _ = window.open_devtools();
+            log::info!("Drift setup starting...");
+            #[cfg(target_os = "windows")]
+            {
+                use windows_sys::Win32::UI::WindowsAndMessaging::ShowCursor;
+                unsafe {
+                    ShowCursor(1);
                 }
+            }
+            if let Some(window) = app.get_webview_window("main") {
+                log::info!("Found main window, calling show/unminimize/focus...");
                 let _ = window.show();
                 let _ = window.unminimize();
                 let _ = window.set_focus();
+            } else {
+                log::error!("CRITICAL: get_webview_window('main') returned None!");
             }
             Ok(())
         })
@@ -46,6 +56,8 @@ pub fn run() {
             commands::input::get_session_keystrokes,
             commands::input::minimize_window,
             commands::input::restore_window,
+            commands::input::hide_os_cursor,
+            commands::input::show_os_cursor,
             commands::hotkeys::get_hotkeys,
             commands::hotkeys::set_hotkeys,
             commands::ai::ai_completion,
@@ -68,7 +80,28 @@ pub fn run() {
             commands::native_recorder::stop_native_session,
             commands::native_recorder::get_native_session_status,
             commands::native_recorder::is_native_capture_supported,
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running Drift");
+        ]);
+
+    let app = builder
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|_app_handle, event| {
+        match event {
+            tauri::RunEvent::ExitRequested { .. } => {
+                log::info!("ExitRequested received!");
+            }
+            tauri::RunEvent::WindowEvent { label, event, .. } => {
+                log::debug!("WindowEvent for {}: {:?}", label, event);
+                #[cfg(target_os = "windows")]
+                if matches!(event, tauri::WindowEvent::Focused(true)) {
+                    use windows_sys::Win32::UI::WindowsAndMessaging::ShowCursor;
+                    unsafe {
+                        ShowCursor(1);
+                    }
+                }
+            }
+            _ => {}
+        }
+    });
 }

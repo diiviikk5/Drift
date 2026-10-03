@@ -177,7 +177,17 @@ pub async fn start_native_session(
 ) -> Result<String, String> {
     let state = app.state::<NativeSessionManager>();
     if state.is_recording.load(Ordering::Relaxed) {
-        return Err("A native recording session is already active".to_string());
+        // If capture_control is already gone or empty, recover from stale state cleanly
+        let is_running = state.capture_control.lock().is_some();
+        if is_running {
+            return Err("A native recording session is already active".to_string());
+        } else {
+            log::warn!("[NativeRecorder] Cleaning up stale recording flag");
+            state.is_recording.store(false, Ordering::Relaxed);
+            if let Some(stop_tx) = state.audio_stop_sender.lock().take() {
+                let _ = stop_tx.send(());
+            }
+        }
     }
 
     #[cfg(not(windows))]
@@ -383,8 +393,17 @@ pub async fn start_native_session(
 
         *state.start_time.lock() = Some(std::time::Instant::now());
 
-        let control = ScreenRecorderHandler::start_free_threaded(settings)
-            .map_err(|e| format!("Failed to initialize Windows Graphics Capture: {:?}", e))?;
+        let control = match ScreenRecorderHandler::start_free_threaded(settings) {
+            Ok(c) => c,
+            Err(e) => {
+                state.is_recording.store(false, Ordering::Relaxed);
+                *state.start_time.lock() = None;
+                if let Some(stop_tx) = state.audio_stop_sender.lock().take() {
+                    let _ = stop_tx.send(());
+                }
+                return Err(format!("Failed to initialize Windows Graphics Capture: {:?}", e));
+            }
+        };
 
         *state.capture_control.lock() = Some(control);
 

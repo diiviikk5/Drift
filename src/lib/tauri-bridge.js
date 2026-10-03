@@ -232,9 +232,10 @@ export async function setHotkeys(hotkeys) {
 
 /**
  * Call AI completion through Rust backend (avoids CORS in Tauri)
+ * Supports custom endpoints (Cerebras Ultra-Fast or OpenRouter)
  * Falls back to direct fetch in browser
  */
-export async function aiCompletion({ apiKey, model, messages, maxTokens, temperature }) {
+export async function aiCompletion({ apiKey, model, messages, maxTokens, temperature, endpoint }) {
     if (isTauri()) {
         const api = await getTauriApi();
         const result = await api.invoke('ai_completion', {
@@ -243,19 +244,25 @@ export async function aiCompletion({ apiKey, model, messages, maxTokens, tempera
             messages,
             maxTokens: maxTokens || null,
             temperature: temperature || null,
+            endpoint: endpoint || null,
         });
         return JSON.parse(result);
     }
 
     // Browser fallback — direct API call
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const targetUrl = endpoint || 'https://openrouter.ai/api/v1/chat/completions';
+    const headers = {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+    };
+    if (targetUrl.includes('openrouter.ai')) {
+        headers['HTTP-Referer'] = 'https://getdrift.app';
+        headers['X-Title'] = 'Drift Screen Recorder';
+    }
+
+    const response = await fetch(targetUrl, {
         method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://getdrift.app',
-            'X-Title': 'Drift Screen Recorder',
-        },
+        headers,
         body: JSON.stringify({
             model,
             messages,
@@ -400,15 +407,44 @@ export async function clearFrameBuffer() {
 export async function convertWebmToMp4(webmData, config = {}) {
     if (isTauri()) {
         const api = await getTauriApi();
-        const bytes = webmData instanceof Uint8Array ? Array.from(webmData) : (
-            webmData instanceof ArrayBuffer ? Array.from(new Uint8Array(webmData)) : Array.from(webmData)
-        );
+        let bytes;
+        if (typeof Blob !== 'undefined' && webmData instanceof Blob) {
+            bytes = Array.from(new Uint8Array(await webmData.arrayBuffer()));
+        } else if (webmData instanceof Uint8Array) {
+            bytes = Array.from(webmData);
+        } else if (webmData instanceof ArrayBuffer) {
+            bytes = Array.from(new Uint8Array(webmData));
+        } else {
+            bytes = Array.from(webmData);
+        }
         return api.invoke('convert_webm_to_mp4', {
             webmData: bytes,
             config,
         });
     }
     throw new Error('Native convertWebmToMp4 only available in Tauri');
+}
+
+/**
+ * Hide Windows OS hardware cursor during screen recording (matches OpenScreen cursorHider)
+ */
+export async function hideOsCursor() {
+    if (isTauri()) {
+        const api = await getTauriApi();
+        return api.invoke('hide_os_cursor');
+    }
+    return false;
+}
+
+/**
+ * Restore Windows OS hardware cursor visibility when recording concludes
+ */
+export async function showOsCursor() {
+    if (isTauri()) {
+        const api = await getTauriApi();
+        return api.invoke('show_os_cursor');
+    }
+    return false;
 }
 
 // ============================================================
@@ -498,27 +534,55 @@ export async function registerGlobalShortcuts(hotkeyConfig) {
     // Unregister any existing shortcuts first
     await unregisterAllShortcuts();
 
-    const entries = Object.entries(hotkeyConfig || {});
-    for (const [action, accelerator] of entries) {
+    // Map unique accelerators to actions, deduplicating toggle_recording and stop_recording
+    const accelMap = new Map();
+    for (const [action, accelerator] of Object.entries(hotkeyConfig || {})) {
         if (!accelerator || typeof accelerator !== 'string') continue;
-        
+        const norm = accelerator.trim();
+        if (!accelMap.has(norm)) {
+            accelMap.set(norm, []);
+        }
+        accelMap.get(norm).push(action);
+    }
+
+    let lastTriggerTime = 0;
+
+    for (const [rawAccel, actions] of accelMap.entries()) {
         const variants = [
-            accelerator,
-            accelerator.replace(/^CmdOrCtrl/i, 'CommandOrControl'),
-            accelerator.replace(/^CommandOrControl/i, 'Ctrl'),
-            accelerator.replace(/^CmdOrCtrl/i, 'Ctrl'),
+            rawAccel,
+            rawAccel.replace(/^CmdOrCtrl/i, 'CommandOrControl'),
+            rawAccel.replace(/^CmdOrCtrl/i, 'Ctrl'),
+            rawAccel.replace(/^CommandOrControl/i, 'Ctrl'),
+            rawAccel.replace(/^CommandOrControl/i, 'Control'),
+            rawAccel.replace(/^Ctrl/i, 'CommandOrControl'),
+            rawAccel.replace(/^Ctrl/i, 'Control'),
+            'Ctrl+X',
+            'Control+X',
+            'CommandOrControl+X',
         ];
         const uniqueVariants = [...new Set(variants)];
         let registered = false;
+
+        // If this accelerator contains both toggle_recording and stop_recording,
+        // prioritize toggle_recording so it does not start and instantly stop
+        const effectiveActions = actions.includes('toggle_recording')
+            ? actions.filter(a => a !== 'stop_recording')
+            : actions;
 
         for (const candidate of uniqueVariants) {
             try {
                 await api.register(candidate, (event) => {
                     // Only fire on key-down (not release)
-                    if (event.state === 'Released') return;
-                    window.dispatchEvent(new CustomEvent('drift-hotkey', {
-                        detail: { action, accelerator: candidate }
-                    }));
+                    if (event && event.state === 'Released') return;
+                    const now = Date.now();
+                    if (now - lastTriggerTime < 350) return; // Debounce rapid global key events
+                    lastTriggerTime = now;
+
+                    for (const action of effectiveActions) {
+                        window.dispatchEvent(new CustomEvent('drift-hotkey', {
+                            detail: { action, accelerator: candidate }
+                        }));
+                    }
                 });
                 _registeredShortcuts.push(candidate);
                 registered = true;
@@ -529,7 +593,7 @@ export async function registerGlobalShortcuts(hotkeyConfig) {
         }
 
         if (!registered) {
-            console.warn(`[drift] Failed to register shortcut for ${action}:`, uniqueVariants);
+            console.warn(`[drift] Failed to register global shortcut for [${effectiveActions.join(', ')}]:`, uniqueVariants);
         }
     }
     console.log('[drift] Registered global shortcuts:', _registeredShortcuts);
@@ -668,6 +732,8 @@ export const drift = {
     stopNativeSession,
     getNativeSessionStatus,
     resolveAssetUrl,
+    hideOsCursor,
+    showOsCursor,
 };
 
 export default drift;

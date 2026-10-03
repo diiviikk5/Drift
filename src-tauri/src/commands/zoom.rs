@@ -3,7 +3,6 @@
 /// Modeled after Cap's rendering crate architecture.
 
 use serde::{Deserialize, Serialize};
-use crate::rendering::spring_physics::{SpringConfig, SpringSimulation, spring_ease, spring_ease_out, instant_ease};
 
 // ═══════════════════════════════════════════════════════════════
 // Shared Data Types (serialized to/from JS)
@@ -32,7 +31,13 @@ pub struct ZoomSegment {
     pub start: f64,    // seconds
     pub end: f64,      // seconds
     pub amount: f64,   // zoom level
+    #[serde(default = "default_center")]
+    pub target_x: f64, // 0-1 normalized
+    #[serde(default = "default_center")]
+    pub target_y: f64, // 0-1 normalized
 }
+
+fn default_center() -> f64 { 0.5 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZoomState {
@@ -51,32 +56,28 @@ pub struct CursorState {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Constants — tuned for aesthetic, cinematic zoom feel
+// Constants — tuned for aesthetic, cinematic zoom feel (single source of truth)
 // ═══════════════════════════════════════════════════════════════
 
-const ZOOM_DURATION: f64 = 1.0;  // seconds for zoom in/out transition — slow & cinematic (matches Cap)
-
-const CLICK_GROUP_TIME_THRESHOLD_SECS: f64 = 2.5;
-const CLICK_GROUP_SPATIAL_THRESHOLD: f64 = 0.15;
-const CLICK_PRE_PADDING: f64 = 0.4;   // start zooming in slightly earlier for anticipation
-const CLICK_POST_PADDING: f64 = 2.0;  // hold zoom longer after click — gives viewer time to read
-const MERGE_GAP_THRESHOLD: f64 = 0.8; // wider merge window to avoid jarring in-out-in
-const MIN_SEGMENT_DURATION: f64 = 1.2; // longer minimum so short segments don't flash
+const RAMP_IN_DURATION: f64 = 0.80;   // seconds for calm anticipation ramp-in
+const RAMP_OUT_DURATION: f64 = 1.05;  // seconds for silky overview landing with zero exit velocity
+const CHAINED_PAN_GAP_SECS: f64 = 6.5;// gap threshold to chain consecutive interactions without zooming out
+const CLICK_GROUP_TIME_THRESHOLD_SECS: f64 = 4.5;
+const CLICK_GROUP_SPATIAL_THRESHOLD: f64 = 0.45;
+const CLICK_PRE_PADDING: f64 = 0.40;  // start zooming in gently before click time
+const CLICK_POST_PADDING: f64 = 2.2;  // hold zoom longer after click — gives viewer time to read
+const MERGE_GAP_THRESHOLD: f64 = 5.0; // merge window to avoid jarring in-out-in
+const MIN_SEGMENT_DURATION: f64 = 2.0;// longer minimum so short segments don't flash
+const START_PADDING_SECONDS: f64 = 0.4; // filter out record button/window activation clicks
 const STOP_PADDING_SECONDS: f64 = 0.5;
-const AUTO_ZOOM_AMOUNT: f64 = 1.8;    // slightly less aggressive zoom (1.8x vs 2.0x) — more subtle
+const AUTO_ZOOM_AMOUNT: f64 = 1.55;   // standard balanced 1.55x cinema zoom level
+const DEADZONE_RADIUS: f64 = 0.18;    // generous deadzone: mouse moves freely without camera shake
+const TRACK_DAMPING: f64 = 0.35;      // heavy studio damping when cursor approaches screen edges
 
 // Cursor smoothing
-const CURSOR_IDLE_DELAY_MS: f64 = 600.0;  // wait a bit longer before fading
-const CURSOR_FADE_OUT_MS: f64 = 500.0;    // slower fade for elegance
-const CLICK_REACTION_WINDOW_MS: f64 = 160.0;
-const CLICK_VISUAL_DURATION_MS: f64 = 350.0;  // slightly longer click ripple
-const SHAKE_THRESHOLD: f64 = 0.015;
-const SHAKE_WINDOW_MS: f64 = 100.0;
-
-// Screen spring constants — softer springs for smooth, cinematic movement
-const SCREEN_SPRING_STIFFNESS: f64 = 120.0;  // softer than Cap's 200 — less snappy, more fluid
-const SCREEN_SPRING_DAMPING: f64 = 32.0;     // lower damping — allows gentle overshoot for organic feel
-const SCREEN_SPRING_MASS: f64 = 2.5;         // slightly heavier — slower to start, graceful deceleration
+const CURSOR_IDLE_DELAY_MS: f64 = 600.0;
+const CURSOR_FADE_OUT_MS: f64 = 500.0;
+const CLICK_VISUAL_DURATION_MS: f64 = 350.0;
 
 // ═══════════════════════════════════════════════════════════════
 // Command: Generate Zoom Segments from Clicks
@@ -108,13 +109,13 @@ fn generate_segments_impl(
         max_duration
     };
 
-    if activity_end_limit <= f64::EPSILON {
+    if activity_end_limit <= START_PADDING_SECONDS {
         return Vec::new();
     }
 
-    // Filter to down-clicks within the valid time range
+    // Filter to down-clicks within the valid time range (ignoring startup click)
     let down_clicks: Vec<&ClickEvent> = clicks.iter()
-        .filter(|c| c.down && c.time / 1000.0 < activity_end_limit)
+        .filter(|c| c.down && (c.time / 1000.0) >= START_PADDING_SECONDS && (c.time / 1000.0) < activity_end_limit)
         .collect();
 
     if down_clicks.is_empty() {
@@ -161,8 +162,8 @@ fn generate_segments_impl(
         }
     }
 
-    // Convert groups to time intervals
-    let mut intervals: Vec<(f64, f64)> = Vec::new();
+    // Convert groups to raw ZoomSegments with centroid anchor
+    let mut raw_segments: Vec<ZoomSegment> = Vec::new();
 
     for group in &groups {
         if group.is_empty() { continue; }
@@ -171,46 +172,96 @@ fn generate_segments_impl(
         let group_start = times.iter().cloned().fold(f64::INFINITY, f64::min);
         let group_end = times.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
 
+        let sum_x: f64 = group.iter().map(|&i| click_positions[i].1).sum();
+        let sum_y: f64 = group.iter().map(|&i| click_positions[i].2).sum();
+        let count = group.len() as f64;
+        let target_x = (sum_x / count).clamp(0.0, 1.0);
+        let target_y = (sum_y / count).clamp(0.0, 1.0);
+
         let start = (group_start - CLICK_PRE_PADDING).max(0.0);
         let end = (group_end + CLICK_POST_PADDING).min(activity_end_limit);
 
         if end > start {
-            intervals.push((start, end));
+            raw_segments.push(ZoomSegment {
+                start,
+                end,
+                amount: AUTO_ZOOM_AMOUNT,
+                target_x,
+                target_y,
+            });
         }
     }
 
-    if intervals.is_empty() {
+    if raw_segments.is_empty() {
         return Vec::new();
     }
 
     // Sort and merge overlapping/close intervals
-    intervals.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+    raw_segments.sort_by(|a, b| a.start.partial_cmp(&b.start).unwrap_or(std::cmp::Ordering::Equal));
 
-    let mut merged: Vec<(f64, f64)> = Vec::new();
-    for interval in intervals {
+    let mut merged: Vec<ZoomSegment> = Vec::new();
+    for seg in raw_segments {
         if let Some(last) = merged.last_mut() {
-            if interval.0 <= last.1 + MERGE_GAP_THRESHOLD {
-                last.1 = last.1.max(interval.1);
+            let gap = seg.start - last.end;
+            let dist = ((seg.target_x - last.target_x).powi(2) + (seg.target_y - last.target_y).powi(2)).sqrt();
+            if (gap <= MERGE_GAP_THRESHOLD || gap <= 0.0) && dist <= 0.45 {
+                // Merge nearby clicks into a single calm focus window
+                last.end = last.end.max(seg.end);
+                last.target_x = last.target_x * 0.40 + seg.target_x * 0.60;
+                last.target_y = last.target_y * 0.40 + seg.target_y * 0.60;
                 continue;
+            } else if gap <= CHAINED_PAN_GAP_SECS {
+                // Bridge gap so camera glides continuously between targets rather than dipping to overview
+                last.end = seg.start;
             }
         }
-        merged.push(interval);
+        merged.push(seg);
     }
 
-    // Convert to ZoomSegments, filtering out too-short ones
+    // Guarantee strict non-overlapping sequence order
+    for i in 0..merged.len().saturating_sub(1) {
+        if merged[i].end > merged[i + 1].start {
+            merged[i].end = merged[i + 1].start;
+        }
+    }
+
+    // Convert to ZoomSegments, ensuring minimum duration so hold is calm and steady without overlapping next segment
+    let len = merged.len();
+    for i in 0..len {
+        let max_end = if i + 1 < len {
+            merged[i + 1].start
+        } else {
+            activity_end_limit
+        };
+        if merged[i].end - merged[i].start < MIN_SEGMENT_DURATION {
+            let desired = (merged[i].start + MIN_SEGMENT_DURATION).min(activity_end_limit);
+            merged[i].end = desired.min(max_end).max(merged[i].end);
+        }
+    }
+
     merged.into_iter()
-        .filter_map(|(start, end)| {
-            let duration = end - start;
-            if duration < MIN_SEGMENT_DURATION {
-                return None;
-            }
-            Some(ZoomSegment {
-                start,
-                end,
-                amount: AUTO_ZOOM_AMOUNT,
-            })
-        })
+        .filter(|s| s.end > s.start)
         .collect()
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Easing Curves — Cinema Grade
+// ═══════════════════════════════════════════════════════════════
+
+fn ease_cinema_ramp_in(t: f64) -> f64 {
+    let clamped = t.clamp(0.0, 1.0);
+    clamped * clamped * (3.0 - 2.0 * clamped)
+}
+
+fn ease_cinema_ramp_out(t: f64) -> f64 {
+    let clamped = t.clamp(0.0, 1.0);
+    let inv = 1.0 - clamped;
+    1.0 - (inv * inv * (3.0 - 2.0 * inv))
+}
+
+fn ease_chained_pan(t: f64) -> f64 {
+    let clamped = t.clamp(0.0, 1.0);
+    clamped * clamped * clamped * (clamped * (clamped * 6.0 - 15.0) + 10.0)
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -231,17 +282,17 @@ pub fn evaluate_zoom_at_time(
     let time_secs = time_ms / 1000.0;
 
     // Find which segment we're in or transitioning from
-    let (zoom_t, focus_x, focus_y) = evaluate_segments(&segments, time_secs, cursor_x, cursor_y);
+    let (zoom_t, focus_x, focus_y, target_amount) = evaluate_segments(&segments, time_secs, cursor_x, cursor_y);
 
     if zoom_t <= 0.001 {
         return ZoomState { x: 0.5, y: 0.5, scale: 1.0 };
     }
 
     // Compute zoomed camera position
-    let amount = 1.0 + (AUTO_ZOOM_AMOUNT - 1.0) * zoom_t;
+    let amount = 1.0 + (target_amount - 1.0) * zoom_t;
     let half = 0.5 / amount;
 
-    // Center on focus, clamped to keep viewport in bounds
+    // Center on focus, clamped to keep viewport strictly in bounds
     let cx = focus_x.clamp(half, 1.0 - half);
     let cy = focus_y.clamp(half, 1.0 - half);
 
@@ -252,104 +303,188 @@ pub fn evaluate_zoom_at_time(
     }
 }
 
-/// Core zoom evaluation — ported from Cap's InterpolatedZoom::new_with_easing_and_cursor
+/// Real-time viewport adjustment to guarantee cursor is always inside the visible viewport.
+/// Ported from proven reference architecture with 15% inner safety margin.
+fn ensure_cursor_visible(
+    focus_x: f64,
+    focus_y: f64,
+    scale: f64,
+    cursor_x: f64,
+    cursor_y: f64,
+) -> (f64, f64, f64) {
+    if scale <= 1.001 {
+        return (0.5, 0.5, 1.0);
+    }
+    let v_size = 1.0 / scale;
+    let margin = v_size * 0.15;
+
+    let v_left = focus_x - v_size * 0.5;
+    let v_top = focus_y - v_size * 0.5;
+
+    let inner_left = v_left + margin;
+    let inner_right = v_left + v_size - margin;
+    let inner_top = v_top + margin;
+    let inner_bottom = v_top + v_size - margin;
+
+    if cursor_x >= inner_left && cursor_x <= inner_right && cursor_y >= inner_top && cursor_y <= inner_bottom {
+        return (focus_x, focus_y, scale);
+    }
+
+    let mut new_left = v_left;
+    let mut new_top = v_top;
+
+    if cursor_x < inner_left {
+        new_left = cursor_x - margin;
+    } else if cursor_x > inner_right {
+        new_left = cursor_x - v_size + margin;
+    }
+
+    if cursor_y < inner_top {
+        new_top = cursor_y - margin;
+    } else if cursor_y > inner_bottom {
+        new_top = cursor_y - v_size + margin;
+    }
+
+    new_left = new_left.clamp(0.0, 1.0 - v_size);
+    new_top = new_top.clamp(0.0, 1.0 - v_size);
+
+    let cur_visible = cursor_x >= new_left && cursor_x <= new_left + v_size && cursor_y >= new_top && cursor_y <= new_top + v_size;
+    if cur_visible {
+        return (new_left + v_size * 0.5, new_top + v_size * 0.5, scale);
+    }
+
+    let dist_left = (cursor_x - 0.05).max(0.0);
+    let dist_right = (1.0 - cursor_x - 0.05).max(0.0);
+    let dist_top = (cursor_y - 0.05).max(0.0);
+    let dist_bottom = (1.0 - cursor_y - 0.05).max(0.0);
+
+    let max_zx = 0.5 / dist_left.min(dist_right).max(0.001);
+    let max_zy = 0.5 / dist_top.min(dist_bottom).max(0.001);
+    let effective_zoom = scale.min(max_zx.min(max_zy)).max(1.0);
+    let new_v_size = 1.0 / effective_zoom;
+
+    let final_left = (cursor_x - new_v_size * 0.5).clamp(0.0, 1.0 - new_v_size);
+    let final_top = (cursor_y - new_v_size * 0.5).clamp(0.0, 1.0 - new_v_size);
+
+    (final_left + new_v_size * 0.5, final_top + new_v_size * 0.5, effective_zoom)
+}
+
+/// Core zoom evaluation — smooth transitions, connected pans, and deadzone damping
 fn evaluate_segments(
     segments: &[ZoomSegment],
     time_secs: f64,
     cursor_x: f64,
     cursor_y: f64,
-) -> (f64, f64, f64) {
-    // Find current and previous segment
-    let mut current_seg: Option<&ZoomSegment> = None;
-    let mut prev_seg: Option<&ZoomSegment> = None;
-
-    for (i, seg) in segments.iter().enumerate() {
-        if time_secs > seg.start && time_secs <= seg.end {
-            current_seg = Some(seg);
-            if i > 0 {
-                prev_seg = Some(&segments[i - 1]);
-            }
-            break;
-        }
+) -> (f64, f64, f64, f64) {
+    if segments.is_empty() {
+        return (0.0, 0.5, 0.5, AUTO_ZOOM_AMOUNT);
     }
 
-    // If not in a segment, check if we recently left one
-    if current_seg.is_none() {
-        for seg in segments.iter().rev() {
-            if seg.end <= time_secs {
-                prev_seg = Some(seg);
-                break;
-            }
-        }
-    }
+    // 1. Check chained pan transition between consecutive segments
+    for i in 0..segments.len().saturating_sub(1) {
+        let seg_a = &segments[i];
+        let seg_b = &segments[i + 1];
+        let gap = seg_b.start - seg_a.end;
 
-    match (prev_seg, current_seg) {
-        // Zooming out from previous segment
-        (Some(prev), None) => {
-            let elapsed = time_secs - prev.end;
-            if elapsed >= ZOOM_DURATION {
-                return (0.0, 0.5, 0.5); // Fully zoomed out
-            }
-            let raw_t = (elapsed / ZOOM_DURATION) as f32;
-            let ease_t = spring_ease_out(
-                raw_t,
-                SCREEN_SPRING_STIFFNESS,
-                SCREEN_SPRING_DAMPING,
-                SCREEN_SPRING_MASS,
-            ) as f64;
-            let zoom_t = 1.0 - ease_t;
-            (zoom_t, cursor_x, cursor_y)
-        }
-
-        // Zooming into current segment (no previous)
-        (None, Some(seg)) => {
-            let elapsed = time_secs - seg.start;
-            let raw_t = (elapsed / ZOOM_DURATION).min(1.0) as f32;
-            let ease_t = spring_ease(
-                raw_t,
-                SCREEN_SPRING_STIFFNESS,
-                SCREEN_SPRING_DAMPING,
-                SCREEN_SPRING_MASS,
-            ) as f64;
-            (ease_t, cursor_x, cursor_y)
-        }
-
-        // Transitioning between segments
-        (Some(prev), Some(seg)) => {
-            let elapsed = time_secs - seg.start;
-            let raw_t = (elapsed / ZOOM_DURATION).min(1.0) as f32;
-            let ease_t = spring_ease(
-                raw_t,
-                SCREEN_SPRING_STIFFNESS,
-                SCREEN_SPRING_DAMPING,
-                SCREEN_SPRING_MASS,
-            ) as f64;
-
-            if seg.start == prev.end {
-                // Back-to-back segments — stay zoomed, just pan
-                (1.0, cursor_x, cursor_y)
-            } else if seg.start - prev.end < ZOOM_DURATION {
-                // Small gap — partial zoom out then back in
-                // At seg.start, compute how far we'd have zoomed out
-                let gap = seg.start - prev.end;
-                let out_t = spring_ease_out(
-                    (gap / ZOOM_DURATION) as f32,
-                    SCREEN_SPRING_STIFFNESS,
-                    SCREEN_SPRING_DAMPING,
-                    SCREEN_SPRING_MASS,
-                ) as f64;
-                let min_zoom = 1.0 - out_t;
-                // Blend from min_zoom to 1.0
-                let t = min_zoom * (1.0 - ease_t) + ease_t;
-                (t, cursor_x, cursor_y)
+        if gap <= CHAINED_PAN_GAP_SECS {
+            let (tran_start, tran_end) = if gap > RAMP_IN_DURATION {
+                (seg_a.end, seg_b.start)
             } else {
-                // Large gap — normal zoom in
-                (ease_t, cursor_x, cursor_y)
+                let junction = (seg_a.end + seg_b.start) * 0.5;
+                let pan_dur = 0.75_f64.min((seg_a.end - seg_a.start) * 0.7).min((seg_b.end - seg_b.start) * 0.7).max(0.2);
+                (junction - pan_dur * 0.5, junction + pan_dur * 0.5)
+            };
+
+            // Hold calm focus on seg_a during pre-pan gap instead of dropping to overview
+            if time_secs >= seg_a.end && time_secs < tran_start {
+                let (fx, fy, sc) = if seg_a.amount > 1.05 {
+                    ensure_cursor_visible(seg_a.target_x, seg_a.target_y, seg_a.amount, cursor_x, cursor_y)
+                } else {
+                    (seg_a.target_x, seg_a.target_y, seg_a.amount)
+                };
+                return (1.0, fx, fy, sc);
+            }
+
+            if time_secs >= tran_start && time_secs <= tran_end {
+                let span = (tran_end - tran_start).max(0.001);
+                let progress = ((time_secs - tran_start) / span).clamp(0.0, 1.0);
+                let eased_pan = ease_chained_pan(progress);
+
+                let scale_a = seg_a.amount;
+                let scale_b = seg_b.amount;
+                let connected_scale = scale_a + (scale_b - scale_a) * eased_pan;
+
+                let pan_x = seg_a.target_x + (seg_b.target_x - seg_a.target_x) * eased_pan;
+                let pan_y = seg_a.target_y + (seg_b.target_y - seg_a.target_y) * eased_pan;
+                return (1.0, pan_x, pan_y, connected_scale);
             }
         }
-
-        _ => (0.0, 0.5, 0.5),
     }
+
+    // 2. Check if inside or transitioning into/out of a segment
+    for (i, seg) in segments.iter().enumerate() {
+        let prev_seg = if i > 0 { Some(&segments[i - 1]) } else { None };
+        let next_seg = segments.get(i + 1);
+
+        let has_chained_prev = prev_seg.map_or(false, |p| (seg.start - p.end) <= CHAINED_PAN_GAP_SECS);
+        let has_chained_next = next_seg.map_or(false, |n| (n.start - seg.end) <= CHAINED_PAN_GAP_SECS);
+
+        let ramp_up_dur = RAMP_IN_DURATION.min((seg.end - seg.start) * 0.5);
+        let ramp_down_dur = RAMP_OUT_DURATION.min((seg.end - seg.start) * 0.5);
+
+        let lead_in = seg.start;
+        let ramp_up_end = seg.start + ramp_up_dur;
+        let ramp_down_start = seg.end - ramp_down_dur;
+        let lead_out = seg.end;
+
+        if time_secs >= lead_in && time_secs <= lead_out {
+            let blend_weight = if time_secs < ramp_up_end && !has_chained_prev {
+                let progress = ((time_secs - lead_in) / ramp_up_dur).clamp(0.0, 1.0);
+                ease_cinema_ramp_in(progress)
+            } else if time_secs > ramp_down_start && !has_chained_next {
+                let progress = ((time_secs - ramp_down_start) / ramp_down_dur).clamp(0.0, 1.0);
+                1.0 - ease_cinema_ramp_out(progress)
+            } else {
+                1.0
+            };
+
+            // Deadzone and damping around focal target
+            let mut focus_x = seg.target_x;
+            let mut focus_y = seg.target_y;
+
+            let dx = cursor_x - focus_x;
+            let dy = cursor_y - focus_y;
+            let dist = (dx * dx + dy * dy).sqrt();
+
+            if dist > DEADZONE_RADIUS {
+                let pull = ((dist - DEADZONE_RADIUS) / dist) * TRACK_DAMPING;
+                focus_x += dx * pull;
+                focus_y += dy * pull;
+            }
+
+            let (final_fx, final_fy, final_scale) = if seg.amount > 1.05 && blend_weight > 0.1 {
+                ensure_cursor_visible(focus_x, focus_y, seg.amount, cursor_x, cursor_y)
+            } else {
+                (focus_x, focus_y, seg.amount)
+            };
+
+            return (blend_weight, final_fx, final_fy, final_scale);
+        }
+    }
+
+    // 3. Zooming out after the very last segment
+    if let Some(last) = segments.last() {
+        if time_secs > last.end {
+            let elapsed = time_secs - last.end;
+            if elapsed < RAMP_OUT_DURATION {
+                let progress = (elapsed / RAMP_OUT_DURATION).clamp(0.0, 1.0);
+                let blend_weight = 1.0 - ease_cinema_ramp_out(progress);
+                return (blend_weight, last.target_x, last.target_y, last.amount);
+            }
+        }
+    }
+
+    (0.0, 0.5, 0.5, AUTO_ZOOM_AMOUNT)
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -366,9 +501,7 @@ pub fn interpolate_cursor_at_time(
         return CursorState { x: 0.5, y: 0.5, opacity: 0.0, click_progress: 0.0, motion: 0.0 };
     }
 
-    let _time_secs = time_ms / 1000.0;
-
-    // --- Position interpolation with spring smoothing ---
+    // --- Position interpolation with smooth trajectory ---
     let (x, y, vx, vy) = interpolate_cursor_position(&moves, time_ms);
 
     // --- Click progress ---
@@ -383,7 +516,7 @@ pub fn interpolate_cursor_at_time(
     CursorState { x, y, opacity, click_progress, motion }
 }
 
-/// Spring-smoothed cursor position interpolation
+/// Smooth cursor position interpolation between telemetry samples
 fn interpolate_cursor_position(moves: &[MoveEvent], time_ms: f64) -> (f64, f64, f32, f32) {
     if moves.is_empty() {
         return (0.5, 0.5, 0.0, 0.0);
@@ -401,89 +534,31 @@ fn interpolate_cursor_position(moves: &[MoveEvent], time_ms: f64) -> (f64, f64, 
         }
     }
 
-    // Filter shake
-    let filtered = filter_shake(moves);
-    
-    // Run spring simulation up to query time
-    let config = SpringConfig::cursor_default();
-    let mut sim = SpringSimulation::new(config);
-    sim.set_position([filtered[0].x as f32, filtered[0].y as f32]);
-    sim.set_velocity([0.0, 0.0]);
-    sim.set_target(sim.position);
-
-    let mut last_time: f32 = 0.0;
-
-    for m in filtered.iter() {
-        if m.time > time_ms {
-            // This move is in the future — set it as target and run partial step
-            sim.set_target([m.x as f32, m.y as f32]);
-            let dt = time_ms as f32 - last_time;
-            sim.run(dt);
-            last_time = time_ms as f32;
-            break;
-        }
-
-        sim.set_target([m.x as f32, m.y as f32]);
-        let dt = m.time as f32 - last_time;
-        if dt > 0.0 {
-            sim.run(dt);
-        }
-        last_time = m.time as f32;
+    // Binary search for bracketing moves
+    let idx = moves.partition_point(|m| m.time <= time_ms);
+    if idx == 0 {
+        return (moves[0].x, moves[0].y, 0.0, 0.0);
+    }
+    if idx >= moves.len() {
+        let last = moves.last().unwrap();
+        return (last.x, last.y, 0.0, 0.0);
     }
 
-    // If we passed all moves without breaking, run remaining time
-    if last_time < time_ms as f32 {
-        let dt = time_ms as f32 - last_time;
-        sim.run(dt);
-    }
+    let a = &moves[idx - 1];
+    let b = &moves[idx];
+    let duration = (b.time - a.time).max(0.001);
+    let t = ((time_ms - a.time) / duration).clamp(0.0, 1.0);
 
-    let x = (sim.position[0] as f64).clamp(0.0, 1.0);
-    let y = (sim.position[1] as f64).clamp(0.0, 1.0);
+    // Smooth hermite cubic interpolation
+    let s = t * t * (3.0 - 2.0 * t);
+    let x = (a.x + (b.x - a.x) * s).clamp(0.0, 1.0);
+    let y = (a.y + (b.y - a.y) * s).clamp(0.0, 1.0);
 
-    (x, y, sim.velocity[0], sim.velocity[1])
-}
+    let dt_sec = duration / 1000.0;
+    let vx = ((b.x - a.x) / dt_sec) as f32;
+    let vy = ((b.y - a.y) / dt_sec) as f32;
 
-/// Simple shake filter — removes jittery micro-movements
-fn filter_shake(moves: &[MoveEvent]) -> Vec<&MoveEvent> {
-    if moves.len() < 3 {
-        return moves.iter().collect();
-    }
-
-    let mut result = Vec::with_capacity(moves.len());
-    result.push(&moves[0]);
-
-    for i in 1..moves.len() - 1 {
-        let prev = &moves[i - 1];
-        let curr = &moves[i];
-        let next = &moves[i + 1];
-
-        let time_window = next.time - prev.time;
-        if time_window > SHAKE_WINDOW_MS {
-            result.push(curr);
-            continue;
-        }
-
-        let dx1 = curr.x - prev.x;
-        let dy1 = curr.y - prev.y;
-        let dx2 = next.x - curr.x;
-        let dy2 = next.y - curr.y;
-
-        let dot = dx1 * dx2 + dy1 * dy2;
-        let dist = ((dx1 * dx1 + dy1 * dy1).sqrt() + (dx2 * dx2 + dy2 * dy2).sqrt()) * 0.5;
-
-        // Skip if direction reversed AND movement is tiny (shake)
-        if dot < 0.0 && dist < SHAKE_THRESHOLD {
-            continue;
-        }
-
-        result.push(curr);
-    }
-
-    if let Some(last) = moves.last() {
-        result.push(last);
-    }
-
-    result
+    (x, y, vx, vy)
 }
 
 /// Compute click visual progress (0 = no click, 0→1 = click animation)
@@ -573,87 +648,10 @@ pub fn precompute_frames(
 
     let mut frames = Vec::with_capacity(frame_count);
 
-    // Pre-filter and prepare cursor data
-    let filtered_moves: Vec<MoveEvent> = {
-        if moves.len() < 3 {
-            moves.clone()
-        } else {
-            // Basic shake filter inline for performance
-            let mut result = Vec::with_capacity(moves.len());
-            result.push(moves[0].clone());
-            for i in 1..moves.len() - 1 {
-                let prev = &moves[i - 1];
-                let curr = &moves[i];
-                let next = &moves[i + 1];
-                let time_window = next.time - prev.time;
-                if time_window > SHAKE_WINDOW_MS {
-                    result.push(curr.clone());
-                    continue;
-                }
-                let dx1 = curr.x - prev.x;
-                let dy1 = curr.y - prev.y;
-                let dx2 = next.x - curr.x;
-                let dy2 = next.y - curr.y;
-                let dot = dx1 * dx2 + dy1 * dy2;
-                let dist = ((dx1 * dx1 + dy1 * dy1).sqrt() + (dx2 * dx2 + dy2 * dy2).sqrt()) * 0.5;
-                if !(dot < 0.0 && dist < SHAKE_THRESHOLD) {
-                    result.push(curr.clone());
-                }
-            }
-            if let Some(last) = moves.last() {
-                result.push(last.clone());
-            }
-            result
-        }
-    };
-
-    // Run spring simulation once through all frames
-    let config = SpringConfig::cursor_default();
-    let mut sim = SpringSimulation::new(config);
-    if !filtered_moves.is_empty() {
-        sim.set_position([filtered_moves[0].x as f32, filtered_moves[0].y as f32]);
-    } else {
-        sim.set_position([0.5, 0.5]);
-    }
-    sim.set_velocity([0.0, 0.0]);
-    sim.set_target(sim.position);
-
-    let mut move_idx = 0;
-    let mut last_sim_time: f32 = 0.0;
-
     for frame in 0..frame_count {
         let time_ms = frame as f64 * frame_duration_ms;
-
-        // Advance spring simulation to this frame time
-        while move_idx < filtered_moves.len() && filtered_moves[move_idx].time <= time_ms {
-            let m = &filtered_moves[move_idx];
-            sim.set_target([m.x as f32, m.y as f32]);
-            let dt = m.time as f32 - last_sim_time;
-            if dt > 0.0 { sim.run(dt); }
-            last_sim_time = m.time as f32;
-            move_idx += 1;
-        }
-
-        // Run remaining time to exact frame position
-        let remaining = time_ms as f32 - last_sim_time;
-        if remaining > 0.0 {
-            sim.run(remaining);
-            last_sim_time = time_ms as f32;
-        }
-
-        let cx = (sim.position[0] as f64).clamp(0.0, 1.0);
-        let cy = (sim.position[1] as f64).clamp(0.0, 1.0);
-
-        let cursor = CursorState {
-            x: cx,
-            y: cy,
-            opacity: compute_opacity(&filtered_moves, time_ms),
-            click_progress: compute_click_progress(&clicks, time_ms),
-            motion: ((sim.velocity[0] * sim.velocity[0] + sim.velocity[1] * sim.velocity[1]) as f64).sqrt().min(1.0),
-        };
-
+        let cursor = interpolate_cursor_at_time(moves.clone(), clicks.clone(), time_ms);
         let zoom = evaluate_zoom_at_time(segments.clone(), time_ms, cursor.x, cursor.y);
-
         frames.push(FrameState { zoom, cursor });
     }
 
@@ -673,7 +671,7 @@ mod tests {
 
     #[test]
     fn segment_zooms_in() {
-        let segments = vec![ZoomSegment { start: 1.0, end: 5.0, amount: 2.0 }];
+        let segments = vec![ZoomSegment { start: 1.0, end: 5.0, amount: 2.0, target_x: 0.5, target_y: 0.5 }];
         // At t=2.0 (1 second into segment), should be partially zoomed
         let state = evaluate_zoom_at_time(segments, 2000.0, 0.5, 0.5);
         assert!(state.scale > 1.0);
@@ -681,8 +679,8 @@ mod tests {
 
     #[test]
     fn segment_zooms_out_after() {
-        let segments = vec![ZoomSegment { start: 1.0, end: 3.0, amount: 2.0 }];
-        // At t=3.5 (0.5s after segment end), should be zooming out
+        let segments = vec![ZoomSegment { start: 1.0, end: 3.0, amount: 2.0, target_x: 0.5, target_y: 0.5 }];
+        // At t=3.5 (0.5s after segment end), should be zooming out (RAMP_OUT_DURATION is 1.05s)
         let state = evaluate_zoom_at_time(segments.clone(), 3500.0, 0.5, 0.5);
         assert!(state.scale > 1.0); // Still partially zoomed
 
@@ -700,6 +698,7 @@ mod tests {
         let segments = generate_zoom_segments(clicks, vec![], 10000.0);
         assert!(!segments.is_empty());
         assert!(segments[0].start < 2.0); // Should start before clicks
+        assert!((segments[0].target_x - 0.5).abs() < 0.01);
     }
 
     #[test]
@@ -715,7 +714,7 @@ mod tests {
 
     #[test]
     fn precompute_consistency() {
-        let segments = vec![ZoomSegment { start: 1.0, end: 3.0, amount: 2.0 }];
+        let segments = vec![ZoomSegment { start: 1.0, end: 3.0, amount: 2.0, target_x: 0.5, target_y: 0.5 }];
         let moves = vec![
             MoveEvent { time: 0.0, x: 0.5, y: 0.5 },
             MoveEvent { time: 5000.0, x: 0.5, y: 0.5 },
@@ -729,7 +728,7 @@ mod tests {
     #[test]
     fn starts_panned_out() {
         // Critical test: at t=0, camera should be at scale 1.0 (no zoom)
-        let segments = vec![ZoomSegment { start: 2.0, end: 5.0, amount: 2.0 }];
+        let segments = vec![ZoomSegment { start: 2.0, end: 5.0, amount: 2.0, target_x: 0.5, target_y: 0.5 }];
         let state = evaluate_zoom_at_time(segments, 0.0, 0.5, 0.5);
         assert_eq!(state.scale, 1.0, "Must start fully panned out!");
         assert_eq!(state.x, 0.5);

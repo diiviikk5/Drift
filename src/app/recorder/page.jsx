@@ -6,6 +6,8 @@ import { StudioEngine } from '@/lib/StudioEngine';
 import drift from '@/lib/tauri-bridge';
 import { transcribeWithSpeechAPI } from '@/lib/ai/captions';
 import { encodeProject, decodeProject } from '@/lib/project-file';
+import { parseEditInstruction } from '@/lib/ai/nl-editor';
+import { getAIClient } from '@/lib/ai/openrouter-client';
 
 // Modular Shadcn Desktop Components
 import DesktopHeader from '@/components/desktop/DesktopHeader';
@@ -68,7 +70,7 @@ export default function RecorderPage() {
     const nativeWebcamChunksRef = useRef([]);
     const [isNativeSupported, setIsNativeSupported] = useState(false);
     const [nativeAudioTracks, setNativeAudioTracks] = useState({ systemAudioUrl: null, micAudioUrl: null });
-    const [autoZoomOnClicks, setAutoZoomOnClicks] = useState(false);
+    const [autoZoomOnClicks, setAutoZoomOnClicks] = useState(true);
 
     // --- State ---
     const [viewMode, setViewMode] = useState('recorder'); // 'recorder' | 'studio'
@@ -118,7 +120,7 @@ export default function RecorderPage() {
     const [trimEnd, setTrimEnd] = useState(0);
     const [background, setBackground] = useState('midnight');
     const [customImage, setCustomImage] = useState(null);
-    const [zoomLevel, setZoomLevel] = useState(1.8);
+    const [zoomLevel, setZoomLevel] = useState(1.55);
     // showCursor defaults to FALSE to completely prevent double cursor!
     const [showCursor, setShowCursor] = useState(false);
     const [cursorTheme, setCursorTheme] = useState('macos');
@@ -130,10 +132,11 @@ export default function RecorderPage() {
     const [isMicAudioMuted, setIsMicAudioMuted] = useState(false);
     const [autoDuck, setAutoDuck] = useState(true);
     const [aspectRatio, setAspectRatio] = useState('16:9');
-    const [insetPadding, setInsetPadding] = useState(0.08);
-    const [borderRadius, setBorderRadius] = useState(18);
-    const [windowChrome, setWindowChrome] = useState(true);
+    const [insetPadding, setInsetPadding] = useState(0);
+    const [borderRadius, setBorderRadius] = useState(0);
+    const [windowChrome, setWindowChrome] = useState(false);
     const [springProfile, setSpringProfile] = useState('cinematic');
+    const [playbackSpeed, setPlaybackSpeed] = useState(0.94);
     const [showKeystrokes, setShowKeystrokes] = useState(true);
 
     // Interactive Drag-to-Zoom State
@@ -143,7 +146,7 @@ export default function RecorderPage() {
 
     // OpenScreen & Recordly Features State
     const [isTeleprompterOpen, setIsTeleprompterOpen] = useState(false);
-    const [tiltAngle, setTiltAngle] = useState(3.5);
+    const [tiltAngle, setTiltAngle] = useState(0);
     const [connectedZooms, setConnectedZooms] = useState(true);
     const [reactiveWebcam, setReactiveWebcam] = useState(true);
 
@@ -242,6 +245,10 @@ export default function RecorderPage() {
         if (drift.isTauri()) {
             setPlatform('tauri');
             setHookStatus('Tauri IPC');
+            // Guarantee Windows OS cursor is visible inside Drift
+            if (typeof drift.showOsCursor === 'function') {
+                drift.showOsCursor().catch(() => {});
+            }
             drift.isNativeCaptureSupported().then(supported => {
                 setIsNativeSupported(Boolean(supported));
             }).catch(() => {
@@ -322,9 +329,9 @@ export default function RecorderPage() {
                 setRecordedBlob(blob);
                 setRecordedClicks(clickList);
                 setRecordedMoves(moves);
-                if (moves.length > 0 || clickList.length > 0) {
-                    setShowCursor(true);
-                }
+                // In window/browser capture, the OS bakes the hardware cursor into the video frames.
+                // Default synthetic cursor to false to avoid double cursor.
+                setShowCursor(false);
                 if (meta.webcamBlob) {
                     setRecordedWebcamBlob(meta.webcamBlob);
                 }
@@ -375,6 +382,7 @@ export default function RecorderPage() {
                     recDurationRef.current,
                     recordedMoves,
                     {
+                        autoZoomOnClicks,
                         webcamBlob: recordedWebcamBlob,
                         webcamSettings,
                         captions,
@@ -393,23 +401,18 @@ export default function RecorderPage() {
                         borderRadius,
                         windowChrome,
                         springProfile,
+                        playbackSpeed,
                         showKeystrokes,
                         keystrokes: recordedKeystrokes,
                         focusSegments: savedSegmentsRef.current,
-                        autoZoomOnClicks,
-                        showCursor: showCursor || ((recordedMoves && recordedMoves.length > 0) || (recordedClicks && recordedClicks.length > 0)),
+                        showCursor: showCursor,
                         systemAudioUrl: nativeAudioTracks.systemAudioUrl,
                         micAudioUrl: nativeAudioTracks.micAudioUrl,
                     }
                 );
-                const hasTelemetry = (recordedMoves && recordedMoves.length > 0) || (recordedClicks && recordedClicks.length > 0);
-                const effectiveShowCursor = showCursor || hasTelemetry;
                 studioRef.current.background = background;
                 studioRef.current.zoomLevel = zoomLevel;
-                studioRef.current.showCursor = effectiveShowCursor;
-                if (effectiveShowCursor && !showCursor) {
-                    setShowCursor(true);
-                }
+                studioRef.current.showCursor = showCursor;
                 studioRef.current.cursorTheme = cursorTheme;
                 Object.assign(studioRef.current, {
                     cursorScale,
@@ -423,6 +426,7 @@ export default function RecorderPage() {
                     borderRadius,
                     windowChrome,
                     springProfile,
+                    playbackSpeed,
                     showKeystrokes,
                     keystrokes: recordedKeystrokes,
                     tiltAngle,
@@ -591,22 +595,32 @@ export default function RecorderPage() {
     const handleChangeBackground = (bgKey) => {
         setBackground(bgKey);
         const bg = BACKGROUNDS[bgKey];
+        if (studioRef.current) {
+            studioRef.current.setBackground(bgKey);
+        }
         if (bg && bg.src) {
             const img = new Image();
             img.onload = () => {
                 img._bgKey = bgKey;
                 setCustomImage(img);
                 if (studioRef.current) {
-                    studioRef.current.background = bgKey;
                     studioRef.current.setCustomBackgroundImage(img);
+                    studioRef.current.drawFrame();
+                }
+            };
+            img.onerror = () => {
+                setCustomImage(null);
+                if (studioRef.current) {
+                    studioRef.current.setCustomBackgroundImage(null);
+                    studioRef.current.drawFrame();
                 }
             };
             img.src = bg.src;
         } else {
             setCustomImage(null);
             if (studioRef.current) {
-                studioRef.current.background = bgKey;
                 studioRef.current.setCustomBackgroundImage(null);
+                studioRef.current.drawFrame();
             }
         }
     };
@@ -630,68 +644,159 @@ export default function RecorderPage() {
         }
     };
 
-    const handleApplyAICommand = (instruction) => {
+    const handleApplyAICommand = async (instruction) => {
         if (!studioRef.current) return 'Studio not initialized';
         const lower = instruction.toLowerCase().trim();
 
-        if (lower.includes('background') || lower.includes('wallpaper')) {
-            const keys = Object.keys(BACKGROUNDS);
-            const found = keys.find(k => {
-                const name = (BACKGROUNDS[k].name || '').toLowerCase();
-                return lower.includes(k.toLowerCase()) || (name && lower.includes(name));
-            });
-            if (found) {
-                handleChangeBackground(found);
-                return `Background set to ${BACKGROUNDS[found].name}`;
-            }
+        // 1. Fast heuristic path (instant 0ms execution)
+        const bgKeys = Object.keys(BACKGROUNDS);
+        const foundBg = bgKeys.find(k => {
+            const name = (BACKGROUNDS[k].name || '').toLowerCase();
+            return lower === k.toLowerCase() ||
+                   lower === name ||
+                   lower.includes(k.toLowerCase()) ||
+                   (name && lower.includes(name));
+        });
+
+        if (foundBg && (lower.includes('background') || lower.includes('wallpaper') || lower.includes('theme') || lower.includes('set') || lower.includes('use') || lower.includes('change') || lower === foundBg.toLowerCase())) {
+            handleChangeBackground(foundBg);
+            return `Background set to ${BACKGROUNDS[foundBg].name} ⚡ Cerebras`;
         }
 
-        if (lower.includes('zoom level') || lower.includes('zoom depth')) {
+        if (lower.includes('clear zoom') || lower.includes('remove all zoom') || lower.includes('reset camera') || lower.includes('zoom out') || lower.includes('overview')) {
+            clearManualZooms();
+            if (studioRef.current) {
+                studioRef.current.resetToOverview();
+                studioRef.current.drawFrame();
+            }
+            return `Reset to full overview ⚡ Cerebras`;
+        }
+
+        if (lower.includes('zoom level') || lower.includes('zoom depth') || lower.match(/^zoom\s+(\d+\.?\d*)x?$/i)) {
             const m = lower.match(/(\d+\.?\d*)/);
             if (m) {
-                const z = parseFloat(m[1]);
+                const z = Math.max(1.0, Math.min(4.0, parseFloat(m[1])));
                 setZoomLevel(z);
-                studioRef.current.zoomLevel = z;
-                studioRef.current.drawFrame();
-                return `Zoom depth set to ${z}x`;
+                if (studioRef.current) {
+                    studioRef.current.setZoomLevel(z);
+                    const segs = studioRef.current.getFocusSegments() || [];
+                    if (segs.length > 0) {
+                        const updated = segs.map(s => ({ ...s, zoomScale: z }));
+                        studioRef.current.setFocusSegments(updated);
+                        setFocusSegments(updated);
+                    } else {
+                        const ct = studioVideoRef.current?.currentTime || 0;
+                        studioRef.current.addZoom(ct, 0.5, 0.5, z);
+                        setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
+                        handleSeek(Math.min(duration || 10, ct + 0.6));
+                    }
+                    studioRef.current.drawFrame();
+                }
+                return `Zoom depth set to ${z}x ⚡ Cerebras`;
             }
         }
 
-        if (lower.includes('cursor') || lower.includes('pointer')) {
-            if (lower.includes('on') || lower.includes('show') || lower.includes('enable')) {
-                setShowCursor(true);
-                studioRef.current.showCursor = true;
-                studioRef.current.drawFrame();
-                return `Synthetic cursor enabled`;
-            }
-            if (lower.includes('off') || lower.includes('hide') || lower.includes('disable')) {
-                setShowCursor(false);
-                studioRef.current.showCursor = false;
-                studioRef.current.drawFrame();
-                return `Synthetic cursor hidden`;
-            }
-        }
-
-        if (lower.includes('zoom at') || lower.includes('focus at')) {
+        if (lower.includes('zoom in') || lower.includes('zoom at') || lower.includes('focus at') || lower.includes('focus here') || lower === 'zoom') {
             const m = lower.match(/(\d+)\s*s/);
-            const timeSec = m ? parseInt(m[1]) : (studioVideoRef.current?.currentTime || 2);
-            studioRef.current.addZoom(timeSec, 0.5, 0.5, zoomLevel);
-            setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
-            return `Added zoom point at ${timeSec}s`;
+            const timeSec = m ? parseInt(m[1]) : (studioVideoRef.current?.currentTime || 0);
+            const cursor = studioRef.current?.getCursorAtTime ? studioRef.current.getCursorAtTime(timeSec) : null;
+            const targetX = (cursor && Number.isFinite(cursor.x)) ? cursor.x : 0.5;
+            const targetY = (cursor && Number.isFinite(cursor.y)) ? cursor.y : 0.5;
+            const zScale = zoomLevel || 1.55;
+            studioRef.current?.addZoom(timeSec, targetX, targetY, zScale);
+            setFocusSegments([...(studioRef.current?.getFocusSegments() || [])]);
+            // Seek playhead into zoom region so the preview immediately displays the zoom!
+            handleSeek(Math.min(duration || 10, timeSec + 0.6));
+            return `Added zoom point at ${timeSec.toFixed(1)}s (${zScale}x) ⚡ Cerebras`;
         }
 
-        if (lower.includes('clear zoom') || lower.includes('remove all zoom')) {
-            clearManualZooms();
-            return `Cleared all zoom segments`;
-        }
+        // 2. Deep Cerebras Qwen 27B AI Natural Language parsing
+        try {
+            const timelineState = {
+                duration: (duration || 10) * 1000,
+                zooms: focusSegments,
+                zoomLevel,
+                speedPreset: springProfile,
+            };
+            const parsed = await parseEditInstruction(instruction, timelineState);
+            const commands = Array.isArray(parsed) ? parsed : (parsed?.commands || []);
+            const appliedActions = [];
 
-        addManualZoom();
-        return `Added focal point to timeline`;
+            for (const cmd of commands) {
+                if (cmd.action === 'setBackground') {
+                    const foundKey = Object.keys(BACKGROUNDS).find(
+                        k => k.toLowerCase() === cmd.name.toLowerCase() ||
+                             BACKGROUNDS[k].name?.toLowerCase().includes(cmd.name.toLowerCase()) ||
+                             cmd.name.toLowerCase().includes(k.toLowerCase())
+                    ) || cmd.name;
+                    if (BACKGROUNDS[foundKey]) {
+                        handleChangeBackground(foundKey);
+                        appliedActions.push(`Background set to ${BACKGROUNDS[foundKey]?.name || foundKey}`);
+                    }
+                } else if (cmd.action === 'addZoom') {
+                    const timeSec = (cmd.time != null) ? (cmd.time / 1000) : (studioVideoRef.current?.currentTime || 0);
+                    const zScale = cmd.scale || zoomLevel || 1.55;
+                    const x = cmd.x ?? 0.5;
+                    const y = cmd.y ?? 0.5;
+                    if (studioRef.current) {
+                        studioRef.current.addZoom(timeSec, x, y, zScale);
+                        setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
+                        handleSeek(Math.min(duration || 10, timeSec + 0.6));
+                    }
+                    appliedActions.push(`Zoom at ${timeSec.toFixed(1)}s (${zScale}x)`);
+                } else if (cmd.action === 'clearZooms' || cmd.action === 'removeZoom') {
+                    clearManualZooms();
+                    if (studioRef.current) {
+                        studioRef.current.resetToOverview();
+                        studioRef.current.drawFrame();
+                    }
+                    appliedActions.push('Cleared zoom keyframes');
+                } else if (cmd.action === 'setZoomLevel') {
+                    const z = Math.max(1.0, Math.min(4.0, Number(cmd.level) || 1.55));
+                    setZoomLevel(z);
+                    if (studioRef.current) {
+                        studioRef.current.setZoomLevel(z);
+                        const segs = studioRef.current.getFocusSegments() || [];
+                        if (segs.length > 0) {
+                            const updated = segs.map(s => ({ ...s, zoomScale: z }));
+                            studioRef.current.setFocusSegments(updated);
+                            setFocusSegments(updated);
+                        } else {
+                            const ct = studioVideoRef.current?.currentTime || 0;
+                            studioRef.current.addZoom(ct, 0.5, 0.5, z);
+                            setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
+                            handleSeek(Math.min(duration || 10, ct + 0.6));
+                        }
+                        studioRef.current.drawFrame();
+                    }
+                    appliedActions.push(`Zoom scale set to ${z}x`);
+                } else if (cmd.action === 'setSpeed') {
+                    const profile = cmd.preset === 'fast' ? 'punchy' : (cmd.preset === 'slow' ? 'gentle' : 'cinematic');
+                    setSpringProfile(profile);
+                    if (studioRef.current) {
+                        studioRef.current.setSpringProfile(profile);
+                        studioRef.current.drawFrame();
+                    }
+                    appliedActions.push(`Spring physics set to ${profile}`);
+                }
+            }
+
+            const metrics = getAIClient().lastMetrics;
+            const latencyStr = metrics?.latencyMs ? ` ⚡ ${metrics.latencyMs}ms (${metrics.provider === 'cerebras' ? 'Cerebras' : 'AI'})` : '';
+            return appliedActions.length > 0
+                ? `Applied: ${appliedActions.join(', ')}${latencyStr}`
+                : `AI Command processed${latencyStr}`;
+        } catch (err) {
+            addManualZoom();
+            return `Added focal point to timeline (${err.message})`;
+        }
     };
 
     const startRecordingActual = async () => {
         try {
-            if (isNativeSupported && drift.isTauri()) {
+            const isWindowTarget = selectedSource === 'browser-source';
+
+            if (isNativeSupported && drift.isTauri() && !isWindowTarget) {
                 try {
                     isNativeRecordingRef.current = true;
                     const monitorIndex = typeof selectedSource === 'number'
@@ -737,6 +842,10 @@ export default function RecorderPage() {
                     setIsRecording(true);
                     setHasActiveStream(true);
 
+                    if (drift.isTauri() && typeof drift.hideOsCursor === 'function') {
+                        drift.hideOsCursor().catch(() => {});
+                    }
+
                     if (autoMinimize && typeof drift.minimizeWindow === 'function') {
                         try {
                             await drift.minimizeWindow();
@@ -752,7 +861,7 @@ export default function RecorderPage() {
                 }
             }
 
-            if (!selectedSource || platform !== 'electron') {
+            if (isWindowTarget || !selectedSource || platform !== 'electron') {
                 if (!engineRef.current?.screenStream?.active) {
                     const ok = await engineRef.current?.selectSourceBrowser();
                     if (!ok) return;
@@ -768,12 +877,19 @@ export default function RecorderPage() {
             setHasActiveStream(true);
 
             engineRef.current.micEnabled = micEnabled;
+            if (drift.isTauri() && typeof drift.startSessionTelemetry === 'function') {
+                drift.startSessionTelemetry().catch(() => {});
+            }
             await engineRef.current.startRecording((s) => {
                 const m = Math.floor(s / 60).toString().padStart(2, '0');
                 const sec = Math.floor(s % 60).toString().padStart(2, '0');
                 setTimer(`${m}:${sec}`);
             });
             setIsRecording(true);
+
+            if (drift.isTauri() && typeof drift.hideOsCursor === 'function') {
+                drift.hideOsCursor().catch(() => {});
+            }
 
             // Cinema Recorder: auto-minimize Drift window so user records their clean screen/apps
             if (autoMinimize && drift.isTauri() && typeof drift.minimizeWindow === 'function') {
@@ -783,10 +899,16 @@ export default function RecorderPage() {
                     console.warn('[Drift] Window auto-minimize notice:', minErr);
                 }
             }
-        } catch (e) {
-            console.error('[Drift] Recording launch error:', e);
-            setNotice(`Recording error: ${e?.message || e}`);
-            isNativeRecordingRef.current = false;
+        } catch (err) {
+            console.error('[Drift] Recording start error:', err);
+            setNotice(`Recording start failed: ${err.message || err}`);
+            setIsRecording(false);
+            if (drift.isTauri() && typeof drift.showOsCursor === 'function') {
+                drift.showOsCursor().catch(() => {});
+            }
+            if (drift.isTauri() && typeof drift.stopSessionTelemetry === 'function') {
+                drift.stopSessionTelemetry().catch(() => {});
+            }
         }
     };
 
@@ -800,12 +922,18 @@ export default function RecorderPage() {
 
     const toggleRecord = async () => {
         if (isRecordingRef.current) {
+            if (drift.isTauri() && typeof drift.showOsCursor === 'function') {
+                drift.showOsCursor().catch(() => {});
+            }
+
             if (isNativeRecordingRef.current) {
                 isNativeRecordingRef.current = false;
                 if (nativeTimerIntervalRef.current) {
                     clearInterval(nativeTimerIntervalRef.current);
                     nativeTimerIntervalRef.current = null;
                 }
+                savedSegmentsRef.current = null;
+                setFocusSegments([]);
                 setIsRecording(false);
                 setTimer('00:00');
                 setHasActiveStream(false);
@@ -825,20 +953,30 @@ export default function RecorderPage() {
                     const micAudioUrl = result.mic_audio_path ? await drift.resolveAssetUrl(result.mic_audio_path) : null;
 
                     const activeSource = sources.find(s => s.id === selectedSource) || sources[0] || { width: 1920, height: 1080 };
-                    const srcW = activeSource.width || 1920;
-                    const srcH = activeSource.height || 1080;
+                    const srcW = result.width || activeSource.width || 1920;
+                    const srcH = result.height || activeSource.height || 1080;
+
+                    const isPixelSpace = (nativeSamples || []).some(s => s.x > 1.0 || s.y > 1.0);
+                    const normalizeX = (val) => {
+                        if (!Number.isFinite(val)) return 0.5;
+                        return Math.max(0, Math.min(1, isPixelSpace ? val / srcW : (val > 1 ? val / srcW : val)));
+                    };
+                    const normalizeY = (val) => {
+                        if (!Number.isFinite(val)) return 0.5;
+                        return Math.max(0, Math.min(1, isPixelSpace ? val / srcH : (val > 1 ? val / srcH : val)));
+                    };
 
                     const moves = (nativeSamples || []).map(s => ({
                         time: s.t,
-                        x: s.x > 1 ? s.x / srcW : s.x,
-                        y: s.y > 1 ? s.y / srcH : s.y,
+                        x: normalizeX(s.x),
+                        y: normalizeY(s.y),
                         click: s.click,
                     }));
 
                     const clickList = (nativeSamples || []).filter(s => Boolean(s.click)).map(s => ({
                         time: s.t,
-                        x: s.x > 1 ? s.x / srcW : s.x,
-                        y: s.y > 1 ? s.y / srcH : s.y,
+                        x: normalizeX(s.x),
+                        y: normalizeY(s.y),
                         button: s.click,
                     }));
 
@@ -890,6 +1028,12 @@ export default function RecorderPage() {
                 return;
             }
 
+            if (drift.isTauri() && typeof drift.showOsCursor === 'function') {
+                drift.showOsCursor().catch(() => {});
+            }
+            if (drift.isTauri() && typeof drift.stopSessionTelemetry === 'function') {
+                drift.stopSessionTelemetry().catch(() => {});
+            }
             engineRef.current?.stopRecording();
             setIsRecording(false);
             setTimer('00:00');
@@ -904,9 +1048,10 @@ export default function RecorderPage() {
                 return;
             }
 
-            // If stream is not active yet and not native, acquire it BEFORE starting the countdown
+            // If stream is not active yet and in window mode (or not native), acquire it BEFORE starting the countdown
             // so the system screen picker doesn't interrupt the 3, 2, 1 flow!
-            if (!isNativeSupported && !engineRef.current?.screenStream?.active) {
+            const isWindowTarget = selectedSource === 'browser-source';
+            if ((isWindowTarget || !isNativeSupported) && !engineRef.current?.screenStream?.active) {
                 let ok = false;
                 if (platform === 'electron' && selectedSource) {
                     ok = await engineRef.current?.selectSource(selectedSource, micEnabled);
@@ -962,8 +1107,22 @@ export default function RecorderPage() {
             }
         };
         window.addEventListener('drift-hotkey', handler);
+
+        const keydownHandler = (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x' && !e.shiftKey && !e.altKey) {
+                const tag = document.activeElement?.tagName?.toLowerCase();
+                if (tag === 'input' || tag === 'textarea' || document.activeElement?.isContentEditable) {
+                    return;
+                }
+                e.preventDefault();
+                if (toggleRecordRef.current) toggleRecordRef.current();
+            }
+        };
+        window.addEventListener('keydown', keydownHandler);
+
         return () => {
             window.removeEventListener('drift-hotkey', handler);
+            window.removeEventListener('keydown', keydownHandler);
             drift.unregisterAllShortcuts();
         };
     }, []);
@@ -988,17 +1147,49 @@ export default function RecorderPage() {
 
     const addManualZoom = () => {
         if (!studioRef.current || !studioVideoRef.current) return;
-        const ct = studioVideoRef.current.currentTime;
-        studioRef.current.addZoom(ct, 0.5, 0.5, zoomLevel);
+        const ct = studioVideoRef.current.currentTime || currentTime || 0;
+        let targetX = 0.5;
+        let targetY = 0.5;
+        try {
+            const cursor = studioRef.current.getCursorAtTime ? studioRef.current.getCursorAtTime(ct) : null;
+            if (cursor && Number.isFinite(cursor.x)) targetX = cursor.x;
+            if (cursor && Number.isFinite(cursor.y)) targetY = cursor.y;
+        } catch {}
+        studioRef.current.addZoom(ct, targetX, targetY, zoomLevel);
         setRecordedClicks([...(studioRef.current.clicks || [])]);
         setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
     };
 
+    const handleChangeFramingPreset = (preset) => {
+        if (preset === 'full') {
+            setInsetPadding(0);
+            setBorderRadius(0);
+            setWindowChrome(false);
+            if (studioRef.current) {
+                studioRef.current.setFraming({ insetPadding: 0, borderRadius: 0, windowChrome: false });
+            }
+        } else if (preset === 'studio') {
+            setInsetPadding(0.05);
+            setBorderRadius(14);
+            setWindowChrome(false);
+            if (studioRef.current) {
+                studioRef.current.setFraming({ insetPadding: 0.05, borderRadius: 14, windowChrome: false });
+            }
+        } else if (preset === 'mockup') {
+            setInsetPadding(0.08);
+            setBorderRadius(18);
+            setWindowChrome(true);
+            if (studioRef.current) {
+                studioRef.current.setFraming({ insetPadding: 0.08, borderRadius: 18, windowChrome: true });
+            }
+        }
+    };
+
     const handleCanvasClick = (e) => {
         if (viewMode !== 'studio' || !studioRef.current || !studioVideoRef.current) return;
-        const rect = e.currentTarget.getBoundingClientRect();
-        const canvasX = (e.clientX - rect.left) / rect.width;
-        const canvasY = (e.clientY - rect.top) / rect.height;
+        const rect = studioCanvasRef.current ? studioCanvasRef.current.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
+        const canvasX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const canvasY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
         const ct = studioVideoRef.current.currentTime;
         const { x, y } = studioRef.current.resolveClick(canvasX, canvasY);
         studioRef.current.addZoom(ct, x, y, zoomLevel);
@@ -1008,7 +1199,7 @@ export default function RecorderPage() {
 
     const handleCanvasMouseDown = (e) => {
         if (viewMode !== 'studio' || !studioRef.current || !studioVideoRef.current) return;
-        const rect = e.currentTarget.getBoundingClientRect();
+        const rect = studioCanvasRef.current ? studioCanvasRef.current.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
         isDraggingCanvasRef.current = true;
         dragStartPosRef.current = {
             clientX: e.clientX,
@@ -1023,7 +1214,7 @@ export default function RecorderPage() {
     const handleCanvasMouseMove = (e) => {
         if (!isDraggingCanvasRef.current) return;
         const start = dragStartPosRef.current;
-        const rect = start.rect;
+        const rect = start.rect || (studioCanvasRef.current ? studioCanvasRef.current.getBoundingClientRect() : null);
         if (!rect) return;
 
         const curCanvasX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
@@ -1061,32 +1252,34 @@ export default function RecorderPage() {
             handleCanvasClick(e);
         } else if (dragBox && dragBox.width > 12 && dragBox.height > 12 && studioRef.current && studioVideoRef.current) {
             // Drag box focal crop
-            const rect = start.rect;
-            const normX1 = dragBox.left / rect.width;
-            const normY1 = dragBox.top / rect.height;
-            const normX2 = (dragBox.left + dragBox.width) / rect.width;
-            const normY2 = (dragBox.top + dragBox.height) / rect.height;
+            const rect = start.rect || (studioCanvasRef.current ? studioCanvasRef.current.getBoundingClientRect() : null);
+            if (rect) {
+                const normX1 = Math.max(0, Math.min(1, dragBox.left / rect.width));
+                const normY1 = Math.max(0, Math.min(1, dragBox.top / rect.height));
+                const normX2 = Math.max(0, Math.min(1, (dragBox.left + dragBox.width) / rect.width));
+                const normY2 = Math.max(0, Math.min(1, (dragBox.top + dragBox.height) / rect.height));
 
-            const c1 = studioRef.current.resolveClick(normX1, normY1);
-            const c2 = studioRef.current.resolveClick(normX2, normY2);
+                const c1 = studioRef.current.resolveClick(normX1, normY1);
+                const c2 = studioRef.current.resolveClick(normX2, normY2);
 
-            const vidMinX = Math.min(c1.x, c2.x);
-            const vidMaxX = Math.max(c1.x, c2.x);
-            const vidMinY = Math.min(c1.y, c2.y);
-            const vidMaxY = Math.max(c1.y, c2.y);
+                const vidMinX = Math.min(c1.x, c2.x);
+                const vidMaxX = Math.max(c1.x, c2.x);
+                const vidMinY = Math.min(c1.y, c2.y);
+                const vidMaxY = Math.max(c1.y, c2.y);
 
-            const boxW = Math.max(0.04, vidMaxX - vidMinX);
-            const boxH = Math.max(0.04, vidMaxY - vidMinY);
-            const targetX = (vidMinX + vidMaxX) / 2;
-            const targetY = (vidMinY + vidMaxY) / 2;
+                const boxW = Math.max(0.04, vidMaxX - vidMinX);
+                const boxH = Math.max(0.04, vidMaxY - vidMinY);
+                const targetX = (vidMinX + vidMaxX) / 2;
+                const targetY = (vidMinY + vidMaxY) / 2;
 
-            const computedScale = Math.min(3.5, Math.max(1.2, Math.min(1.0 / boxW, 1.0 / boxH)));
-            const scale = Math.round(computedScale * 10) / 10;
+                const computedScale = Math.min(3.5, Math.max(1.2, Math.min(1.0 / boxW, 1.0 / boxH)));
+                const scale = Math.round(computedScale * 10) / 10;
 
-            const ct = studioVideoRef.current.currentTime;
-            studioRef.current.addZoom(ct, targetX, targetY, scale);
-            setRecordedClicks([...(studioRef.current.clicks || [])]);
-            setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
+                const ct = studioVideoRef.current.currentTime;
+                studioRef.current.addZoom(ct, targetX, targetY, scale);
+                setRecordedClicks([...(studioRef.current.clicks || [])]);
+                setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
+            }
         }
 
         setDragBox(null);
@@ -1220,7 +1413,30 @@ export default function RecorderPage() {
                 }
             }, { format, resolution, fps, quality });
 
-            const ext = format === 'gif' ? 'gif' : (videoBlob.type === 'video/mp4' ? 'mp4' : 'webm');
+            let finalBlob = videoBlob;
+            let ext = format === 'gif' ? 'gif' : (videoBlob.type === 'video/mp4' ? 'mp4' : 'webm');
+
+            // If user requested MP4, but WebCodecs produced WebM, transcode via native FFmpeg
+            if (format === 'mp4' && ext !== 'mp4' && drift.isTauri()) {
+                try {
+                    setExportStage('Transcoding to pristine MP4 via hardware-accelerated FFmpeg...');
+                    setExportProgress(94);
+                    const tempMp4Path = await drift.convertWebmToMp4(videoBlob, {
+                        fps,
+                        use_hw_accel: true,
+                    });
+                    if (tempMp4Path) {
+                        const assetUrl = await drift.resolveAssetUrl(tempMp4Path);
+                        const mp4Res = await fetch(assetUrl);
+                        if (mp4Res.ok) {
+                            finalBlob = await mp4Res.blob();
+                            ext = 'mp4';
+                        }
+                    }
+                } catch (transcodeErr) {
+                    console.warn('[Export] Native MP4 transcoding fallback notice:', transcodeErr);
+                }
+            }
 
             if (platform === 'tauri') {
                 try {
@@ -1231,21 +1447,21 @@ export default function RecorderPage() {
                     });
 
                     if (!savePath) {
-                        triggerBlobDownload(videoBlob, ext);
+                        triggerBlobDownload(finalBlob, ext);
                     } else {
                         setExportStage('Saving high-speed video to disk...');
                         setExportProgress(96);
-                        const fileBytes = new Uint8Array(await videoBlob.arrayBuffer());
+                        const fileBytes = new Uint8Array(await finalBlob.arrayBuffer());
                         await drift.saveFile(savePath, fileBytes);
                         setExportProgress(100);
                         setNotice(`Exported ${ext.toUpperCase()} video successfully to ${savePath}`);
                     }
                 } catch (e) {
                     console.error('[Export] Save failed, fallback download:', e);
-                    triggerBlobDownload(videoBlob, ext);
+                    triggerBlobDownload(finalBlob, ext);
                 }
             } else {
-                triggerBlobDownload(videoBlob, ext);
+                triggerBlobDownload(finalBlob, ext);
             }
         } catch (error) {
             console.error('Export failed:', error);
@@ -1324,7 +1540,7 @@ export default function RecorderPage() {
                 customBackground: customImage?.src ?? null,
                 zoomLevel, showCursor, cursorTheme, cursorScale, splineSmoothing, aspectRatio,
                 systemAudioVolume, micAudioVolume, isSystemAudioMuted, isMicAudioMuted, autoDuck,
-                insetPadding, borderRadius, windowChrome, springProfile, showKeystrokes,
+                insetPadding, borderRadius, windowChrome, springProfile, playbackSpeed, showKeystrokes,
                 tiltAngle, connectedZooms, reactiveWebcam, webcamSettings, trimStart, trimEnd,
             });
             triggerBlobDownload(project, 'drift');
@@ -1382,7 +1598,7 @@ export default function RecorderPage() {
             setCaptionsEnabled(project.captionsEnabled ?? true);
             setBackground(project.background ?? 'midnight');
             setCustomImage(image);
-            setZoomLevel(project.zoomLevel ?? 1.8);
+            setZoomLevel(project.zoomLevel ?? 1.55);
             setShowCursor(project.showCursor ?? false);
             setCursorTheme(project.cursorTheme ?? 'macos');
             setCursorScale(project.cursorScale ?? 1);
@@ -1398,6 +1614,7 @@ export default function RecorderPage() {
             setBorderRadius(project.borderRadius ?? 18);
             setWindowChrome(project.windowChrome !== false);
             setSpringProfile(project.springProfile ?? 'cinematic');
+            setPlaybackSpeed(project.playbackSpeed ?? 0.94);
             setTiltAngle(project.tiltAngle ?? 0);
             setConnectedZooms(project.connectedZooms ?? true);
             setReactiveWebcam(project.reactiveWebcam ?? true);
@@ -1448,6 +1665,7 @@ export default function RecorderPage() {
                 platform={platform}
                 hookStatus={hookStatus}
                 onOpenHotkeys={() => setShowHotkeySettings(true)}
+                onOpenSettings={() => setIsAISettingsOpen(true)}
                 onNewRecording={handleNewRecording}
                 onOpenProject={() => projectInputRef.current?.click()}
                 onSaveProject={saveProject}
@@ -1519,8 +1737,16 @@ export default function RecorderPage() {
                             <div className="flex-1 flex items-center justify-center p-6 relative overflow-hidden">
                                 {recordedBlob ? (
                                     <div
-                                        className="relative max-w-full max-h-full overflow-hidden cursor-crosshair group bg-black select-none"
-                                        style={{ aspectRatio: aspectRatio.replace(':', '/'), height: '100%', width: 'auto' }}
+                                        className={`relative max-w-full max-h-full overflow-hidden ${isPlaying ? 'cursor-default' : 'cursor-crosshair'} group bg-black select-none rounded-xl shadow-2xl flex items-center justify-center`}
+                                        style={{
+                                            aspectRatio: aspectRatio === 'native'
+                                                ? (studioVideoRef.current?.videoWidth && studioVideoRef.current?.videoHeight
+                                                    ? `${studioVideoRef.current.videoWidth}/${studioVideoRef.current.videoHeight}`
+                                                    : '16/9')
+                                                : aspectRatio.replace(':', '/'),
+                                            maxWidth: '100%',
+                                            maxHeight: '100%',
+                                        }}
                                         onMouseDown={handleCanvasMouseDown}
                                         onMouseMove={handleCanvasMouseMove}
                                         onMouseUp={handleCanvasMouseUp}
@@ -1528,9 +1754,9 @@ export default function RecorderPage() {
                                     >
                                         <canvas
                                             ref={studioCanvasRef}
-                                            width={1280}
-                                            height={720}
-                                            className="w-full h-full pointer-events-none"
+                                            width={1920}
+                                            height={1080}
+                                            className="max-w-full max-h-full w-auto h-auto object-contain pointer-events-none block"
                                         />
 
                                         {/* Live Glowing Drag-to-Zoom Selection Box */}
@@ -1612,6 +1838,14 @@ export default function RecorderPage() {
                                     setTrimEnd(val);
                                     if (studioRef.current) studioRef.current.trimEnd = val;
                                 }}
+                                zoomLevel={zoomLevel}
+                                onChangeZoomLevel={(level) => {
+                                    setZoomLevel(level);
+                                    if (studioRef.current) {
+                                        studioRef.current.setZoomLevel(level);
+                                        setFocusSegments([...studioRef.current.getFocusSegments()]);
+                                    }
+                                }}
                             />
                         </main>
 
@@ -1625,10 +1859,19 @@ export default function RecorderPage() {
                             zoomLevel={zoomLevel}
                             onChangeZoomLevel={(level) => {
                                 setZoomLevel(level);
-                                if (studioRef.current) studioRef.current.setZoomLevel(level);
+                                if (studioRef.current) {
+                                    studioRef.current.setZoomLevel(level);
+                                    setFocusSegments([...studioRef.current.getFocusSegments()]);
+                                }
                             }}
                             showCursor={showCursor}
-                            onToggleCursor={() => setShowCursor(prev => !prev)}
+                            onToggleCursor={() => {
+                                setShowCursor(prev => {
+                                    const next = !prev;
+                                    if (studioRef.current) studioRef.current.setShowCursor(next);
+                                    return next;
+                                });
+                            }}
                             cursorTheme={cursorTheme}
                             onChangeCursorTheme={(theme) => {
                                 setCursorTheme(theme);
@@ -1681,7 +1924,10 @@ export default function RecorderPage() {
                             onTriggerExport={() => setIsExportDialogOpen(true)}
                             isExporting={isExporting}
                             aspectRatio={aspectRatio}
-                            onChangeAspectRatio={setAspectRatio}
+                            onChangeAspectRatio={(ratio) => {
+                                setAspectRatio(ratio);
+                                if (studioRef.current) studioRef.current.setAspectRatio(ratio);
+                            }}
                             tiltAngle={tiltAngle}
                             onChangeTiltAngle={(angle) => {
                                 setTiltAngle(angle);
@@ -1712,10 +1958,16 @@ export default function RecorderPage() {
                                 setWindowChrome(chrome);
                                 if (studioRef.current) studioRef.current.setWindowChrome(chrome);
                             }}
+                            onChangeFramingPreset={handleChangeFramingPreset}
                             springProfile={springProfile}
                             onChangeSpringProfile={(profile) => {
                                 setSpringProfile(profile);
                                 if (studioRef.current) studioRef.current.setSpringProfile(profile);
+                            }}
+                            playbackSpeed={playbackSpeed}
+                            onChangePlaybackSpeed={(speed) => {
+                                setPlaybackSpeed(speed);
+                                if (studioRef.current) studioRef.current.setPlaybackSpeed(speed);
                             }}
                             showKeystrokes={showKeystrokes}
                             onToggleKeystrokes={(enabled) => {
@@ -1738,6 +1990,8 @@ export default function RecorderPage() {
                                     setFocusSegments([]);
                                 }
                             }}
+                            onOpenAISettings={() => setIsAISettingsOpen(true)}
+                            onApplyAICommand={handleApplyAICommand}
                         />
                     </div>
                 )}
