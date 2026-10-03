@@ -313,7 +313,7 @@ export class InteractionAnalyzer {
                     targetY: seg.targetY,
                     zoomScale: seg.zoomScale,
                     reason: seg.reason,
-                    sceneMode: 'zoom',
+                    sceneMode: 'focus',
                     followCursor: true,
                     auto: true,
                 };

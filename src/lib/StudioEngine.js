@@ -376,7 +376,14 @@ export class StudioEngine {
     updateFocusSegment(id, updates) {
         const seg = (this.focusSegments || []).find(s => s.id === id);
         if (seg) {
-            Object.assign(seg, updates);
+            const edits = { ...updates };
+            // Any user edit makes the segment theirs: regeneration must keep it.
+            if (seg.auto && !('auto' in edits)) edits.auto = false;
+            // Picking a focus point means "frame this", not "follow the cursor".
+            if (('targetX' in edits || 'targetY' in edits) && !('followCursor' in edits)) {
+                edits.followCursor = false;
+            }
+            Object.assign(seg, edits);
             this.zoomSegments = this.focusSegments.map(s => ({
                 start: s.startTime,
                 end: s.endTime,
@@ -464,9 +471,13 @@ export class StudioEngine {
 
         if (activeIndex !== -1) {
             // Re-target the active segment directly
-            this.focusSegments[activeIndex].targetX = clampedX;
-            this.focusSegments[activeIndex].targetY = clampedY;
-            this.focusSegments[activeIndex].zoomScale = targetScale;
+            Object.assign(this.focusSegments[activeIndex], {
+                targetX: clampedX,
+                targetY: clampedY,
+                zoomScale: targetScale,
+                followCursor: false,
+                auto: false,
+            });
             this.drawFrame();
             return;
         }
@@ -484,7 +495,8 @@ export class StudioEngine {
             targetY: clampedY,
             zoomScale: targetScale,
             reason: 'manual',
-            sceneMode: 'zoom',
+            sceneMode: 'focus',
+            followCursor: false,
         });
     }
 

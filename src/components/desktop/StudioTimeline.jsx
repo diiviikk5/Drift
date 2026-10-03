@@ -259,6 +259,18 @@ export default function StudioTimeline({
                         </div>
                     </div>
 
+                    <button
+                        onClick={() => onUpdateSegment && onUpdateSegment(selectedSeg.id, { followCursor: selectedSeg.followCursor === false })}
+                        title="When on, the camera calmly follows the cursor inside this zoom. When off, it holds the chosen framing."
+                        className={`px-2 py-0.5 rounded-md font-mono text-[10px] transition-all ${
+                            selectedSeg.followCursor !== false
+                                ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold'
+                                : 'bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
+                        }`}
+                    >
+                        {selectedSeg.followCursor !== false ? '🎯 Follow cursor' : '📌 Fixed framing'}
+                    </button>
+
                     <div className="flex items-center gap-2">
                         <span className="font-mono text-[10px] text-[var(--text-app-muted)]">
                             Depth:
@@ -456,7 +468,7 @@ export default function StudioTimeline({
                                          <span>🎯 {Math.round((seg.targetX ?? 0.5) * 100)}%</span>
                                      </span>
                                  ) : (
-                                     `${seg.reason === 'dwell' ? '👁' : '⚡'} ${seg.zoomScale}x ${seg.speed && seg.speed !== 1 ? `(${seg.speed}x)` : ''}`
+                                     `${seg.reason === 'manual' ? '📌' : seg.reason === 'key' ? '⌨' : '⚡'} ${seg.zoomScale}x ${seg.speed && seg.speed !== 1 ? `(${seg.speed}x)` : ''}`
                                  )}
                             </span>
 

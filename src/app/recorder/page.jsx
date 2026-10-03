@@ -8,6 +8,7 @@ import { transcribeWithSpeechAPI } from '@/lib/ai/captions';
 import { encodeProject, decodeProject } from '@/lib/project-file';
 import { parseEditInstruction } from '@/lib/ai/nl-editor';
 import { getAIClient } from '@/lib/ai/openrouter-client';
+import { focusForCenter } from '@/lib/zoom/cameraTrack';
 
 // Modular Shadcn Desktop Components
 import DesktopHeader from '@/components/desktop/DesktopHeader';
@@ -1269,11 +1270,11 @@ export default function RecorderPage() {
 
                 const boxW = Math.max(0.04, vidMaxX - vidMinX);
                 const boxH = Math.max(0.04, vidMaxY - vidMinY);
-                const targetX = (vidMinX + vidMaxX) / 2;
-                const targetY = (vidMinY + vidMaxY) / 2;
-
                 const computedScale = Math.min(3.5, Math.max(1.2, Math.min(1.0 / boxW, 1.0 / boxH)));
                 const scale = Math.round(computedScale * 10) / 10;
+                // The box is the desired viewport; convert its centre to the camera's focus point.
+                const targetX = Math.max(0, Math.min(1, focusForCenter((vidMinX + vidMaxX) / 2, scale)));
+                const targetY = Math.max(0, Math.min(1, focusForCenter((vidMinY + vidMaxY) / 2, scale)));
 
                 const ct = studioVideoRef.current.currentTime;
                 studioRef.current.addZoom(ct, targetX, targetY, scale);
