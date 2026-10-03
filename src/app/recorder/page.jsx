@@ -124,6 +124,7 @@ export default function RecorderPage() {
     const [zoomLevel, setZoomLevel] = useState(1.55);
     // showCursor defaults to FALSE to completely prevent double cursor!
     const [showCursor, setShowCursor] = useState(false);
+    const [frameFit, setFrameFit] = useState('contain');
     const [cursorTheme, setCursorTheme] = useState('macos');
     const [cursorScale, setCursorScale] = useState(1.0);
     const [splineSmoothing, setSplineSmoothing] = useState(true);
@@ -435,6 +436,7 @@ export default function RecorderPage() {
                     reactiveWebcam,
                     captionsEnabled,
                 });
+                studioRef.current.frameFit = frameFit;
                 studioRef.current.setAspectRatio(aspectRatio);
 
                 if (studioVideoRef.current) {
@@ -1540,7 +1542,7 @@ export default function RecorderPage() {
                 focusSegments: studioRef.current?.getFocusSegments() ?? focusSegments,
                 annotations, captions, captionsEnabled, background,
                 customBackground: customImage?.src ?? null,
-                zoomLevel, showCursor, cursorTheme, cursorScale, splineSmoothing, aspectRatio,
+                zoomLevel, showCursor, cursorTheme, cursorScale, splineSmoothing, aspectRatio, frameFit,
                 systemAudioVolume, micAudioVolume, isSystemAudioMuted, isMicAudioMuted, autoDuck,
                 insetPadding, borderRadius, windowChrome, springProfile, playbackSpeed, showKeystrokes,
                 tiltAngle, connectedZooms, reactiveWebcam, webcamSettings, trimStart, trimEnd,
@@ -1602,6 +1604,7 @@ export default function RecorderPage() {
             setCustomImage(image);
             setZoomLevel(project.zoomLevel ?? 1.55);
             setShowCursor(project.showCursor ?? false);
+            setFrameFit(project.frameFit === 'fill' ? 'fill' : 'contain');
             setCursorTheme(project.cursorTheme ?? 'macos');
             setCursorScale(project.cursorScale ?? 1);
             setSplineSmoothing(project.splineSmoothing ?? true);
@@ -1929,6 +1932,11 @@ export default function RecorderPage() {
                             onChangeAspectRatio={(ratio) => {
                                 setAspectRatio(ratio);
                                 if (studioRef.current) studioRef.current.setAspectRatio(ratio);
+                            }}
+                            frameFit={frameFit}
+                            onChangeFrameFit={(fit) => {
+                                setFrameFit(fit);
+                                if (studioRef.current) studioRef.current.setFrameFit(fit);
                             }}
                             tiltAngle={tiltAngle}
                             onChangeTiltAngle={(angle) => {

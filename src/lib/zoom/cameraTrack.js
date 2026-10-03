@@ -90,7 +90,7 @@ function springStep(x, v, target, omega, dt) {
  * affects it changes (segments are edited in place by the studio UI).
  */
 export function cameraTrackSignature(segments, samples, options = {}) {
-    let sig = `${options.springProfile || 'cinematic'}|${options.zoomMultiplier ?? 1}|${options.connectedZooms !== false}|${options.trackCursor !== false}|${options.duration ?? ''}|`;
+    let sig = `${options.springProfile || 'cinematic'}|${options.zoomMultiplier ?? 1}|${options.connectedZooms !== false}|${options.trackCursor !== false}|${options.duration ?? ''}|${options.cropKx ?? 1}|${options.cropKy ?? 1}|`;
     for (const s of segments || []) {
         sig += `${s.startTime},${s.endTime},${s.targetX},${s.targetY},${s.zoomScale},${s.sceneMode || ''},${s.followCursor === false ? 0 : 1};`;
     }
@@ -115,6 +115,11 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
     const connected = options.connectedZooms !== false;
     const trackCursor = options.trackCursor !== false;
     const chainGap = options.chainGapSec ?? 1.6;
+    // Fill-mode crop factors (>1 on an axis means the frame shows only part of
+    // the source on that axis even when unzoomed, so the camera must reframe).
+    const kx = Math.max(1, options.cropKx ?? 1);
+    const ky = Math.max(1, options.cropKy ?? 1);
+    const cropped = kx > 1.001 || ky > 1.001;
 
     const sorted = (segments || [])
         .filter(s => Number.isFinite(s.startTime) && Number.isFinite(s.endTime) && s.endTime > s.startTime)
@@ -175,10 +180,12 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
     const segFollows = (seg) => trackCursor && seg && seg.followCursor !== false && segScale(seg) > 1.001;
 
     // Initial state: unzoomed, focus parked on the first point of interest so
-    // the first zoom is a pure dolly into it.
+    // the first zoom is a pure dolly into it (or on the cursor when cropped).
     const first = sorted.find(s => segScale(s) > 1.001);
-    let x = first ? clamp(first.targetX ?? 0.5, 0, 1) : 0.5;
-    let y = first ? clamp(first.targetY ?? 0.5, 0, 1) : 0.5;
+    const c0 = cropped && trackCursor ? cursorAt(0) : null;
+    ci = 0;
+    let x = c0 ? c0.x : (first ? clamp(first.targetX ?? 0.5, 0, 1) : 0.5);
+    let y = c0 ? c0.y : (first ? clamp(first.targetY ?? 0.5, 0, 1) : 0.5);
     let s = 1;
     let vx = 0;
     let vy = 0;
@@ -190,6 +197,37 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
     let followY = y;
     let activeSegIndex = -1;
     let si = 0;
+
+    // Move the follow target so the cursor stays in a calm zone and, with a
+    // margin, inside the visible frame. ex/ey are the effective per-axis
+    // scales (zoom x fill crop); an axis that shows the whole source is left alone.
+    const follow = (t, ex, ey) => {
+        const c = cursorAt(t);
+        if (!c) return;
+        const radius = 0.16 / Math.max(ex, ey);
+        const dx = ex > 1.001 ? c.x - followX : 0;
+        const dy = ey > 1.001 ? c.y - followY : 0;
+        const dist = Math.hypot(dx, dy);
+        if (dist > radius) {
+            const pull = (dist - radius) / dist;
+            followX += dx * pull;
+            followY += dy * pull;
+        }
+        // Keep the cursor (now and a moment ahead, to cancel spring lag) visible.
+        const margin = 0.1;
+        const ahead = cursorAhead(t + FOLLOW_LOOKAHEAD) || c;
+        const keep = (f, v, va, e) => {
+            if (e <= 1.001) return f;
+            const lo = (u) => (u * e - (1 - margin)) / (e - 1);
+            const hi = (u) => (u * e - margin) / (e - 1);
+            let l = Math.max(lo(v), lo(va));
+            let h = Math.min(hi(v), hi(va));
+            if (l > h) { l = lo(v); h = hi(v); }
+            return clamp(clamp(f, l, h), 0, 1);
+        };
+        followX = keep(followX, c.x, ahead.x, ex);
+        followY = keep(followY, c.y, ahead.y, ey);
+    };
 
     for (let i = 0; i < frames; i++) {
         const t = i * dt;
@@ -222,33 +260,7 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
                 followY = clamp(seg.targetY ?? 0.5, 0, 1);
             }
             if (segFollows(seg) && !bridging) {
-                const c = cursorAt(t);
-                if (c) {
-                    // Calm zone radius shrinks as zoom deepens (less room on screen).
-                    const radius = 0.16 / targetScale;
-                    const dx = c.x - followX;
-                    const dy = c.y - followY;
-                    const dist = Math.hypot(dx, dy);
-                    if (dist > radius) {
-                        const pull = (dist - radius) / dist;
-                        followX += dx * pull;
-                        followY += dy * pull;
-                    }
-                    // Keep the cursor (now and a moment ahead, to cancel spring
-                    // lag) inside the visible frame with a safety margin.
-                    const margin = 0.1;
-                    const lo = (v) => (v * targetScale - (1 - margin)) / (targetScale - 1);
-                    const hi = (v) => (v * targetScale - margin) / (targetScale - 1);
-                    const ahead = cursorAhead(t + FOLLOW_LOOKAHEAD) || c;
-                    let loX = Math.max(lo(c.x), lo(ahead.x));
-                    let hiX = Math.min(hi(c.x), hi(ahead.x));
-                    let loY = Math.max(lo(c.y), lo(ahead.y));
-                    let hiY = Math.min(hi(c.y), hi(ahead.y));
-                    if (loX > hiX) { loX = lo(c.x); hiX = hi(c.x); }
-                    if (loY > hiY) { loY = lo(c.y); hiY = hi(c.y); }
-                    followX = clamp(clamp(followX, loX, hiX), 0, 1);
-                    followY = clamp(clamp(followY, loY, hiY), 0, 1);
-                }
+                follow(t, targetScale * kx, targetScale * ky);
             }
             tx = followX;
             ty = followY;
@@ -256,17 +268,26 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
             // Overview. Keep the focus where it is while zooming out (the
             // viewport mapping recentres it automatically), then park it on the
             // next point of interest once we are fully out.
-            activeSegIndex = -1;
             targetScale = 1;
             tx = x;
             ty = y;
-            if (s < 1.01) {
+            if (cropped && trackCursor) {
+                // Fill crop: keep reframing on the action even when unzoomed.
+                if (activeSegIndex !== -1) {
+                    followX = x;
+                    followY = y;
+                }
+                follow(t, kx, ky);
+                tx = followX;
+                ty = followY;
+            } else if (s < 1.01) {
                 const next = sorted.slice(si).find(n => segScale(n) > 1.001);
                 if (next) {
                     tx = clamp(next.targetX ?? 0.5, 0, 1);
                     ty = clamp(next.targetY ?? 0.5, 0, 1);
                 }
             }
+            activeSegIndex = -1;
         }
 
         // Pull back a little while the camera travels far, then settle back in
@@ -278,7 +299,8 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
         }
 
         const zoomOmega = targetScale >= s ? profile.zoomIn : profile.zoomOut;
-        const panOmega = s < 1.01 ? 14 : (segFollows(seg) && !bridging ? profile.follow : profile.pan);
+        const following = (segFollows(seg) && !bridging) || (!seg && cropped && trackCursor);
+        const panOmega = s < 1.01 && !cropped ? 14 : (following ? profile.follow : profile.pan);
 
         [s, vs] = springStep(s, vs, targetScale, zoomOmega, dt);
         [x, vx] = springStep(x, vx, tx, panOmega, dt);
@@ -290,14 +312,16 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
 
         // Soft wall: if a very fast flick still outruns the spring, nudge the
         // focus just enough that the cursor stays on screen.
-        if (segFollows(seg) && !bridging && s > 1.02) {
+        if (following) {
             const c = cursorAt(t);
             if (c) {
                 const edge = 0.03;
-                const loW = (v) => (v * s - (1 - edge)) / (s - 1);
-                const hiW = (v) => (v * s - edge) / (s - 1);
-                const nx = clamp(x, loW(c.x), hiW(c.x));
-                const ny = clamp(y, loW(c.y), hiW(c.y));
+                const wall = (f, v, e) => {
+                    if (e <= 1.02) return f;
+                    return clamp(f, (v * e - (1 - edge)) / (e - 1), (v * e - edge) / (e - 1));
+                };
+                const nx = wall(x, c.x, s * kx);
+                const ny = wall(y, c.y, s * ky);
                 if (nx !== x) { vx += (nx - x) / dt * 0.5; x = nx; }
                 if (ny !== y) { vy += (ny - y) / dt * 0.5; y = ny; }
             }

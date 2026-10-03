@@ -8,32 +8,10 @@
 
 import { computeCursorSwayRotation } from '../zoom/cursorSway.js';
 import { getSmoothedCursorPath } from '../zoom/cursorPathSmoothing.js';
-import { getCameraTrack, sampleCameraTrack } from '../zoom/cameraTrack.js';
+import { getCameraTrack, sampleCameraTrack, viewportCenter } from '../zoom/cameraTrack.js';
+import { WALLPAPERS, computeStageLayout, drawMeshBackground, getGrainPattern } from './stage.js';
 
-// Gradient wallpaper palettes
-export const WALLPAPERS = {
-    midnight: ['#090d16', '#111827', '#1f2937', '#0f172a'],
-    driftLime: ['#061a0d', '#0d3319', '#14532d', '#DCFE50'],
-    neonDrift: ['#061a0d', '#0d3319', '#14532d', '#DCFE50'],
-    cosmicMesh: ['#4A00E0', '#8E2DE2', '#F000FF'],
-    sunsetPrism: ['#FF512F', '#DD2476', '#FF9966'],
-    auroraFlow: ['#2E0854', '#8A2BE2', '#00FFFF'],
-    oceanBreeze: ['#00c6ff', '#0072ff', '#1D2671'],
-    deepSpace: ['#000000', '#130CB7', '#52E5E7'],
-    hyperGlow: ['#FF0844', '#FFB199', '#7F00FF'],
-    pastelDream: ['#FFAFBD', '#C9FFBF', '#FFC3A0'],
-    velvetHaze: ['#200122', '#6f0000', '#3f0c35'],
-    neonDusk: ['#f12711', '#f5af19', '#8e0e00'],
-    abstractFluid: ['#654ea3', '#eaafc8', '#5b247a'],
-    bigSur: ['#d14545', '#e27b38', '#ebae42', '#2d60b3'],
-    monterey: ['#591e77', '#93226a', '#c73a4c', '#181f62'],
-    ventura: ['#e55d28', '#f19e38', '#e2385c', '#3b1c6e'],
-    bloom: ['#6930c3', '#5390d9', '#4ea8de', '#48bfe3'],
-    sonoma: ['#1d3557', '#457b9d', '#a8dadc', '#1d3557'],
-    emerald: ['#059669', '#10b981', '#064e3b', '#022c22'],
-    obsidian: ['#050505', '#121214', '#18181b', '#0a0a0c'],
-    cyberpunk: ['#0f051d', '#3b0764', '#701a75', '#0284c7'],
-};
+export { WALLPAPERS };
 
 /**
  * Reactive Webcam Scaling (from OpenScreen / Recordly)
@@ -69,11 +47,15 @@ export function calculate3DTilt(cameraX, cameraY, scale, maxTiltDeg = 3.5) {
  * @returns {{x:number, y:number, scale:number, rotateX:number, rotateY:number, activeSeg:Object|null}}
  */
 export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples = [], options = {}) {
-    if (!focusSegments || focusSegments.length === 0) {
+    const kx = options.cropKx ?? 1;
+    const ky = options.cropKy ?? 1;
+    if ((!focusSegments || focusSegments.length === 0) && kx <= 1 && ky <= 1) {
         return { x: 0.5, y: 0.5, scale: 1.0, rotateX: 0, rotateY: 0, activeSeg: null };
     }
 
-    const track = getCameraTrack(focusSegments, mouseSamples, {
+    const track = getCameraTrack(focusSegments || [], mouseSamples, {
+        cropKx: kx,
+        cropKy: ky,
         springProfile: options.springProfile,
         zoomMultiplier: options.zoomMultiplier ?? 1.0,
         connectedZooms: options.connectedZooms,
@@ -84,8 +66,8 @@ export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples =
     const tilt = calculate3DTilt(cam.x, cam.y, cam.scale, options.tiltAngle ?? 0);
 
     return {
-        x: cam.x,
-        y: cam.y,
+        x: kx > 1 ? viewportCenter(cam.focusX, cam.scale * kx) : cam.x,
+        y: ky > 1 ? viewportCenter(cam.focusY, cam.scale * ky) : cam.y,
         scale: cam.scale,
         focusX: cam.focusX,
         focusY: cam.focusY,
@@ -251,40 +233,22 @@ export function cursorIdleOpacity(timeSec, mouseSamples) {
  * Computes window frame dimensions and offsets preserving video aspect ratio inside canvas
  */
 export function getFrameMetrics(width, height, videoSource, renderSettings = {}) {
-    const {
-        insetPadding = 0.08,
-        windowChrome = true,
-        titleBarHeight = 34,
-    } = renderSettings;
+    const srcW = videoSource?.videoWidth || 1920;
+    const srcH = videoSource?.videoHeight || 1080;
+    return computeStageLayout(width, height, srcW, srcH, renderSettings);
+}
 
-    const maxW = width * (1 - insetPadding * 2);
-    const maxH = height * (1 - insetPadding * 2);
-    const headerH = windowChrome ? titleBarHeight : 0;
-
-    const srcAspect = (videoSource && videoSource.videoWidth && videoSource.videoHeight)
-        ? (videoSource.videoWidth / videoSource.videoHeight)
-        : (16 / 9);
-
-    let frameW = maxW;
-    let videoH = frameW / srcAspect;
-    let frameH = videoH + headerH;
-    if (frameH > maxH) {
-        frameH = maxH;
-        videoH = Math.max(1, frameH - headerH);
-        frameW = videoH * srcAspect;
-    }
-
-    const padX = (width - frameW) / 2;
-    const padY = (height - frameH) / 2;
-
-    return {
-        padX,
-        padY,
-        frameW,
-        frameH,
-        headerH,
-        videoH,
-    };
+/**
+ * Map a point on the canvas back to normalized source coordinates, given the
+ * layout and the camera at that moment (inverse of the render transform).
+ */
+export function canvasToSource(canvasX, canvasY, layout, camera) {
+    const cx = layout.padX + layout.videoW * 0.5;
+    const cy = layout.padY + layout.headerH + layout.videoH * 0.5;
+    const s = camera?.scale || 1;
+    const x = ((canvasX - cx) / s + (camera?.x ?? 0.5) * layout.contentW) / layout.contentW;
+    const y = ((canvasY - cy) / s + (camera?.y ?? 0.5) * layout.contentH) / layout.contentH;
+    return { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) };
 }
 
 let _cachedBackdropCanvas = null;
@@ -335,22 +299,55 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         keystrokes = [],
     } = sessionData;
 
-    // 2. Compute Inset Screen Frame with aspect ratio preservation
-    const { padX, padY, frameW, frameH, headerH, videoH } = getFrameMetrics(width, height, videoSource, {
+    // 2. Stage layout (resolution independent: 1 unit = 1px at 1080p)
+    const layout = getFrameMetrics(width, height, videoSource, {
         insetPadding,
         windowChrome,
         titleBarHeight,
+        borderRadius,
+        frameFit: renderSettings.frameFit,
     });
+    const { padX, padY, frameW, frameH, headerH, videoH, contentW, contentH, unit, radius } = layout;
 
-    const isFullBleed = (insetPadding <= 0.001);
-    const effectiveShadowOpacity = isFullBleed ? 0 : shadowOpacity;
-    const effectiveShadowBlur = isFullBleed ? 0 : shadowBlur;
-    const effectiveShadowOffsetY = isFullBleed ? 0 : shadowOffsetY;
+    const effectiveShadowOpacity = layout.fullBleed ? 0 : shadowOpacity;
 
-    // 1 & 3. Draw Cached Backdrop (Wallpaper + Film Grain + Ambient Drop Shadow)
-    // Pre-rendering to an offscreen canvas avoids calculating expensive Gaussian shadowBlur (45px) and gradients on every frame.
+    // 1 & 3. Cached backdrop: wallpaper, grain and the frame's drop shadow.
+    // Rendered once per layout/background change, then blitted every frame.
     const customImgKey = customBackgroundImage?.src || customBackgroundImage?.currentSrc || (customBackgroundImage ? 'custom' : 'none');
-    const backdropKey = `${width}x${height}_${background}_${customImgKey}_${Math.round(padX)}_${Math.round(padY)}_${Math.round(frameW)}_${Math.round(frameH)}_${borderRadius}_${effectiveShadowBlur}_${effectiveShadowOffsetY}_${effectiveShadowOpacity}`;
+    const backdropKey = `${width}x${height}_${background}_${customImgKey}_${Math.round(padX)}_${Math.round(padY)}_${Math.round(frameW)}_${Math.round(frameH)}_${Math.round(radius)}_${shadowBlur}_${shadowOffsetY}_${effectiveShadowOpacity}`;
+
+    const paintBackdrop = (bCtx) => {
+        if (customBackgroundImage && (customBackgroundImage.complete !== false)) {
+            _drawCoverImage(bCtx, customBackgroundImage, 0, 0, width, height);
+        } else {
+            drawMeshBackground(bCtx, width, height, WALLPAPERS[background] || WALLPAPERS.bigSur);
+        }
+
+        const grain = getGrainPattern(bCtx);
+        if (grain) {
+            bCtx.save();
+            bCtx.fillStyle = grain;
+            bCtx.fillRect(0, 0, width, height);
+            bCtx.restore();
+        }
+
+        if (effectiveShadowOpacity > 0) {
+            // Two-layer shadow: wide ambient falloff plus a tight contact shadow.
+            bCtx.save();
+            bCtx.fillStyle = '#000000';
+            bCtx.shadowColor = `rgba(0, 0, 0, ${effectiveShadowOpacity * 0.85})`;
+            bCtx.shadowBlur = shadowBlur * 1.6 * unit;
+            bCtx.shadowOffsetY = shadowOffsetY * unit;
+            _drawRoundedRectPath(bCtx, padX, padY, frameW, frameH, radius);
+            bCtx.fill();
+            bCtx.shadowColor = `rgba(0, 0, 0, ${effectiveShadowOpacity * 0.6})`;
+            bCtx.shadowBlur = 10 * unit;
+            bCtx.shadowOffsetY = 3 * unit;
+            _drawRoundedRectPath(bCtx, padX, padY, frameW, frameH, radius);
+            bCtx.fill();
+            bCtx.restore();
+        }
+    };
 
     let drewFromCache = false;
     try {
@@ -369,36 +366,7 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
             if (_cachedBackdropCanvas && _cachedBackdropKey !== backdropKey) {
                 const bCtx = _cachedBackdropCanvas.getContext('2d');
                 if (bCtx) {
-                    if (customBackgroundImage && (customBackgroundImage.complete !== false)) {
-                        _drawCoverImage(bCtx, customBackgroundImage, 0, 0, width, height);
-                    } else {
-                        const colors = WALLPAPERS[background] || WALLPAPERS.bigSur;
-                        const grad = bCtx.createLinearGradient(0, 0, width, height);
-                        const step = 1 / (colors.length - 1);
-                        colors.forEach((c, i) => grad.addColorStop(i * step, c));
-                        bCtx.fillStyle = grad;
-                        bCtx.fillRect(0, 0, width, height);
-                    }
-
-                    const grain = _getNoisePattern(bCtx);
-                    if (grain) {
-                        bCtx.save();
-                        bCtx.fillStyle = grain;
-                        bCtx.fillRect(0, 0, width, height);
-                        bCtx.restore();
-                    }
-
-                    if (effectiveShadowOpacity > 0) {
-                        bCtx.save();
-                        bCtx.shadowColor = `rgba(0, 0, 0, ${effectiveShadowOpacity})`;
-                        bCtx.shadowBlur = effectiveShadowBlur;
-                        bCtx.shadowOffsetY = effectiveShadowOffsetY;
-                        bCtx.fillStyle = '#000000';
-                        _drawRoundedRectPath(bCtx, padX, padY, frameW, frameH, borderRadius);
-                        bCtx.fill();
-                        bCtx.restore();
-                    }
-
+                    paintBackdrop(bCtx);
                     _cachedBackdropKey = backdropKey;
                 }
             }
@@ -413,60 +381,35 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
     }
 
     if (!drewFromCache) {
-        // Fallback for headless environments or mock contexts without offscreen canvas
-        if (customBackgroundImage && (customBackgroundImage.complete !== false)) {
-            _drawCoverImage(ctx, customBackgroundImage, 0, 0, width, height);
-        } else {
-            const colors = WALLPAPERS[background] || WALLPAPERS.bigSur;
-            const grad = ctx.createLinearGradient(0, 0, width, height);
-            const step = 1 / (colors.length - 1);
-            colors.forEach((c, i) => grad.addColorStop(i * step, c));
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, width, height);
-        }
-
-        const grain = _getNoisePattern(ctx);
-        if (grain) {
-            ctx.save();
-            ctx.fillStyle = grain;
-            ctx.fillRect(0, 0, width, height);
-            ctx.restore();
-        }
-
-        if (effectiveShadowOpacity > 0) {
-            ctx.save();
-            ctx.shadowColor = `rgba(0, 0, 0, ${effectiveShadowOpacity})`;
-            ctx.shadowBlur = effectiveShadowBlur;
-            ctx.shadowOffsetY = effectiveShadowOffsetY;
-            ctx.fillStyle = '#000000';
-            _drawRoundedRectPath(ctx, padX, padY, frameW, frameH, borderRadius);
-            ctx.fill();
-            ctx.restore();
-        }
+        // Headless environments / mock contexts without an offscreen canvas
+        paintBackdrop(ctx);
     }
 
     // 4. Clip to Rounded Rect Screen Frame
     ctx.save();
-    _drawRoundedRectPath(ctx, padX, padY, frameW, frameH, borderRadius);
+    _drawRoundedRectPath(ctx, padX, padY, frameW, frameH, radius);
     ctx.clip();
 
-    // Window Header / Title Bar
-    if (windowChrome) {
-        ctx.fillStyle = '#1e1e24';
+    // Window title bar
+    if (headerH > 0) {
+        const bar = ctx.createLinearGradient(0, padY, 0, padY + headerH);
+        bar.addColorStop(0, '#2b2b31');
+        bar.addColorStop(1, '#1f1f24');
+        ctx.fillStyle = bar;
         ctx.fillRect(padX, padY, frameW, headerH);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+        ctx.fillRect(padX, padY + headerH - Math.max(1, unit), frameW, Math.max(1, unit));
 
-        // macOS Traffic light dots
         const dotY = padY + headerH / 2;
-        const dotR = 5.5;
-        const startDotX = padX + 18;
-        const dotSpacing = 18;
-
-        ctx.fillStyle = '#FF5F57'; // Red
-        ctx.beginPath(); ctx.arc(startDotX, dotY, dotR, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#FEBC2E'; // Yellow
-        ctx.beginPath(); ctx.arc(startDotX + dotSpacing, dotY, dotR, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#28C840'; // Green
-        ctx.beginPath(); ctx.arc(startDotX + dotSpacing * 2, dotY, dotR, 0, Math.PI * 2); ctx.fill();
+        const dotR = 6 * unit;
+        const startDotX = padX + 20 * unit;
+        const dotSpacing = 20 * unit;
+        ['#FF5F57', '#FEBC2E', '#28C840'].forEach((color, i) => {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(startDotX + dotSpacing * i, dotY, dotR, 0, Math.PI * 2);
+            ctx.fill();
+        });
     }
 
     // 5. Calculate Camera Zoom & Position
@@ -475,6 +418,8 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         connectedZooms: renderSettings.connectedZooms,
         tiltAngle: renderSettings.tiltAngle,
         springProfile: renderSettings.springProfile,
+        cropKx: layout.cropKx,
+        cropKy: layout.cropKy,
     };
     const camera = evaluateCameraAtTime(timeSec, focusSegments, mouseSamples, cameraOptions);
 
@@ -503,15 +448,15 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
     // Scale by camera zoom
     ctx.scale(camera.scale, camera.scale);
     // Translate by negative camera position relative to center
-    ctx.translate(-camera.x * frameW, -camera.y * videoH);
+    ctx.translate(-camera.x * contentW, -camera.y * contentH);
 
     // Draw source video filling video area
     if (videoSource) {
         try {
-            ctx.drawImage(videoSource, 0, 0, frameW, videoH);
+            ctx.drawImage(videoSource, 0, 0, contentW, contentH);
         } catch (e) {
             ctx.fillStyle = '#0f172a';
-            ctx.fillRect(0, 0, frameW, videoH);
+            ctx.fillRect(0, 0, contentW, contentH);
         }
     }
 
@@ -523,10 +468,10 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
             const dt = curMs - cTimeMs;
             if (dt >= 0 && dt <= 380) {
                 const progress = dt / 380;
-                const ringRadius = progress * 28 * (frameW / 1920);
+                const ringRadius = progress * 28 * unit;
                 const ringAlpha = (1 - progress) * 0.55;
-                const cx = (click.x > 1 ? click.x / 1920 : click.x) * frameW;
-                const cy = (click.y > 1 ? click.y / 1080 : click.y) * videoH;
+                const cx = (click.x > 1 ? click.x / 1920 : click.x) * contentW;
+                const cy = (click.y > 1 ? click.y / 1080 : click.y) * contentH;
 
                 ctx.save();
                 ctx.beginPath();
@@ -550,8 +495,8 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         const smooth = renderSettings.splineSmoothing !== false;
         const cursor = sampleCursor(timeSec, mouseSamples, smooth);
         if (cursor) {
-            const curScreenX = cursor.x * frameW;
-            const curScreenY = cursor.y * videoH;
+            const curScreenX = cursor.x * contentW;
+            const curScreenY = cursor.y * contentH;
 
             // Click bounce: quick compression on press and springy release (click times are ms)
             let clickFactor = 1.0;
@@ -575,15 +520,15 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
             if (mouseSamples.length > 2 && timeSec > 0.02) {
                 const prev = sampleCursor(timeSec - 0.02, mouseSamples, smooth);
                 if (prev) {
-                    const dx = (cursor.x - prev.x) * frameW;
-                    const dy = (cursor.y - prev.y) * videoH;
+                    const dx = (cursor.x - prev.x) * contentW;
+                    const dy = (cursor.y - prev.y) * contentH;
                     swayAngle = computeCursorSwayRotation(dx, dy, 20, renderSettings.sway ?? 1.0);
                 }
             }
 
             ctx.save();
             ctx.globalAlpha = idleOpacity;
-            _drawThemedCursor(ctx, curScreenX, curScreenY, cursorScale * clickFactor * (frameW / 1920), cursorTheme, swayAngle);
+            _drawThemedCursor(ctx, curScreenX, curScreenY, cursorScale * clickFactor * (contentH / 1080), cursorTheme, swayAngle);
             ctx.restore();
         }
     }
@@ -597,15 +542,17 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         ctx.rect(padX, padY + headerH, frameW, videoH);
         ctx.clip();
 
-        let spotX = padX + (camera.activeSeg.targetX ?? 0.5) * frameW;
-        let spotY = padY + headerH + (camera.activeSeg.targetY ?? 0.5) * videoH;
+        let spotU = camera.activeSeg.targetX ?? 0.5;
+        let spotV = camera.activeSeg.targetY ?? 0.5;
         if (mouseSamples && mouseSamples.length > 0) {
-            const cursor = getInterpolatedCursor(timeSec, mouseSamples);
+            const cursor = sampleCursor(timeSec, mouseSamples, renderSettings.splineSmoothing !== false);
             if (cursor) {
-                spotX = padX + cursor.x * frameW;
-                spotY = padY + headerH + cursor.y * videoH;
+                spotU = cursor.x;
+                spotV = cursor.y;
             }
         }
+        const spotX = padX + frameW * 0.5 + (spotU - camera.x) * contentW * camera.scale;
+        const spotY = padY + headerH + videoH * 0.5 + (spotV - camera.y) * contentH * camera.scale;
 
         const spotRadius = Math.min(frameW, videoH) * 0.22;
         const grad = ctx.createRadialGradient(spotX, spotY, spotRadius * 0.35, spotX, spotY, spotRadius * 1.35);
@@ -663,7 +610,7 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
             frameW, 
             videoH,
             cameraScale: camera.scale,
-            borderRadius
+            borderRadius: radius,
         });
     }
 
@@ -673,8 +620,19 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         _drawSpeedRampBadge(ctx, speedMultiplier, { padX, padY: padY + headerH, frameW, videoH });
     }
 
-    ctx.restore(); // restore rounded rect screen frame (line 528)
-    ctx.restore(); // restore outer canvas state (line 387)
+    ctx.restore(); // restore rounded rect screen frame
+
+    // Hairline edge: gives the frame a crisp, glassy outline on any wallpaper.
+    if (!layout.fullBleed) {
+        ctx.save();
+        _drawRoundedRectPath(ctx, padX, padY, frameW, frameH, radius);
+        ctx.lineWidth = Math.max(1, unit);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    ctx.restore(); // restore outer canvas state
 }
 
 /**
@@ -1178,36 +1136,6 @@ function _drawSyntheticCursor(ctx, x, y, scale = 1.0, swayAngle = 0) {
     ctx.stroke();
 
     ctx.restore();
-}
-
-/**
- * Procedural Film Grain Noise Pattern (Cap-inspired)
- * Prevents 8-bit digital color banding on gradient backgrounds
- */
-let _cachedNoisePattern = null;
-function _getNoisePattern(ctx) {
-    if (_cachedNoisePattern) return _cachedNoisePattern;
-    if (typeof document === 'undefined') return null;
-    try {
-        const nCanvas = document.createElement('canvas');
-        nCanvas.width = 128;
-        nCanvas.height = 128;
-        const nCtx = nCanvas.getContext('2d');
-        const imgData = nCtx.createImageData(128, 128);
-        const data = imgData.data;
-        for (let i = 0; i < data.length; i += 4) {
-            const val = Math.floor(Math.random() * 255);
-            data[i] = val;
-            data[i + 1] = val;
-            data[i + 2] = val;
-            data[i + 3] = 16; // subtle 6% grain opacity
-        }
-        nCtx.putImageData(imgData, 0, 0);
-        _cachedNoisePattern = ctx.createPattern(nCanvas, 'repeat');
-        return _cachedNoisePattern;
-    } catch (e) {
-        return null;
-    }
 }
 
 /**

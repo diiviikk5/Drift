@@ -4,7 +4,7 @@
 
 import { isTauri } from './tauri-bridge.js';
 import { InteractionAnalyzer } from './zoom/InteractionAnalyzer.js';
-import { renderFrame, getFrameMetrics, evaluateCameraAtTime, getInterpolatedCursor } from './rendering/renderFrame.js';
+import { renderFrame, getFrameMetrics, canvasToSource, evaluateCameraAtTime, getInterpolatedCursor } from './rendering/renderFrame.js';
 import { getSmoothedCursorPath } from './zoom/cursorPathSmoothing.js';
 import { ZOOM_PRESETS, DEFAULT_ZOOM_SCALE, resolveZoomPreset } from './zoom/ZoomConstruct.js';
 
@@ -89,6 +89,7 @@ export class StudioEngine {
         this.borderRadius = options.borderRadius ?? 18;
         this.windowChrome = options.windowChrome !== false;
         this.aspectRatio = options.aspectRatio || '16:9';
+        this.frameFit = options.frameFit || 'contain';
         this.autoZoomOnClicks = options.autoZoomOnClicks !== false;
 
         const initialSrcW = options.sourceWidth || (this.canvas?.width) || (typeof window !== 'undefined' ? (window.screen.width * (window.devicePixelRatio || 1)) : 1920);
@@ -536,47 +537,30 @@ export class StudioEngine {
         });
     }
 
-    resolveClick(normX, normY) {
-        const metrics = getFrameMetrics(this.canvas.width, this.canvas.height, this.video, {
+    /** Current stage layout, matching what renderFrame draws. */
+    getStageLayout() {
+        return getFrameMetrics(this.canvas.width, this.canvas.height, this.video, {
             insetPadding: this.insetPadding ?? 0.08,
             windowChrome: this.windowChrome !== false,
             titleBarHeight: this.titleBarHeight ?? 34,
+            borderRadius: this.borderRadius ?? 18,
+            frameFit: this.frameFit || 'contain',
         });
+    }
 
-        const canvasPx = normX * this.canvas.width;
-        const canvasPy = normY * this.canvas.height;
-
-        const centerX = metrics.padX + metrics.frameW * 0.5;
-        const centerY = metrics.padY + metrics.headerH + metrics.videoH * 0.5;
-
+    /** Map a normalized canvas point (0..1) to normalized source coordinates. */
+    resolveClick(normX, normY) {
+        const layout = this.getStageLayout();
         const curTimeSec = this.video?.currentTime || 0;
         const cam = evaluateCameraAtTime(curTimeSec, this.focusSegments || [], this.mouseMoves || [], {
             zoomMultiplier: 1.0,
             connectedZooms: this.connectedZooms !== false,
-            tiltAngle: 0, // Invert from neutral projection so perspective tilt does not skew click projection
+            tiltAngle: 0, // invert from the untilted projection
             springProfile: this.springProfile || 'cinematic',
+            cropKx: layout.cropKx,
+            cropKy: layout.cropKy,
         });
-
-        const camScale = (cam && cam.scale) ? cam.scale : (this.camera?.scale || 1.0);
-        const camX = (cam && Number.isFinite(cam.x)) ? cam.x : (this.camera?.x || 0.5);
-        const camY = (cam && Number.isFinite(cam.y)) ? cam.y : (this.camera?.y || 0.5);
-
-        const p1x = canvasPx - centerX;
-        const p1y = canvasPy - centerY;
-
-        const p2x = p1x / camScale;
-        const p2y = p1y / camScale;
-
-        const p3x = p2x + camX * metrics.frameW;
-        const p3y = p2y + camY * metrics.videoH;
-
-        const finalX = p3x / metrics.frameW;
-        const finalY = p3y / metrics.videoH;
-
-        return {
-            x: Math.max(0, Math.min(1, finalX)),
-            y: Math.max(0, Math.min(1, finalY))
-        };
+        return canvasToSource(normX * this.canvas.width, normY * this.canvas.height, layout, cam);
     }
 
     renderLoop() {
@@ -827,6 +811,7 @@ export class StudioEngine {
                 clickRipples: true,
                 tiltAngle: this.tiltAngle ?? 0,
                 connectedZooms: this.connectedZooms !== false,
+                frameFit: this.frameFit || 'contain',
                 webcamSource: this.webcamVideo && this.webcamVideo.readyState >= 2 ? this.webcamVideo : null,
                 webcamSettings: {
                     ...this.webcamSettings,
@@ -976,6 +961,12 @@ export class StudioEngine {
         this.background = bg;
         this._cachedBg = null;
         this._cachedBgKey = '';
+        this.drawFrame();
+    }
+
+    /** 'contain' letterboxes the recording; 'fill' fills the frame and reframes on the action. */
+    setFrameFit(fit) {
+        this.frameFit = fit === 'fill' ? 'fill' : 'contain';
         this.drawFrame();
     }
 

@@ -25,6 +25,7 @@ import {
     AppWindow,
     Gauge
 } from 'lucide-react';
+import { WALLPAPERS, meshCss } from '@/lib/rendering/stage';
 
 export default function InspectorPanel({
     background,
@@ -71,6 +72,8 @@ export default function InspectorPanel({
     isExporting = false,
     aspectRatio = '16:9',
     onChangeAspectRatio,
+    frameFit = 'contain',
+    onChangeFrameFit,
     tiltAngle = 3.5,
     onChangeTiltAngle,
     connectedZooms = true,
@@ -188,6 +191,28 @@ export default function InspectorPanel({
                                     </button>
                                 ))}
                             </div>
+                            {(aspectRatio || '16:9') !== 'native' && (
+                                <div className="grid grid-cols-2 gap-1.5 pt-1">
+                                    {[
+                                        { id: 'contain', label: 'Fit', desc: 'Show the whole recording' },
+                                        { id: 'fill', label: 'Fill', desc: 'Fill frame, auto-reframe' },
+                                    ].map((opt) => (
+                                        <button
+                                            key={opt.id}
+                                            onClick={() => onChangeFrameFit && onChangeFrameFit(opt.id)}
+                                            title={opt.id === 'fill' ? 'Crops the recording to fill the frame and keeps the camera on the action - great for vertical and square clips' : 'Letterboxes the whole recording inside the frame'}
+                                            className={`p-2 rounded-lg border text-left transition-all ${
+                                                (frameFit || 'contain') === opt.id
+                                                    ? 'bg-[var(--bg-card-subtle)] border-[var(--accent-app)] text-[var(--text-app)] shadow-xs font-bold'
+                                                    : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
+                                            }`}
+                                        >
+                                            <div className="font-mono text-xs">{opt.label}</div>
+                                            <div className="text-[10px] opacity-75">{opt.desc}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         {/* Wallpapers */}
@@ -217,7 +242,7 @@ export default function InspectorPanel({
                                     const isSelected = background === key && (!customImage || customImage._bgKey === key);
                                     const bgStyle = val.src
                                         ? { backgroundImage: `url(${val.src})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-                                        : { background: `linear-gradient(135deg, ${val.colors.join(', ')})` };
+                                        : { background: meshCss(WALLPAPERS[key] || val.colors) };
 
                                     return (
                                         <button
