@@ -32,6 +32,11 @@ pub struct NativeSessionResult {
     pub height: u32,
     pub fps: u32,
     pub frames_captured: u64,
+    /// Desktop position of the recorded monitor (telemetry is already local to it).
+    pub monitor_x: i32,
+    pub monitor_y: i32,
+    /// Telemetry was shifted so t = 0 matches the first video frame.
+    pub telemetry_offset_ms: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,6 +71,7 @@ pub struct CaptureSessionFlags {
     pub height: u32,
     pub is_recording: Arc<AtomicBool>,
     pub frame_counter: Arc<std::sync::atomic::AtomicU64>,
+    pub first_frame_at: Arc<Mutex<Option<std::time::Instant>>>,
 }
 
 #[cfg(windows)]
@@ -73,6 +79,7 @@ pub struct ScreenRecorderHandler {
     encoder: Option<VideoEncoder>,
     is_recording: Arc<AtomicBool>,
     frame_counter: Arc<std::sync::atomic::AtomicU64>,
+    first_frame_at: Arc<Mutex<Option<std::time::Instant>>>,
 }
 
 #[cfg(windows)]
@@ -96,6 +103,7 @@ impl GraphicsCaptureApiHandler for ScreenRecorderHandler {
             encoder: Some(encoder),
             is_recording: flags.is_recording,
             frame_counter: flags.frame_counter,
+            first_frame_at: flags.first_frame_at,
         })
     }
 
@@ -110,6 +118,12 @@ impl GraphicsCaptureApiHandler for ScreenRecorderHandler {
         }
 
         if let Some(encoder) = &mut self.encoder {
+            {
+                let mut first = self.first_frame_at.lock();
+                if first.is_none() {
+                    *first = Some(std::time::Instant::now());
+                }
+            }
             encoder.send_frame(frame)?;
             self.frame_counter.fetch_add(1, Ordering::Relaxed);
         }
@@ -134,6 +148,8 @@ pub struct NativeSessionManager {
     pub system_audio_path: Arc<Mutex<Option<PathBuf>>>,
     pub mic_audio_path: Arc<Mutex<Option<PathBuf>>>,
     pub target_geometry: Arc<Mutex<(u32, u32, u32)>>, // width, height, fps
+    pub monitor_origin: Arc<Mutex<(i32, i32)>>,
+    pub first_frame_at: Arc<Mutex<Option<std::time::Instant>>>,
     #[cfg(windows)]
     capture_control: Arc<Mutex<Option<CaptureControl<ScreenRecorderHandler, Box<dyn std::error::Error + Send + Sync>>>>>,
     audio_stop_sender: Arc<Mutex<Option<std::sync::mpsc::Sender<()>>>>,
@@ -151,6 +167,8 @@ impl Default for NativeSessionManager {
             system_audio_path: Arc::new(Mutex::new(None)),
             mic_audio_path: Arc::new(Mutex::new(None)),
             target_geometry: Arc::new(Mutex::new((1920, 1080, 60))),
+            monitor_origin: Arc::new(Mutex::new((0, 0))),
+            first_frame_at: Arc::new(Mutex::new(None)),
             #[cfg(windows)]
             capture_control: Arc::new(Mutex::new(None)),
             audio_stop_sender: Arc::new(Mutex::new(None)),
@@ -239,6 +257,13 @@ pub async fn start_native_session(
         let without_cursor = config.without_cursor.unwrap_or(true);
 
         *state.target_geometry.lock() = (width, height, fps);
+        // Same index the source picker used (xcap enumerates monitors in the same order).
+        let origin = xcap::Monitor::all()
+            .ok()
+            .and_then(|all| all.get(config.monitor_index).map(|m| (m.x(), m.y())))
+            .unwrap_or((0, 0));
+        *state.monitor_origin.lock() = origin;
+        *state.first_frame_at.lock() = None;
         *state.session_id.lock() = Some(session_uuid.clone());
         *state.session_dir.lock() = Some(base_dir.clone());
         *state.screen_path.lock() = Some(screen_video_path.clone());
@@ -378,6 +403,7 @@ pub async fn start_native_session(
             height,
             is_recording: state.is_recording.clone(),
             frame_counter: state.frame_counter.clone(),
+            first_frame_at: state.first_frame_at.clone(),
         };
 
         let settings = Settings::new(
@@ -436,11 +462,26 @@ pub async fn stop_native_session(app: AppHandle) -> Result<NativeSessionResult, 
         let _ = stop_tx.send(());
     }
 
+    let first_frame = state.first_frame_at.lock().take();
     let duration_ms = {
         let mut st = state.start_time.lock();
-        let elapsed = st.as_ref().map(|t: &std::time::Instant| t.elapsed().as_secs_f64() * 1000.0).unwrap_or(0.0);
+        let started = first_frame.or(*st);
+        let elapsed = started.map(|t: std::time::Instant| t.elapsed().as_secs_f64() * 1000.0).unwrap_or(0.0);
         *st = None;
         elapsed
+    };
+
+    // Align telemetry with the video: t = 0 is the first encoded frame and
+    // coordinates are local to the recorded monitor.
+    let (monitor_x, monitor_y) = *state.monitor_origin.lock();
+    let telemetry_offset_ms = {
+        let input_state = app.state::<crate::commands::input::InputListenerState>();
+        let offset = match (first_frame, crate::commands::input::session_start_instant(&input_state)) {
+            (Some(frame), Some(tele)) if frame > tele => frame.duration_since(tele).as_secs_f64() * 1000.0,
+            _ => 0.0,
+        };
+        crate::commands::input::rebase_session(&input_state, offset, (monitor_x as f64, monitor_y as f64));
+        offset
     };
 
     let session_id = state.session_id.lock().take().unwrap_or_else(|| "unknown".to_string());
@@ -475,6 +516,8 @@ pub async fn stop_native_session(app: AppHandle) -> Result<NativeSessionResult, 
         "height": height,
         "fps": fps,
         "frames_captured": frames_captured,
+        "monitor_origin": [monitor_x, monitor_y],
+        "telemetry_offset_ms": telemetry_offset_ms,
         "tracks": {
             "screen": screen_video_path.to_string_lossy(),
             "system_audio": system_audio_path.as_ref().map(|p| p.to_string_lossy()),
@@ -499,6 +542,9 @@ pub async fn stop_native_session(app: AppHandle) -> Result<NativeSessionResult, 
         height,
         fps,
         frames_captured,
+        monitor_x,
+        monitor_y,
+        telemetry_offset_ms,
     };
 
     let _ = app.emit("native-recording-stopped", &res);

@@ -32,6 +32,10 @@ pub struct CursorSample {
 pub struct KeystrokeSample {
     pub time: f64,
     pub text: String,
+    /// Plain typing activity (letters/digits without modifiers). The key itself
+    /// is never stored; only the timing is kept so auto-zoom can follow typing.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub typed: bool,
 }
 
 /// State to control the global input listener and buffer session telemetry
@@ -212,6 +216,7 @@ pub fn start_global_listener(app: AppHandle) {
         let listener_start = std::time::Instant::now();
         let mut last_move_time: f64 = 0.0;
         let mut last_sample_time: f64 = 0.0;
+        let mut last_typed_time: f64 = f64::NEG_INFINITY;
 
         listen(move |event: Event| {
             if !*is_listening.lock() {
@@ -321,12 +326,21 @@ pub fn start_global_listener(app: AppHandle) {
                                     let sample = KeystrokeSample {
                                         time: (elapsed / 1000.0 * 100.0).round() / 100.0,
                                         text: combo,
+                                        typed: false,
                                     };
 
                                     if is_rec {
                                         session_keystrokes.lock().push(sample.clone());
                                     }
                                     let _ = app_handle.emit("global-keystroke", &sample);
+                                } else if is_rec && elapsed - last_typed_time >= 120.0 {
+                                    // Anonymous typing activity, throttled; never emitted live.
+                                    last_typed_time = elapsed;
+                                    session_keystrokes.lock().push(KeystrokeSample {
+                                        time: (elapsed / 1000.0 * 100.0).round() / 100.0,
+                                        text: String::new(),
+                                        typed: true,
+                                    });
                                 }
                             }
                         }
@@ -374,6 +388,32 @@ pub fn stop_session_telemetry(state: tauri::State<'_, InputListenerState>) -> Ve
     *state.is_recording.lock() = false;
     *state.recording_start.lock() = None;
     state.session_samples.lock().clone()
+}
+
+/// Instant the current telemetry session started (its t = 0), if recording.
+pub fn session_start_instant(state: &InputListenerState) -> Option<std::time::Instant> {
+    *state.recording_start.lock()
+}
+
+/// Re-base the buffered session onto the video timeline: shift timestamps so
+/// t = 0 is the first captured frame, and translate global desktop
+/// coordinates into the recorded monitor's local pixel space.
+pub fn rebase_session(state: &InputListenerState, offset_ms: f64, origin: (f64, f64)) {
+    {
+        let mut samples = state.session_samples.lock();
+        for s in samples.iter_mut() {
+            s.t -= offset_ms;
+            s.x -= origin.0;
+            s.y -= origin.1;
+        }
+        // Drop anything recorded well before the first frame.
+        samples.retain(|s| s.t >= -250.0);
+    }
+    let mut keys = state.session_keystrokes.lock();
+    for k in keys.iter_mut() {
+        k.time = ((k.time * 1000.0 - offset_ms) / 10.0).round() / 100.0;
+    }
+    keys.retain(|k| k.time >= -0.25);
 }
 
 /// Retrieve the high-frequency telemetry buffer recorded during the session
