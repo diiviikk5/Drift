@@ -478,16 +478,6 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
     };
     const camera = evaluateCameraAtTime(timeSec, focusSegments, mouseSamples, cameraOptions);
 
-    // Optional Cinema Motion Blur (180-degree shutter interval)
-    let blurPrevCam = null;
-    let motionVelocity = 0;
-    if (renderSettings.motionBlur !== false && timeSec > 0.016) {
-        blurPrevCam = evaluateCameraAtTime(timeSec - 0.016, focusSegments, mouseSamples, cameraOptions);
-        const moveDist = Math.hypot(camera.x - blurPrevCam.x, camera.y - blurPrevCam.y);
-        const scaleDist = Math.abs(camera.scale - blurPrevCam.scale);
-        motionVelocity = moveDist * 12 + scaleDist * 2.5;
-    }
-
     // 6. Draw Video Frame with Camera Transformation inside video area
     ctx.save();
     // Clip specifically to content area below header
@@ -498,22 +488,6 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
     // Dark solid backdrop inside window frame so stage is never transparent
     ctx.fillStyle = '#0a0d14';
     ctx.fillRect(padX, padY + headerH, frameW, videoH);
-
-    // Cinematic shutter motion blur blend
-    if (videoSource && motionVelocity > 0.04 && blurPrevCam) {
-        ctx.save();
-        ctx.globalAlpha = Math.min(0.28, motionVelocity * 0.35);
-        ctx.translate(padX + frameW * 0.5, padY + headerH + videoH * 0.5);
-        const midScale = (camera.scale + blurPrevCam.scale) * 0.5;
-        const midX = (camera.x + blurPrevCam.x) * 0.5;
-        const midY = (camera.y + blurPrevCam.y) * 0.5;
-        ctx.scale(midScale, midScale);
-        ctx.translate(-midX * frameW, -midY * videoH);
-        try {
-            ctx.drawImage(videoSource, 0, 0, frameW, videoH);
-        } catch (e) {}
-        ctx.restore();
-    }
 
     ctx.save();
     // Translate origin to center of video area
