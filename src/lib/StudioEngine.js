@@ -84,7 +84,7 @@ export class StudioEngine {
         this.cursorScale = options.cursorScale ?? 1.0;
         this.splineSmoothing = options.splineSmoothing ?? true;
         this.springProfile = options.springProfile || 'cinematic';
-        this.playbackSpeed = options.playbackSpeed ?? 0.94;
+        this.playbackSpeed = options.playbackSpeed ?? 1.0;
         this.insetPadding = options.insetPadding ?? 0.08;
         this.borderRadius = options.borderRadius ?? 18;
         this.windowChrome = options.windowChrome !== false;
@@ -598,7 +598,7 @@ export class StudioEngine {
     _applyPlaybackRate(curTimeSec) {
         if (!this.video) return;
         const seg = (this.focusSegments || []).find(s => curTimeSec >= s.startTime && curTimeSec <= s.endTime);
-        const baseSpeed = this.playbackSpeed ?? 0.94;
+        const baseSpeed = this.playbackSpeed ?? 1.0;
         const targetRate = (seg && seg.speed) ? seg.speed : baseSpeed;
         if (Math.abs(this.video.playbackRate - targetRate) > 0.02) {
             this.video.preservesPitch = true;
@@ -894,7 +894,7 @@ export class StudioEngine {
     }
 
     setPlaybackSpeed(speed) {
-        this.playbackSpeed = Math.max(0.5, Math.min(2.0, Number(speed) || 0.94));
+        this.playbackSpeed = Math.max(0.5, Math.min(2.0, Number(speed) || 1.0));
         if (this.video) {
             this._applyPlaybackRate(this.video.currentTime);
         }
@@ -1093,7 +1093,7 @@ export class StudioEngine {
 
         const effectiveDuration = this.videoDuration || this.explicitDuration || this.video?.duration || 10;
         const exportDuration = Math.max(0.5, (this.trimEnd || effectiveDuration) - (this.trimStart || 0));
-        const baseSpeed = Math.max(0.25, Math.min(2.0, this.playbackSpeed ?? 0.94));
+        const baseSpeed = Math.max(0.25, Math.min(2.0, this.playbackSpeed ?? 1.0));
         const totalOutputDuration = exportDuration / baseSpeed;
         const fps = options.fps ? Number(options.fps) : 60;
         const quality = options.quality || 'pro';

@@ -257,15 +257,13 @@ test('multi-click conversational interactions stay continuously chained without 
     assert.notEqual(camDuringTransition.scale, 1.0, 'Camera must not drop back to 1.0x overview in between chained clicks');
 });
 
-test('StudioEngine supports studio calm playback pacing and audio pitch preservation', async () => {
+test('StudioEngine plays back in real time by default and supports pacing changes', async () => {
     const { StudioEngine } = await import('../src/lib/StudioEngine.js');
     const mockCanvas = { getContext: () => ({ fillRect: () => {}, drawImage: () => {} }), width: 1920, height: 1080 };
-    const engine = new StudioEngine(mockCanvas, {
-        playbackSpeed: 0.94,
-    });
-    assert.equal(engine.playbackSpeed, 0.94);
-    engine.setPlaybackSpeed(0.88);
-    assert.equal(engine.playbackSpeed, 0.88);
+    const engine = new StudioEngine(mockCanvas, {});
+    assert.equal(engine.playbackSpeed, 1.0);
+    engine.setPlaybackSpeed(1.25);
+    assert.equal(engine.playbackSpeed, 1.25);
 });
 
 test('InteractionAnalyzer guarantees strict non-overlapping segment bounds across all click configurations', () => {

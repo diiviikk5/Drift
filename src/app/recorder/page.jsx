@@ -137,7 +137,7 @@ export default function RecorderPage() {
     const [borderRadius, setBorderRadius] = useState(0);
     const [windowChrome, setWindowChrome] = useState(false);
     const [springProfile, setSpringProfile] = useState('cinematic');
-    const [playbackSpeed, setPlaybackSpeed] = useState(0.94);
+    const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
     const [showKeystrokes, setShowKeystrokes] = useState(true);
 
     // Interactive Drag-to-Zoom State
@@ -811,7 +811,8 @@ export default function RecorderPage() {
                         withMic: micEnabled,
                         withoutCursor: true,
                     });
-                    await drift.startSessionTelemetry();
+                    // start_native_session already started telemetry; starting it again here
+                    // would reset its clock and desync cursor/zoom timing from the video.
 
                     // Capture webcam stream in parallel if enabled
                     if (webcamEnabled && engineRef.current?.webcamStream) {
@@ -1615,7 +1616,7 @@ export default function RecorderPage() {
             setBorderRadius(project.borderRadius ?? 18);
             setWindowChrome(project.windowChrome !== false);
             setSpringProfile(project.springProfile ?? 'cinematic');
-            setPlaybackSpeed(project.playbackSpeed ?? 0.94);
+            setPlaybackSpeed(project.playbackSpeed ?? 1.0);
             setTiltAngle(project.tiltAngle ?? 0);
             setConnectedZooms(project.connectedZooms ?? true);
             setReactiveWebcam(project.reactiveWebcam ?? true);

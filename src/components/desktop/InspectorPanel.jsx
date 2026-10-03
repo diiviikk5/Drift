@@ -91,7 +91,7 @@ export default function InspectorPanel({
     onToggleAutoZoomOnClicks,
     onResetToOverview,
     onChangeFramingPreset,
-    playbackSpeed = 0.94,
+    playbackSpeed = 1.0,
     onChangePlaybackSpeed,
 }) {
     const [activeTab, setActiveTab] = useState('style');
@@ -485,17 +485,17 @@ export default function InspectorPanel({
                                     <span>Pacing & Tempo</span>
                                 </label>
                                 <span className="text-xs font-mono font-bold text-[var(--accent-app)]">
-                                    {(playbackSpeed || 0.94).toFixed(2)}×
+                                    {(playbackSpeed || 1).toFixed(2)}×
                                 </span>
                             </div>
 
                             <div className="grid grid-cols-3 gap-1.5">
                                 {[
-                                    { speed: 0.88, label: 'Cinema', desc: '0.88× • Deliberate' },
-                                    { speed: 0.94, label: 'Studio', desc: '0.94× • Aesthetic' },
                                     { speed: 1.00, label: 'Realtime', desc: '1.00× • Exact 1:1' },
+                                    { speed: 1.10, label: 'Brisk', desc: '1.10× • Tighter' },
+                                    { speed: 1.25, label: 'Fast', desc: '1.25× • Long demos' },
                                 ].map((p) => {
-                                    const isSelected = Math.abs((playbackSpeed || 0.94) - p.speed) < 0.02;
+                                    const isSelected = Math.abs((playbackSpeed || 1) - p.speed) < 0.02;
                                     return (
                                         <button
                                             key={p.label}
@@ -518,13 +518,13 @@ export default function InspectorPanel({
                                 min="0.75"
                                 max="1.25"
                                 step="0.01"
-                                value={playbackSpeed || 0.94}
+                                value={playbackSpeed || 1}
                                 onChange={(e) => onChangePlaybackSpeed && onChangePlaybackSpeed(parseFloat(e.target.value))}
                                 className="w-full accent-[var(--accent-app)] cursor-pointer"
                             />
                             <div className="flex justify-between text-[10px] text-[var(--text-app-muted)] font-mono">
                                 <span>0.75× (Relaxed)</span>
-                                <span>0.94× (Studio)</span>
+                                <span>1.00× (Realtime)</span>
                                 <span>1.25× (Brisk)</span>
                             </div>
                         </div>
