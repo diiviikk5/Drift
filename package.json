@@ -80,6 +80,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^11.15.0",
     "lucide-react": "^0.562.0",
+    "mediabunny": "^1.61.0",
     "mp4-muxer": "^5.2.2",
     "next": "16.1.1",
     "react": "19.2.3",

@@ -4,6 +4,7 @@
 
 import { isTauri } from './tauri-bridge.js';
 import { InteractionAnalyzer } from './zoom/InteractionAnalyzer.js';
+import { openSequentialFrames } from './export/frameSource.js';
 import { renderFrame, getFrameMetrics, canvasToSource, evaluateCameraAtTime, getInterpolatedCursor } from './rendering/renderFrame.js';
 import { getSmoothedCursorPath } from './zoom/cursorPathSmoothing.js';
 import { ZOOM_PRESETS, DEFAULT_ZOOM_SCALE, resolveZoomPreset } from './zoom/ZoomConstruct.js';
@@ -795,26 +796,31 @@ export class StudioEngine {
         return gradient;
     }
 
-    drawFrame() {
+    /**
+     * Render one frame. `override` lets export supply decoded frames directly:
+     * { time, video, webcam, sourceWidth, sourceHeight }.
+     */
+    drawFrame(override = null) {
         const ctx = this.ctx;
         const v = this.video;
-        const curTimeSec = v?.currentTime || 0;
+        const curTimeSec = override ? override.time : (v?.currentTime || 0);
 
         // A <video> mid-seek/buffering has no frame (readyState < 2) and draws as
         // nothing, which flashed the dark backdrop. Keep the previous frame on
         // screen instead, unless the canvas was resized (e.g. export setup).
         const sizeKey = `${this.canvas.width}x${this.canvas.height}`;
-        if (v && v.readyState < 2 && this._hasDrawnVideo && this._lastDrawSize === sizeKey) {
+        if (!override && v && v.readyState < 2 && this._hasDrawnVideo && this._lastDrawSize === sizeKey) {
             return;
         }
         this._lastDrawSize = sizeKey;
-        const isVideoReady = v && v.readyState >= 2 && v.videoWidth > 0;
-        if (isVideoReady) this._hasDrawnVideo = true;
+        const isVideoReady = override ? Boolean(override.video) : (v && v.readyState >= 2 && v.videoWidth > 0);
+        if (isVideoReady && !override) this._hasDrawnVideo = true;
+        const videoSource = override ? override.video : (isVideoReady ? v : null);
 
         renderFrame(
             ctx,
             curTimeSec,
-            isVideoReady ? v : null,
+            videoSource,
             {
                 focusSegments: this.focusSegments || [],
                 mouseSamples: this.mouseMoves || [],
@@ -837,7 +843,9 @@ export class StudioEngine {
                 tiltAngle: this.tiltAngle ?? 0,
                 connectedZooms: this.connectedZooms !== false,
                 frameFit: this.frameFit || 'contain',
-                webcamSource: this.webcamVideo || null,
+                webcamSource: override ? (override.webcam || null) : (this.webcamVideo || null),
+                sourceWidth: override?.sourceWidth || this.video?.videoWidth || undefined,
+                sourceHeight: override?.sourceHeight || this.video?.videoHeight || undefined,
                 webcamSettings: {
                     ...this.webcamSettings,
                     reactiveScale: this.reactiveWebcam !== false,
@@ -1448,6 +1456,35 @@ export class StudioEngine {
             }
         }
 
+        // Decode the recording (and webcam) sequentially for speed and frame
+        // accuracy; fall back to seeking the <video> elements if unsupported.
+        const exportTimes = (offset = 0) => {
+            const times = [];
+            for (let i = 0; i < totalFrames; i++) {
+                const t = (this.trimStart || 0) + (i / fps) * baseSpeed;
+                if (t >= (this.trimEnd || effectiveDuration)) break;
+                times.push(Math.max(0, t + offset));
+            }
+            return times;
+        };
+        let screenFrames = null;
+        let camFrames = null;
+        try {
+            screenFrames = await openSequentialFrames(this.blob, exportTimes());
+            if (this.webcamBlob) {
+                try {
+                    camFrames = await openSequentialFrames(this.webcamBlob, exportTimes(this.webcamOffset || 0));
+                } catch (camErr) {
+                    console.warn('[Studio] Webcam sequential decode unavailable, seeking instead:', camErr?.message || camErr);
+                    camFrames = null;
+                }
+            }
+            console.log('[Studio] Export using sequential WebCodecs decode');
+        } catch (decodeErr) {
+            console.warn('[Studio] Sequential decode unavailable, seeking per frame:', decodeErr?.message || decodeErr);
+            screenFrames = null;
+        }
+
         return new Promise((resolve, reject) => {
             const encoder = new VideoEncoder({
                 output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
@@ -1477,20 +1514,40 @@ export class StudioEngine {
                 el.currentTime = t;
             });
 
+            const outputTime = (i) => (this.trimStart || 0) + (i / fps) * baseSpeed;
+            const exportEnd = this.trimEnd || effectiveDuration;
+
             const seekAndRender = async () => {
-                const targetTime = (this.trimStart || 0) + (frameIndex / fps) * baseSpeed;
-                if (targetTime >= (this.trimEnd || effectiveDuration) || frameIndex >= totalFrames) {
+                const targetTime = outputTime(frameIndex);
+                if (targetTime >= exportEnd || frameIndex >= totalFrames) {
                     return false;
                 }
 
-                // Wait for the screen AND the webcam to land on this frame, so the
-                // webcam is never missing or a frame behind in the export.
-                await Promise.all([
-                    seekTo(this.video, targetTime),
-                    seekTo(this.webcamVideo, Math.max(0, targetTime + (this.webcamOffset || 0))),
-                ]);
+                if (screenFrames) {
+                    // Fast path: frames decoded sequentially with WebCodecs.
+                    const [screenImg, camImg] = await Promise.all([
+                        screenFrames.next(),
+                        camFrames
+                            ? camFrames.next()
+                            : seekTo(this.webcamVideo, Math.max(0, targetTime + (this.webcamOffset || 0))).then(() => null),
+                    ]);
+                    this.drawFrame({
+                        time: targetTime,
+                        video: screenImg(),
+                        webcam: camImg ? camImg() : (this.webcamVideo || null),
+                        sourceWidth: screenFrames.width,
+                        sourceHeight: screenFrames.height,
+                    });
+                } else {
+                    // Fallback: seek the media elements. Wait for the screen AND the
+                    // webcam to land on this frame so neither is stale or missing.
+                    await Promise.all([
+                        seekTo(this.video, targetTime),
+                        seekTo(this.webcamVideo, Math.max(0, targetTime + (this.webcamOffset || 0))),
+                    ]);
+                    this.drawFrame();
+                }
 
-                this.drawFrame();
                 const frame = new VideoFrame(this.canvas, {
                     timestamp: Math.round(frameIndex * frameDurationUs),
                     duration: Math.round(frameDurationUs),
@@ -1531,6 +1588,8 @@ export class StudioEngine {
                 } catch (e) {
                     reject(e);
                 } finally {
+                    screenFrames?.dispose();
+                    camFrames?.dispose();
                     this.canvas.width = origW;
                     this.canvas.height = origH;
                     this.drawFrame();

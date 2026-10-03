@@ -260,8 +260,8 @@ export function cursorIdleOpacity(timeSec, mouseSamples) {
  * Computes window frame dimensions and offsets preserving video aspect ratio inside canvas
  */
 export function getFrameMetrics(width, height, videoSource, renderSettings = {}) {
-    const srcW = videoSource?.videoWidth || 1920;
-    const srcH = videoSource?.videoHeight || 1080;
+    const srcW = renderSettings.sourceWidth || videoSource?.videoWidth || videoSource?.displayWidth || videoSource?.width || 1920;
+    const srcH = renderSettings.sourceHeight || videoSource?.videoHeight || videoSource?.displayHeight || videoSource?.height || 1080;
     return computeStageLayout(width, height, srcW, srcH, renderSettings);
 }
 
@@ -333,6 +333,8 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         titleBarHeight,
         borderRadius,
         frameFit: renderSettings.frameFit,
+        sourceWidth: renderSettings.sourceWidth,
+        sourceHeight: renderSettings.sourceHeight,
     });
     const { padX, padY, frameW, frameH, headerH, videoH, contentW, contentH, unit, radius } = layout;
 
@@ -868,8 +870,8 @@ function _drawWebcamPiP(ctx, webcamSourceIn, settings, bounds) {
         ctx.translate(-x, -y);
     }
 
-    const vw = webcamSource.videoWidth || webcamSource.naturalWidth || webcamSource.width || renderW;
-    const vh = webcamSource.videoHeight || webcamSource.naturalHeight || webcamSource.height || renderH;
+    const vw = webcamSource.videoWidth || webcamSource.displayWidth || webcamSource.naturalWidth || webcamSource.width || renderW;
+    const vh = webcamSource.videoHeight || webcamSource.displayHeight || webcamSource.naturalHeight || webcamSource.height || renderH;
     const scale = Math.max(renderW / vw, renderH / vh);
     const sw = renderW / scale;
     const sh = renderH / scale;
