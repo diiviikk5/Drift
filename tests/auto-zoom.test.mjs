@@ -145,3 +145,21 @@ test('plans hours-long sessions quickly', () => {
     assert.ok(track.frames >= 1800 * 120);
     assert.ok(elapsed < 4000, `planning a 30 min session took ${elapsed}ms`);
 });
+
+test('smoothed cursor path is fast on long recordings and rests between movements', async () => {
+    const { getSmoothedCursorPath } = await import('../src/lib/zoom/cursorPathSmoothing.js');
+    const samples = [];
+    // 20 minutes: bursts of motion separated by 3s rests (no samples while resting)
+    for (let burst = 0; burst < 300; burst++) {
+        const t0 = burst * 4000;
+        for (let t = 0; t < 1000; t += 4) {
+            samples.push({ time: t0 + t, x: 0.2 + 0.6 * (t / 1000), y: 0.5 });
+        }
+    }
+    const start = Date.now();
+    const p = getSmoothedCursorPath(samples, 1.0);
+    const mid = p.sampleAt(2500); // resting after the first burst
+    const elapsed = Date.now() - start;
+    assert.ok(elapsed < 3000, `smoothing took ${elapsed}ms`);
+    assert.ok(mid && Math.abs(mid.cx - 0.8) < 0.02, `cursor should rest at the end of the move, got ${JSON.stringify(mid)}`);
+});

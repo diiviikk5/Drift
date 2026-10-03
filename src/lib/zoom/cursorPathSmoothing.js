@@ -15,6 +15,28 @@
 // 240 steps/sec keeps the spring stable and crisp at any playback fps
 const STEP_MS = 1000 / 240;
 const STEP_S = STEP_MS / 1000;
+const HOLD_GAP_MS = 60;
+const MOVE_IN_MS = 16;
+
+/**
+ * Gap above which consecutive samples are treated as "cursor sat still".
+ * Adapts to the telemetry rate so sparse synthetic/imported data still
+ * interpolates normally.
+ */
+export function getHoldGapMs(samples) {
+    const n = samples.length;
+    if (n < 3) return Infinity;
+    const gaps = [];
+    const stride = Math.max(1, Math.floor(n / 512));
+    for (let i = stride; i < n; i += stride) {
+        const g = getSampleTime(samples[i]) - getSampleTime(samples[i - stride]);
+        if (g > 0) gaps.push(g / stride);
+    }
+    if (!gaps.length) return Infinity;
+    gaps.sort((a, b) => a - b);
+    const median = gaps[gaps.length >> 1];
+    return Math.max(HOLD_GAP_MS, median * 8);
+}
 
 const CURSOR_SMOOTHING_MIN = 0;
 const CURSOR_SMOOTHING_MAX = 2;
@@ -110,8 +132,13 @@ function interpolateRun(samples, timeMs, srcW, srcH) {
     if (timeMs <= firstTime) return { cx: getNormalizedX(samples[0], srcW), cy: getNormalizedY(samples[0], srcH) };
     if (timeMs >= lastTime) return { cx: getNormalizedX(samples[last], srcW), cy: getNormalizedY(samples[last], srcH) };
 
-    const times = samples.map(getSampleTime);
-    const i = binarySearchAtOrBefore(times, timeMs, last);
+    let lo = 0;
+    let hi = last;
+    let i = -1;
+    while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (getSampleTime(samples[mid]) <= timeMs) { i = mid; lo = mid + 1; } else { hi = mid - 1; }
+    }
     if (i < 0) return { cx: getNormalizedX(samples[0], srcW), cy: getNormalizedY(samples[0], srcH) };
 
     const a = samples[i];
@@ -175,21 +202,37 @@ function splitVisibleRuns(samples) {
     return runs;
 }
 
-function buildSmoothedRun(samples, stiffness, damping, mass, srcW, srcH) {
+function buildSmoothedRun(samples, stiffness, damping, mass, srcW, srcH, settleMs = 0) {
     const start = getSampleTime(samples[0]);
-    const end = getSampleTime(samples[samples.length - 1]);
+    // Keep simulating past the last sample (holding its position) so the spring
+    // settles where the cursor actually stopped instead of freezing mid-lag.
+    const end = getSampleTime(samples[samples.length - 1]) + Math.max(0, settleMs);
     const stepCount = Math.max(1, Math.round((end - start) / STEP_MS));
     const n = stepCount + 1;
     const times = new Float32Array(n);
     const rawX = new Float32Array(n);
     const rawY = new Float32Array(n);
 
+    const holdGap = getHoldGapMs(samples);
+    // Single forward pass over the samples (the grid is monotonic), O(n + m).
+    let j = 0;
+    const last = samples.length - 1;
     for (let i = 0; i < n; i++) {
         const t = i === n - 1 ? end : start + i * STEP_MS;
         times[i] = t;
-        const p = interpolateRun(samples, t, srcW, srcH);
-        rawX[i] = p.cx;
-        rawY[i] = p.cy;
+        while (j < last && getSampleTime(samples[j + 1]) <= t) j++;
+        const a = samples[j];
+        const b = samples[Math.min(last, j + 1)];
+        const tA = getSampleTime(a);
+        const tB = getSampleTime(b);
+        let k = tB > tA ? Math.max(0, Math.min(1, (t - tA) / (tB - tA))) : 0;
+        // The recorder only samples while the mouse moves: a long gap means the
+        // cursor sat still, so hold it instead of drifting across the gap.
+        if (tB - tA > holdGap) k = Math.max(0, Math.min(1, (t - (tB - MOVE_IN_MS)) / MOVE_IN_MS));
+        const ax = getNormalizedX(a, srcW);
+        const ay = getNormalizedY(a, srcH);
+        rawX[i] = ax + (getNormalizedX(b, srcW) - ax) * k;
+        rawY[i] = ay + (getNormalizedY(b, srcH) - ay) * k;
     }
 
     return {
@@ -220,19 +263,12 @@ function sampleRun(run, timeMs) {
 }
 
 function buildRawPath(runs, srcW, srcH) {
+    const starts = runs.map(r => getSampleTime(r[0]));
     return {
         sampleAt(timeMs) {
-            for (const run of runs) {
-                const sStart = getSampleTime(run[0]);
-                const sEnd = getSampleTime(run[run.length - 1]);
-                if (timeMs >= sStart && timeMs <= sEnd) {
-                    return interpolateRun(run, timeMs, srcW, srcH);
-                }
-            }
-            if (runs.length > 0) {
-                return interpolateRun(runs[0], timeMs, srcW, srcH);
-            }
-            return null;
+            const i = binarySearchAtOrBefore(starts, timeMs, starts.length - 1);
+            const run = runs[Math.max(0, i)];
+            return interpolateRun(run, timeMs, srcW, srcH);
         }
     };
 }
@@ -252,7 +288,7 @@ function buildSmoothedPath(samples, smoothingStrength, options = {}) {
 
     const config = getCursorSpringConfig(smoothingStrength);
 
-    const smoothedRuns = runs.map(run => {
+    const smoothedRuns = runs.map((run, idx) => {
         if (run.length < 2) {
             const t = getSampleTime(run[0]);
             const x = getNormalizedX(run[0], srcW);
@@ -265,23 +301,21 @@ function buildSmoothedPath(samples, smoothingStrength, options = {}) {
                 ys: new Float32Array([y]),
             };
         }
-        return buildSmoothedRun(run, config.stiffness, config.damping, config.mass, srcW, srcH);
+        const next = runs[idx + 1];
+        const lastT = getSampleTime(run[run.length - 1]);
+        const settle = Math.min(800, next ? getSampleTime(next[0]) - lastT - STEP_MS : 800);
+        return buildSmoothedRun(run, config.stiffness, config.damping, config.mass, srcW, srcH, settle);
     });
 
+    const starts = smoothedRuns.map(r => r.start);
     return {
         sampleAt(timeMs) {
-            for (const run of smoothedRuns) {
-                if (timeMs >= run.start && timeMs <= run.end) {
-                    return sampleRun(run, timeMs);
-                }
-            }
-            // Clamp to nearest run boundary
-            if (smoothedRuns.length > 0) {
-                if (timeMs < smoothedRuns[0].start) return sampleRun(smoothedRuns[0], smoothedRuns[0].start);
-                const lastRun = smoothedRuns[smoothedRuns.length - 1];
-                if (timeMs > lastRun.end) return sampleRun(lastRun, lastRun.end);
-            }
-            return null;
+            // Latest run starting at or before timeMs; between runs the cursor
+            // rests where the previous run ended (the recorder only samples motion).
+            const i = binarySearchAtOrBefore(starts, timeMs, starts.length - 1);
+            if (i < 0) return sampleRun(smoothedRuns[0], smoothedRuns[0].start);
+            const run = smoothedRuns[i];
+            return sampleRun(run, Math.min(timeMs, run.end));
         }
     };
 }

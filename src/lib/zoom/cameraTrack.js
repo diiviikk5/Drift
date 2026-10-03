@@ -18,6 +18,7 @@
  */
 
 import { DEFAULT_ZOOM_SCALE } from './ZoomConstruct.js';
+import { getHoldGapMs } from './cursorPathSmoothing.js';
 
 export const TRACK_HZ = 120;
 const FOLLOW_LOOKAHEAD = 0.3; // seconds
@@ -135,6 +136,7 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
     const sc = new Float32Array(frames);
     const segIdx = new Int32Array(frames);
 
+    const holdGap = getHoldGapMs(cursor);
     // Cursor lookup with a monotonic pointer (time only moves forward here).
     let ci = 0;
     const cursorAt = (tSec) => {
@@ -146,7 +148,8 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
         if (tMs <= ta || ci === cursor.length - 1) return { x: sampleX(a), y: sampleY(a) };
         const b = cursor[ci + 1];
         const tb = sampleTimeMs(b);
-        const k = tb > ta ? (tMs - ta) / (tb - ta) : 0;
+        // Sparse samples mean the mouse sat still: hold, then move in at the end.
+        const k = tb - ta > holdGap ? clamp((tMs - (tb - 16)) / 16, 0, 1) : (tb > ta ? (tMs - ta) / (tb - ta) : 0);
         return { x: sampleX(a) + (sampleX(b) - sampleX(a)) * k, y: sampleY(a) + (sampleY(b) - sampleY(a)) * k };
     };
 
@@ -160,7 +163,8 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
         if (tMs <= ta || ai === cursor.length - 1) return { x: sampleX(a), y: sampleY(a) };
         const b = cursor[ai + 1];
         const tb = sampleTimeMs(b);
-        const k = tb > ta ? (tMs - ta) / (tb - ta) : 0;
+        // Sparse samples mean the mouse sat still: hold, then move in at the end.
+        const k = tb - ta > holdGap ? clamp((tMs - (tb - 16)) / 16, 0, 1) : (tb > ta ? (tMs - ta) / (tb - ta) : 0);
         return { x: sampleX(a) + (sampleX(b) - sampleX(a)) * k, y: sampleY(a) + (sampleY(b) - sampleY(a)) * k };
     };
 
