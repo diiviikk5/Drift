@@ -4,6 +4,8 @@
  * Falls back gracefully when running in browser/extension
  */
 
+import { DEFAULT_HOTKEYS, GLOBAL_HOTKEY_ACTIONS } from './hotkeys.js';
+
 let tauriApi = null;
 let eventApi = null;
 let shortcutApi = null;
@@ -209,12 +211,7 @@ export async function getHotkeys() {
     if (isElectron()) {
         return window.electron.getHotkeys();
     }
-    return {
-        toggle_recording: 'CmdOrCtrl+Shift+R',
-        stop_recording: 'CmdOrCtrl+Shift+S',
-        toggle_pause: 'CmdOrCtrl+Shift+P',
-        toggle_zoom: 'CmdOrCtrl+Shift+Z',
-    };
+    return { ...DEFAULT_HOTKEYS };
 }
 
 /**
@@ -425,89 +422,109 @@ export async function saveFile(path, data) {
 }
 
 // ============================================================
+// TRAY & WINDOW
+// ============================================================
+
+/** Update the tray menu label, tooltip and recording dot. */
+export async function setTrayState(recording, shortcut) {
+    if (!isTauri()) return;
+    try {
+        const api = await getTauriApi();
+        await api.invoke('set_tray_state', { recording: Boolean(recording), shortcut: shortcut ?? null });
+    } catch (e) {
+        console.warn('[drift] Tray update failed:', e);
+    }
+}
+
+export async function getCloseToTray() {
+    if (!isTauri()) return false;
+    try {
+        const api = await getTauriApi();
+        return Boolean(await api.invoke('get_close_to_tray'));
+    } catch {
+        return true;
+    }
+}
+
+export async function setCloseToTray(enabled) {
+    if (!isTauri()) return;
+    const api = await getTauriApi();
+    await api.invoke('set_close_to_tray', { enabled: Boolean(enabled) });
+}
+
+/** True when the main window is on screen (not hidden to the tray or minimized). */
+export async function isWindowVisible() {
+    if (!isTauri()) return typeof document === 'undefined' || document.visibilityState === 'visible';
+    try {
+        const api = await getTauriApi();
+        return Boolean(await api.invoke('is_window_visible'));
+    } catch {
+        return true;
+    }
+}
+
+// ============================================================
 // GLOBAL SHORTCUTS
 // ============================================================
 
 // Stores current registered shortcuts so we can unregister them
 let _registeredShortcuts = [];
+let _trayHotkeyUnlisten = null;
+
+function dispatchHotkey(action, source) {
+    window.dispatchEvent(new CustomEvent('drift-hotkey', { detail: { action, source } }));
+}
 
 /**
- * Register global shortcuts from saved hotkey config.
- * Each shortcut dispatches a custom 'drift-hotkey' event on window.
- * @param {object} hotkeyConfig - { toggle_recording, pause_resume, cancel_recording, ... }
- * @returns {Promise<void>}
+ * Register the system-wide recording shortcuts (they keep working while Drift
+ * is in the background or the tray) and forward tray menu actions.
+ * Every action arrives as a 'drift-hotkey' window event.
+ * @param {object} hotkeyConfig - { toggle_recording, stop_recording, ... }
+ * @returns {Promise<{registered: string[], failed: {action: string, accelerator: string}[]}>}
  */
 export async function registerGlobalShortcuts(hotkeyConfig) {
-    if (!isTauri()) return;
+    const result = { registered: [], failed: [] };
+    if (!isTauri()) return result;
     const api = await getShortcutApi();
-    if (!api) return;
+    if (!api) return result;
 
-    // Unregister any existing shortcuts first
     await unregisterAllShortcuts();
 
-    // Map unique accelerators to actions, deduplicating toggle_recording and stop_recording
-    const accelMap = new Map();
-    for (const [action, accelerator] of Object.entries(hotkeyConfig || {})) {
-        if (!accelerator || typeof accelerator !== 'string') continue;
-        const norm = accelerator.trim();
-        if (!accelMap.has(norm)) {
-            accelMap.set(norm, []);
-        }
-        accelMap.get(norm).push(action);
+    if (!_trayHotkeyUnlisten) {
+        const events = await getEventApi();
+        _trayHotkeyUnlisten = await events.listen('drift-hotkey', (event) => {
+            const { action, source } = event.payload || {};
+            if (action) dispatchHotkey(action, source || 'tray');
+        });
     }
 
-    let lastTriggerTime = 0;
+    // One registration per accelerator; if start/stop share a key, toggle wins.
+    const byAccel = new Map();
+    for (const action of GLOBAL_HOTKEY_ACTIONS) {
+        const accel = String(hotkeyConfig?.[action] || '').trim();
+        if (!accel) continue;
+        if (!byAccel.has(accel)) byAccel.set(accel, action);
+    }
 
-    for (const [rawAccel, actions] of accelMap.entries()) {
-        const variants = [
-            rawAccel,
-            rawAccel.replace(/^CmdOrCtrl/i, 'CommandOrControl'),
-            rawAccel.replace(/^CmdOrCtrl/i, 'Ctrl'),
-            rawAccel.replace(/^CommandOrControl/i, 'Ctrl'),
-            rawAccel.replace(/^CommandOrControl/i, 'Control'),
-            rawAccel.replace(/^Ctrl/i, 'CommandOrControl'),
-            rawAccel.replace(/^Ctrl/i, 'Control'),
-            'Ctrl+X',
-            'Control+X',
-            'CommandOrControl+X',
-        ];
-        const uniqueVariants = [...new Set(variants)];
-        let registered = false;
-
-        // If this accelerator contains both toggle_recording and stop_recording,
-        // prioritize toggle_recording so it does not start and instantly stop
-        const effectiveActions = actions.includes('toggle_recording')
-            ? actions.filter(a => a !== 'stop_recording')
-            : actions;
-
-        for (const candidate of uniqueVariants) {
-            try {
-                await api.register(candidate, (event) => {
-                    // Only fire on key-down (not release)
-                    if (event && event.state === 'Released') return;
-                    const now = Date.now();
-                    if (now - lastTriggerTime < 350) return; // Debounce rapid global key events
-                    lastTriggerTime = now;
-
-                    for (const action of effectiveActions) {
-                        window.dispatchEvent(new CustomEvent('drift-hotkey', {
-                            detail: { action, accelerator: candidate }
-                        }));
-                    }
-                });
-                _registeredShortcuts.push(candidate);
-                registered = true;
-                break;
-            } catch (err) {
-                // Try next variant
-            }
-        }
-
-        if (!registered) {
-            console.warn(`[drift] Failed to register global shortcut for [${effectiveActions.join(', ')}]:`, uniqueVariants);
+    let last = 0;
+    for (const [accel, action] of byAccel.entries()) {
+        try {
+            await api.register(accel, (event) => {
+                if (event && event.state === 'Released') return;
+                const now = Date.now();
+                if (now - last < 350) return; // key repeat
+                last = now;
+                dispatchHotkey(action, 'global');
+            });
+            _registeredShortcuts.push(accel);
+            result.registered.push(accel);
+        } catch (err) {
+            console.warn(`[drift] Could not register ${accel} for ${action}:`, err);
+            result.failed.push({ action, accelerator: accel });
         }
     }
     console.log('[drift] Registered global shortcuts:', _registeredShortcuts);
+    return result;
 }
 
 /**
@@ -629,6 +646,10 @@ export const drift = {
     // Global shortcuts
     registerGlobalShortcuts,
     unregisterAllShortcuts,
+    setTrayState,
+    getCloseToTray,
+    setCloseToTray,
+    isWindowVisible,
     // Native Multi-Track Cinema Session Pipeline
     isNativeCaptureSupported,
     startNativeSession,

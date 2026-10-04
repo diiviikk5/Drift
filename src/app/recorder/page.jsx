@@ -19,6 +19,7 @@ import StudioTimeline from '@/components/desktop/StudioTimeline';
 import InspectorPanel from '@/components/desktop/InspectorPanel';
 import ExportDialog from '@/components/desktop/ExportDialog';
 import HotkeyModal from '@/components/desktop/HotkeyModal';
+import { normalizeHotkeys, formatAccelerator, matchesAccelerator } from '@/lib/hotkeys';
 import AISettings from '@/app/components/settings/AISettings';
 import NotesTeleprompter from '@/components/desktop/NotesTeleprompter';
 
@@ -167,16 +168,29 @@ export default function RecorderPage() {
     // Hotkeys & Telemetry
     const [showHotkeySettings, setShowHotkeySettings] = useState(false);
     const [hookStatus, setHookStatus] = useState('Active');
-    const [hotkeys, setHotkeys] = useState({
-        toggle_recording: 'CmdOrCtrl+X',
-        stop_recording: 'CmdOrCtrl+X',
-        toggle_pause: 'CmdOrCtrl+Shift+P',
-        toggle_zoom: 'CmdOrCtrl+Shift+Z',
-    });
+    const [hotkeys, setHotkeys] = useState(() => normalizeHotkeys());
+    const hotkeysRef = useRef(hotkeys);
+    const recordHotkeyRef = useRef(null);
+    const pendingHotkeyStartRef = useRef(false);
+    const studioConfirmRef = useRef(0);
 
     const isDesktop = platform === 'tauri' || platform === 'electron';
 
     useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
+    useEffect(() => { hotkeysRef.current = hotkeys; }, [hotkeys]);
+
+    // Register the system-wide recording keys and report any that are taken.
+    const applyGlobalHotkeys = useCallback(async (hk) => {
+        const { failed } = await drift.registerGlobalShortcuts(hk);
+        if (failed.length) {
+            setNotice(`${failed.map(f => formatAccelerator(f.accelerator)).join(', ')} is already used by another app - pick a different shortcut in Keyboard Shortcuts`);
+        }
+    }, []);
+
+    // Tray menu label, tooltip and recording dot follow the recording state.
+    useEffect(() => {
+        if (platform === 'tauri') drift.setTrayState(isRecording, formatAccelerator(hotkeys.toggle_recording));
+    }, [platform, isRecording, hotkeys.toggle_recording]);
     useEffect(() => { viewModeRef.current = viewMode; }, [viewMode]);
 
     // Load media devices (microphones & webcams)
@@ -254,17 +268,18 @@ export default function RecorderPage() {
                 setIsNativeSupported(false);
             });
             drift.getHotkeys().then(saved => {
-                if (saved) setHotkeys(saved);
-                drift.registerGlobalShortcuts(saved || hotkeys);
+                const hk = normalizeHotkeys(saved);
+                setHotkeys(hk);
+                applyGlobalHotkeys(hk);
             }).catch(() => {
-                drift.registerGlobalShortcuts(hotkeys);
+                applyGlobalHotkeys(normalizeHotkeys());
             });
         } else if (window.electron) {
             setPlatform('electron');
             setHookStatus('Electron');
             if (window.electron.getHotkeys) {
                 window.electron.getHotkeys().then(saved => {
-                    if (saved) setHotkeys(saved);
+                    if (saved) setHotkeys(normalizeHotkeys(saved));
                 });
             }
         } else {
@@ -306,6 +321,10 @@ export default function RecorderPage() {
             engineRef.current.onHotkeyStart = () => {
                 if (toggleRecordRef.current) toggleRecordRef.current();
             };
+            if (pendingHotkeyStartRef.current) {
+                pendingHotkeyStartRef.current = false;
+                setTimeout(() => toggleRecordRef.current?.({ fromHotkey: true }), 400);
+            }
 
             engineRef.current.onStopCallback = (blob, clicks, dur, meta = {}) => {
                 savedSegmentsRef.current = null;
@@ -848,7 +867,7 @@ export default function RecorderPage() {
                         drift.hideOsCursor().catch(() => {});
                     }
 
-                    if (autoMinimize && typeof drift.minimizeWindow === 'function') {
+                    if (autoMinimize && typeof drift.minimizeWindow === 'function' && await drift.isWindowVisible()) {
                         try {
                             await drift.minimizeWindow();
                         } catch (minErr) {
@@ -894,7 +913,7 @@ export default function RecorderPage() {
             }
 
             // Cinema Recorder: auto-minimize Drift window so user records their clean screen/apps
-            if (autoMinimize && drift.isTauri() && typeof drift.minimizeWindow === 'function') {
+            if (autoMinimize && drift.isTauri() && typeof drift.minimizeWindow === 'function' && await drift.isWindowVisible()) {
                 try {
                     await drift.minimizeWindow();
                 } catch (minErr) {
@@ -922,7 +941,7 @@ export default function RecorderPage() {
         setActiveCountdown(0);
     };
 
-    const toggleRecord = async () => {
+    const toggleRecord = async ({ fromHotkey = false } = {}) => {
         if (isRecordingRef.current) {
             if (drift.isTauri() && typeof drift.showOsCursor === 'function') {
                 drift.showOsCursor().catch(() => {});
@@ -1072,6 +1091,10 @@ export default function RecorderPage() {
             // so the system screen picker doesn't interrupt the 3, 2, 1 flow!
             const isWindowTarget = selectedSource === 'browser-source';
             if ((isWindowTarget || !isNativeSupported) && !engineRef.current?.screenStream?.active) {
+                // The capture picker needs the window on screen.
+                if (fromHotkey && drift.isTauri()) {
+                    try { await drift.restoreWindow(); } catch (e) {}
+                }
                 let ok = false;
                 if (platform === 'electron' && selectedSource) {
                     ok = await engineRef.current?.selectSource(selectedSource, micEnabled);
@@ -1083,7 +1106,8 @@ export default function RecorderPage() {
                 setHasActiveStream(true);
             }
 
-            if (countdownSeconds > 0) {
+            // Hotkey/tray starts record immediately: the user is already in position.
+            if (countdownSeconds > 0 && !fromHotkey) {
                 setActiveCountdown(countdownSeconds);
                 let current = countdownSeconds;
                 countdownTimerRef.current = setInterval(() => {
@@ -1105,18 +1129,43 @@ export default function RecorderPage() {
 
     useEffect(() => { toggleRecordRef.current = toggleRecord; }, [toggleRecord]);
 
+    // Start/stop from a global hotkey or the tray. From the studio this opens a
+    // fresh recording; if the studio is on screen, a second press confirms so a
+    // stray key can't close an edit.
+    const recordFromHotkey = async (source) => {
+        if (isRecordingRef.current) {
+            toggleRecordRef.current?.();
+            return;
+        }
+        if (viewModeRef.current === 'studio') {
+            const visible = await drift.isWindowVisible();
+            if (visible && source !== 'tray') {
+                const now = Date.now();
+                if (now - studioConfirmRef.current > 3000) {
+                    studioConfirmRef.current = now;
+                    setNotice(`Press ${formatAccelerator(hotkeysRef.current.toggle_recording)} again to start a new recording (this edit will close)`);
+                    return;
+                }
+            }
+            studioConfirmRef.current = 0;
+            pendingHotkeyStartRef.current = true;
+            handleNewRecording();
+            return;
+        }
+        toggleRecordRef.current?.({ fromHotkey: true });
+    };
+    useEffect(() => { recordHotkeyRef.current = recordFromHotkey; });
+
     // Permanent hotkey listener — stays active through recording without unregistering
     useEffect(() => {
         const handler = (e) => {
-            const { action } = e.detail || {};
+            const { action, source } = e.detail || {};
             switch (action) {
                 case 'toggle_recording':
-                    if (toggleRecordRef.current) toggleRecordRef.current();
+                    recordHotkeyRef.current?.(source);
                     break;
                 case 'stop_recording':
-                    if (isRecordingRef.current) {
-                        if (toggleRecordRef.current) toggleRecordRef.current();
-                    }
+                    if (isRecordingRef.current) recordHotkeyRef.current?.(source);
                     break;
                 case 'toggle_pause':
                     if (viewModeRef.current === 'studio') togglePlayback();
@@ -1128,15 +1177,16 @@ export default function RecorderPage() {
         };
         window.addEventListener('drift-hotkey', handler);
 
+        // In-app shortcuts (studio keys; recording keys too when there are no global ones).
         const keydownHandler = (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x' && !e.shiftKey && !e.altKey) {
-                const tag = document.activeElement?.tagName?.toLowerCase();
-                if (tag === 'input' || tag === 'textarea' || document.activeElement?.isContentEditable) {
-                    return;
-                }
-                e.preventDefault();
-                if (toggleRecordRef.current) toggleRecordRef.current();
-            }
+            const tag = document.activeElement?.tagName?.toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || document.activeElement?.isContentEditable) return;
+            const hk = hotkeysRef.current || {};
+            const local = drift.isTauri() ? ['toggle_pause', 'toggle_zoom'] : ['toggle_recording', 'stop_recording', 'toggle_pause', 'toggle_zoom'];
+            const action = local.find(a => matchesAccelerator(e, hk[a]));
+            if (!action) return;
+            e.preventDefault();
+            window.dispatchEvent(new CustomEvent('drift-hotkey', { detail: { action, source: 'local' } }));
         };
         window.addEventListener('keydown', keydownHandler);
 
@@ -1506,10 +1556,11 @@ export default function RecorderPage() {
     };
 
     const saveHotkeys = async (newHotkeys) => {
-        setHotkeys(newHotkeys);
+        const hk = normalizeHotkeys(newHotkeys);
+        setHotkeys(hk);
         if (platform === 'tauri') {
-            await drift.setHotkeys(newHotkeys);
-            await drift.registerGlobalShortcuts(newHotkeys);
+            await drift.setHotkeys(hk);
+            await applyGlobalHotkeys(hk);
         }
         setShowHotkeySettings(false);
     };

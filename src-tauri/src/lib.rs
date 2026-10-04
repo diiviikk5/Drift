@@ -1,4 +1,5 @@
 mod commands;
+mod tray;
 
 use commands::input::InputListenerState;
 use commands::native_recorder::NativeSessionManager;
@@ -32,6 +33,9 @@ pub fn run() {
                     ShowCursor(1);
                 }
             }
+            if let Err(e) = tray::setup(app) {
+                log::error!("[Tray] setup failed: {}", e);
+            }
             if let Some(window) = app.get_webview_window("main") {
                 log::info!("Found main window, calling show/unminimize/focus...");
                 let _ = window.show();
@@ -57,6 +61,10 @@ pub fn run() {
             commands::input::show_os_cursor,
             commands::hotkeys::get_hotkeys,
             commands::hotkeys::set_hotkeys,
+            tray::set_tray_state,
+            tray::get_close_to_tray,
+            tray::set_close_to_tray,
+            tray::is_window_visible,
             commands::ai::ai_completion,
             commands::export::convert_webm_to_mp4,
             commands::native_recorder::start_native_session,
