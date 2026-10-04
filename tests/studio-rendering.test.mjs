@@ -85,20 +85,14 @@ test('interaction analyzer converts synchronized session clicks to zoom targets'
     assert.ok(Math.abs(segments[0].targetY - 0.42) < 0.05);
 });
 
-test('Catmull-Rom spline curves smoothly through multi-point trajectories without corner cuts', () => {
-    const trajectory = [
-        { time: 0, x: 0.1, y: 0.1 },
-        { time: 100, x: 0.2, y: 0.4 },
-        { time: 200, x: 0.6, y: 0.8 },
-        { time: 300, x: 0.9, y: 0.9 },
-    ];
-    // Evaluate between p1 and p2 at t = 150ms
-    const pt = getInterpolatedCursor(0.15, trajectory);
-    assert.ok(pt !== null);
-    assert.ok(pt.x > 0.2 && pt.x < 0.6);
-    assert.ok(pt.y > 0.4 && pt.y < 0.8);
-    // Linear midpoint would be (0.4, 0.6). Spline curve produces non-linear smooth curve
-    assert.ok(Math.abs(pt.x - 0.375) < 0.05);
+test('smoothed cursor follows a curved path without corner-cutting lag', () => {
+    const trajectory = [];
+    for (let t = 0; t <= 600; t += 5) {
+        const u = t / 600;
+        trajectory.push({ time: t, x: 0.1 + 0.8 * u, y: 0.5 + 0.3 * Math.sin(u * Math.PI) });
+    }
+    const pt = getInterpolatedCursor(0.3, trajectory, { springSmooth: true });
+    assert.ok(Math.abs(pt.x - 0.5) < 0.01 && Math.abs(pt.y - 0.8) < 0.01, JSON.stringify(pt));
 });
 
 test('compositor renders all vector cursor themes without throwing', () => {
@@ -322,3 +316,11 @@ test('StudioEngine.setZoomPreset updates global construct depth and synchronizes
 
 
 
+
+test('pointer hides while outside the recorded area', async () => {
+    const { cursorAreaOpacity } = await import('../src/lib/rendering/renderFrame.js');
+    const samples = [{ time: 0, x: 0.5, y: 0.5 }, { time: 100, x: 1, y: 0.5, hidden: true }, { time: 300, x: 0.9, y: 0.5 }];
+    assert.equal(cursorAreaOpacity(0.05, samples), 1);
+    assert.equal(cursorAreaOpacity(0.2, samples), 0);
+    assert.equal(cursorAreaOpacity(0.35, samples), 1);
+});

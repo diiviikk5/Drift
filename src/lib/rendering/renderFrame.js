@@ -78,108 +78,18 @@ export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples =
 }
 
 /**
- * Cursor position at a time: binary search + linear interpolation (no added latency).
+ * Cursor position at a time (normalized). `springSmooth` / `splineSmoothing`
+ * pick the smoothed path; otherwise raw linear interpolation.
  */
 export function getInterpolatedCursor(timeSec, mouseSamples = [], options = {}) {
     if (!mouseSamples || mouseSamples.length === 0) return null;
-
-    const timeMs = timeSec * 1000;
-    const srcW = options.sourceWidth || options.screenWidth || 1920;
-    const srcH = options.sourceHeight || options.screenHeight || 1080;
-
-    // Offline 240 Hz spring smoothing of the cursor path (when requested)
-    if (options.springSmooth === true && mouseSamples.length >= 2) {
-        const smoothedPath = getSmoothedCursorPath(mouseSamples, options.smoothingStrength ?? 1.0, {
-            sourceWidth: srcW,
-            sourceHeight: srcH,
-        });
-        if (smoothedPath) {
-            const p = smoothedPath.sampleAt(timeMs);
-            if (p) return { x: p.cx, y: p.cy };
-        }
-    }
-
-    let low = 0;
-    let high = mouseSamples.length - 1;
-
-    const getSampleTime = (s) => s.timeMs ?? s.time ?? s.t ?? 0;
-    const normX = (s) => {
-        if (s.cx != null) return s.cx;
-        return s.x > 1 ? s.x / srcW : (s.x != null ? s.x : 0.5);
-    };
-    const normY = (s) => {
-        if (s.cy != null) return s.cy;
-        return s.y > 1 ? s.y / srcH : (s.y != null ? s.y : 0.5);
-    };
-
-    if (timeMs <= getSampleTime(mouseSamples[0])) {
-        const s = mouseSamples[0];
-        return { x: normX(s), y: normY(s) };
-    }
-    if (timeMs >= getSampleTime(mouseSamples[high])) {
-        const s = mouseSamples[high];
-        return { x: normX(s), y: normY(s) };
-    }
-
-    while (low <= high) {
-        const mid = (low + high) >> 1;
-        const tMid = getSampleTime(mouseSamples[mid]);
-
-        if (tMid < timeMs) {
-            low = mid + 1;
-        } else {
-            high = mid - 1;
-        }
-    }
-
-    const i1 = Math.max(0, low - 1);
-    const i2 = Math.min(mouseSamples.length - 1, low);
-
-    const prev = mouseSamples[i1];
-    const next = mouseSamples[i2];
-
-    const tPrev = getSampleTime(prev);
-    const tNext = getSampleTime(next);
-    const alpha = tNext === tPrev ? 0 : Math.max(0, Math.min(1, (timeMs - tPrev) / (tNext - tPrev)));
-
-    const p1x = normX(prev);
-    const p1y = normY(prev);
-    const p2x = normX(next);
-    const p2y = normY(next);
-
-    // If only 2 samples, or long pause (>350ms), or spline explicitly disabled, use linear
-    if (mouseSamples.length < 3 || (tNext - tPrev) > 350 || options.spline === false || options.splineSmoothing === false) {
-        return {
-            x: p1x + (p2x - p1x) * alpha,
-            y: p1y + (p2y - p1y) * alpha,
-        };
-    }
-
-    // 4-point Catmull-Rom Spline for silky smooth organic mouse trajectories
-    const i0 = Math.max(0, i1 - 1);
-    const i3 = Math.min(mouseSamples.length - 1, i2 + 1);
-
-    const p0 = mouseSamples[i0];
-    const p3 = mouseSamples[i3];
-
-    const p0x = normX(p0), p0y = normY(p0);
-    const p3x = normX(p3), p3y = normY(p3);
-
-    const u = alpha;
-    const u2 = u * u;
-    const u3 = u2 * u;
-
-    const catmull = (v0, v1, v2, v3) => 0.5 * (
-        (2 * v1) +
-        (-v0 + v2) * u +
-        (2 * v0 - 5 * v1 + 4 * v2 - v3) * u2 +
-        (-v0 + 3 * v1 - 3 * v2 + v3) * u3
-    );
-
-    return {
-        x: Math.max(0, Math.min(1, catmull(p0x, p1x, p2x, p3x))),
-        y: Math.max(0, Math.min(1, catmull(p0y, p1y, p2y, p3y))),
-    };
+    const smooth = options.springSmooth === true || options.splineSmoothing === true;
+    const path = getSmoothedCursorPath(mouseSamples, smooth ? (options.smoothingStrength ?? 1) : 0, {
+        sourceWidth: options.sourceWidth || options.screenWidth,
+        sourceHeight: options.sourceHeight || options.screenHeight,
+    });
+    const p = path && path.sampleAt(timeSec * 1000);
+    return p ? { x: p.cx, y: p.cy } : null;
 }
 
 /**
@@ -187,15 +97,11 @@ export function getInterpolatedCursor(timeSec, mouseSamples = [], options = {}) 
  * (memoized per sample set), otherwise the raw interpolated telemetry.
  */
 export function sampleCursor(timeSec, mouseSamples, smooth = true) {
-    if (smooth && mouseSamples.length >= 2) {
-        const path = getSmoothedCursorPath(mouseSamples, 1.0);
-        const p = path && path.sampleAt(timeSec * 1000);
-        if (p) return { x: p.cx, y: p.cy };
-    }
-    return getInterpolatedCursor(timeSec, mouseSamples);
+    return getInterpolatedCursor(timeSec, mouseSamples, { springSmooth: smooth });
 }
 
-const CURSOR_BASE_SCALE = 1.45;  // ~32px tall on a 1080p recording at 1x
+// 1x = the real Windows pointer at 100% display scale (~19 px tall per 1080 px).
+const CURSOR_BASE_SCALE = 1.0;
 const CLICK_RIPPLE_MS = 480;
 const PRESS_DOWN_MS = 70;
 const PRESS_UP_MS = 260;
@@ -213,13 +119,31 @@ export function cursorPressScale(timeSec, clicks) {
         if (dt > PRESS_DOWN_MS + PRESS_UP_MS) break;
         if (dt < PRESS_DOWN_MS) {
             const u = dt / PRESS_DOWN_MS;
-            return 1 - 0.2 * u * u * (3 - 2 * u);
+            return 1 - 0.12 * u * u * (3 - 2 * u);
         }
         const u = (dt - PRESS_DOWN_MS) / PRESS_UP_MS;
         const spring = 1 - Math.exp(-6 * u) * Math.cos(9 * u);
-        return 0.8 + 0.2 * spring;
+        return 0.88 + 0.12 * spring;
     }
     return 1;
+}
+
+/**
+ * 0 while the pointer is outside the recorded window/monitor (samples flagged
+ * `hidden`), with a short fade at the boundary; 1 otherwise.
+ */
+export function cursorAreaOpacity(timeSec, mouseSamples) {
+    const n = mouseSamples ? mouseSamples.length : 0;
+    if (!n) return 1;
+    const tMs = timeSec * 1000;
+    let lo = 0;
+    let hi = n - 1;
+    let idx = 0;
+    while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (_sampleMs(mouseSamples[mid]) <= tMs) { idx = mid; lo = mid + 1; } else { hi = mid - 1; }
+    }
+    return mouseSamples[idx]?.hidden ? 0 : 1;
 }
 
 const IDLE_FADE_AFTER = 1.6;   // seconds of stillness before fading
@@ -524,7 +448,9 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
             const curScreenX = cursor.x * contentW;
             const curScreenY = cursor.y * contentH;
             const press = cursorPressScale(timeSec, clicks);
-            const idleOpacity = cursorIdleOpacity(timeSec, mouseSamples);
+            // Effects a real pointer doesn't have are opt-in.
+            const idleOpacity = (renderSettings.hideIdleCursor ? cursorIdleOpacity(timeSec, mouseSamples) : 1)
+                * cursorAreaOpacity(timeSec, mouseSamples);
             // Cursor size is relative to the recording, like a real pointer.
             const size = cursorScale * press * (contentH / 1080) * CURSOR_BASE_SCALE;
 
@@ -535,10 +461,10 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
                 if (prev) {
                     const dx = (cursor.x - prev.x) * contentW;
                     const dy = (cursor.y - prev.y) * contentH;
-                    swayAngle = computeCursorSwayRotation(dx, dy, 20, renderSettings.sway ?? 1.0);
+                    swayAngle = computeCursorSwayRotation(dx, dy, 20, renderSettings.sway ?? 0);
                     // px per second in 1080p units
                     const speed = Math.hypot(dx, dy) / 0.02 / Math.max(0.25, contentH / 1080);
-                    if (renderSettings.cursorMotionBlur !== false && speed > 900) trail = speed;
+                    if (renderSettings.cursorMotionBlur === true && speed > 900) trail = speed;
                 }
             }
 
@@ -1119,23 +1045,26 @@ function _drawThemedCursor(ctx, x, y, scale = 1.0, theme = 'macos', swayAngle = 
         ctx.save();
         ctx.translate(x, y);
         if (swayAngle) ctx.rotate(swayAngle);
-        ctx.scale(scale * 1.25, scale * 1.25);
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-        ctx.shadowBlur = 8;
-        ctx.shadowOffsetY = 2;
+        ctx.scale(scale, scale);
         ctx.beginPath();
         ctx.moveTo(0, 0);
-        ctx.lineTo(0, 18);
-        ctx.lineTo(4.5, 14);
-        ctx.lineTo(8.5, 21.5);
-        ctx.lineTo(11.5, 20);
-        ctx.lineTo(7.5, 12.8);
-        ctx.lineTo(13, 12.8);
+        ctx.lineTo(0, 16.2);
+        ctx.lineTo(3.9, 12.5);
+        ctx.lineTo(6.5, 18.6);
+        ctx.lineTo(9, 17.5);
+        ctx.lineTo(6.4, 11.6);
+        ctx.lineTo(11.7, 11.6);
         ctx.closePath();
-        ctx.fillStyle = '#0f172a';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+        ctx.shadowBlur = 2.5;
+        ctx.shadowOffsetX = 0.6;
+        ctx.shadowOffsetY = 1;
+        ctx.fillStyle = '#ffffff';
         ctx.fill();
-        ctx.strokeStyle = '#f8fafc';
-        ctx.lineWidth = 1.6;
+        ctx.shadowColor = 'transparent';
+        ctx.lineJoin = 'miter';
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#000000';
         ctx.stroke();
         ctx.restore();
         return;

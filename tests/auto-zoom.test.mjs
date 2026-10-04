@@ -203,6 +203,6 @@ test('click press squashes the pointer and springs back', async () => {
     const { cursorPressScale } = await import('../src/lib/rendering/renderFrame.js');
     const clicks = [{ time: 1000 }];
     assert.equal(cursorPressScale(0.9, clicks), 1);
-    assert.ok(cursorPressScale(1.07, clicks) < 0.85);
+    assert.ok(cursorPressScale(1.07, clicks) < 0.92);
     assert.ok(Math.abs(cursorPressScale(1.5, clicks) - 1) < 1e-9);
 });

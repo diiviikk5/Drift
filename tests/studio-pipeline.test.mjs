@@ -112,35 +112,26 @@ test('StudioEngine setAspectRatio supports native video dimensions', async () =>
     assert.equal(studio.canvas.height, 900);
 });
 
-test('getSmoothedCursorPath computes 240Hz symplectic Euler physics with natural inertia', async () => {
-    const { getSmoothedCursorPath, getCursorSpringConfig, springSmooth } = await import('../src/lib/zoom/cursorPathSmoothing.js');
-
-    // Verify spring configs for different smoothing strengths
-    const cfgLow = getCursorSpringConfig(0.2);
-    const cfgHigh = getCursorSpringConfig(1.0);
-    assert.ok(cfgLow.stiffness > cfgHigh.stiffness); // lower smoothing has stiffer response
-    assert.ok(cfgHigh.damping > cfgLow.damping);     // higher smoothing has more damping
-
-    // Test symplectic Euler numerical stability
-    const targets = new Float32Array(240).fill(1.0); // 1-second step target
-    targets[0] = 0.0;
-    const smoothed = springSmooth(targets, cfgHigh.stiffness, cfgHigh.damping, cfgHigh.mass);
-    assert.equal(smoothed[0], 0.0);
-    assert.ok(smoothed[smoothed.length - 1] > 0.95); // converges to target
-    assert.ok(smoothed[20] > 0.0 && smoothed[20] < 1.0); // smooth ramp
-
-    // Test path sampling
-    const samples = [
-        { time: 0, x: 0.1, y: 0.1 },
-        { time: 500, x: 0.5, y: 0.5 },
-        { time: 1000, x: 0.9, y: 0.9 },
-    ];
-    const path = getSmoothedCursorPath(samples, 1.0, { sourceWidth: 1920, sourceHeight: 1080 });
-    assert.ok(path !== null);
-    const mid = path.sampleAt(500);
-    assert.ok(mid !== null);
-    assert.ok(mid.cx > 0.3 && mid.cx < 0.7);
-    assert.ok(mid.cy > 0.3 && mid.cy < 0.7);
+test('smoothed cursor path is lag-free, removes jitter, pins clicks and handles edge values', async () => {
+    const { getSmoothedCursorPath } = await import('../src/lib/zoom/cursorPathSmoothing.js');
+    // Fast sweep at 3000 px/s (1080p units) sampled every 5 ms, with 1px jitter.
+    const samples = [];
+    for (let t = 0; t <= 500; t += 5) {
+        const jitter = (t / 5) % 2 ? 1 / 1920 : -1 / 1920;
+        samples.push({ time: t, x: 0.1 + (t / 500) * 0.78 + jitter, y: 0.5 });
+    }
+    for (let t = 505; t <= 900; t += 5) samples.push({ time: t, x: 0.88, y: 0.5 });
+    samples.push({ time: 900, x: 0.88, y: 0.5, click: 'left' });
+    const path = getSmoothedCursorPath(samples, 1.0);
+    // On schedule mid-sweep (a causal spring trailed by >100 px here).
+    const mid = path.sampleAt(250);
+    assert.ok(Math.abs(mid.cx - 0.49) * 1920 < 3, `lag ${((0.49 - mid.cx) * 1920).toFixed(1)}px`);
+    // No overshoot after stopping.
+    for (let t = 500; t <= 900; t += 10) assert.ok(path.sampleAt(t).cx <= 0.8801);
+    assert.ok(Math.abs(path.sampleAt(900).cx - 0.88) < 1e-6);
+    // A position a hair past the edge is not mistaken for pixels.
+    const edge = getSmoothedCursorPath([{ time: 0, x: 0.99, y: 0.5 }, { time: 10, x: 1.001, y: 0.5 }], 0);
+    assert.ok(edge.sampleAt(10).cx > 0.99);
 });
 
 test('InteractionAnalyzer filters startup click at t <= 300ms to preserve unzoomed overview', async () => {

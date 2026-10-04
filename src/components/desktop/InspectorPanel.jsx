@@ -638,8 +638,8 @@ export default function InspectorPanel({
                                 </label>
                                 <div className="grid grid-cols-3 gap-1">
                                     {[
-                                        { id: 'macos', label: 'macOS' },
                                         { id: 'windows', label: 'Windows 11' },
+                                        { id: 'macos', label: 'macOS' },
                                         { id: 'cyber', label: 'Cyber Lime' },
                                         { id: 'neon', label: 'Neon Glow' },
                                         { id: 'dot', label: 'Minimal Dot' },
@@ -684,8 +684,8 @@ export default function InspectorPanel({
                             {/* Catmull-Rom Spline Trajectory Smoothing */}
                             <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)]">
                                 <div>
-                                    <div className="text-xs font-semibold text-[var(--text-app)]">Cinema Spline Curves</div>
-                                    <div className="text-[10px] text-[var(--text-app-muted)]">Catmull-Rom organic glide</div>
+                                    <div className="text-xs font-semibold text-[var(--text-app)]">Smooth Movement</div>
+                                    <div className="text-[10px] text-[var(--text-app-muted)]">Removes hand jitter without lag</div>
                                 </div>
                                 <button
                                     onClick={() => onToggleSplineSmoothing && onToggleSplineSmoothing(!splineSmoothing)}

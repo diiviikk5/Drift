@@ -24,6 +24,9 @@ import AISettings from '@/app/components/settings/AISettings';
 import NotesTeleprompter from '@/components/desktop/NotesTeleprompter';
 
 
+// The default synthetic pointer matches the system one.
+const DEFAULT_CURSOR_THEME = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform || '') ? 'macos' : 'windows';
+
 export default function RecorderPage() {
     // --- Refs ---
     const recorderCanvasRef = useRef(null);
@@ -107,7 +110,7 @@ export default function RecorderPage() {
     // Screen-capture fallback recordings have the real OS cursor baked into the
     // video; a synthetic cursor on top of those shows two pointers.
     const [cursorBakedIn, setCursorBakedIn] = useState(false);
-    const [cursorTheme, setCursorTheme] = useState('macos');
+    const [cursorTheme, setCursorTheme] = useState(DEFAULT_CURSOR_THEME);
     const [cursorScale, setCursorScale] = useState(1.0);
     const [splineSmoothing, setSplineSmoothing] = useState(true);
     const [systemAudioVolume, setSystemAudioVolume] = useState(1.0);
@@ -997,11 +1000,19 @@ export default function RecorderPage() {
                         return Math.max(0, Math.min(1, isPixelSpace ? val / srcH : (val > 1 ? val / srcH : val)));
                     };
 
+                    // Outside the recorded window/monitor (beyond a small margin) the
+                    // synthetic pointer is hidden rather than stuck to the edge.
+                    const outside = (s) => {
+                        const u = isPixelSpace ? s.x / srcW : s.x;
+                        const v = isPixelSpace ? s.y / srcH : s.y;
+                        return u < -0.005 || u > 1.005 || v < -0.005 || v > 1.005;
+                    };
                     const moves = (nativeSamples || []).map(s => ({
                         time: s.t,
                         x: normalizeX(s.x),
                         y: normalizeY(s.y),
                         click: s.click,
+                        ...(outside(s) ? { hidden: true } : {}),
                     }));
 
                     const clickList = (nativeSamples || []).filter(s => Boolean(s.click)).map(s => ({
@@ -1697,7 +1708,7 @@ export default function RecorderPage() {
             setShowCursor(project.showCursor ?? false);
             setCursorBakedIn(Boolean(project.cursorBakedIn));
             setFrameFit(project.frameFit === 'fill' ? 'fill' : 'contain');
-            setCursorTheme(project.cursorTheme ?? 'macos');
+            setCursorTheme(project.cursorTheme ?? DEFAULT_CURSOR_THEME);
             setCursorScale(project.cursorScale ?? 1);
             setSplineSmoothing(project.splineSmoothing ?? true);
             setShowKeystrokes(project.showKeystrokes ?? true);

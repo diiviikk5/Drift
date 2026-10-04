@@ -214,9 +214,12 @@ pub fn start_global_listener(app: AppHandle) {
 
     thread::spawn(move || {
         let listener_start = std::time::Instant::now();
-        let mut last_move_time: f64 = 0.0;
-        let mut last_sample_time: f64 = 0.0;
-        let mut last_typed_time: f64 = f64::NEG_INFINITY;
+        // Throttles run on the listener's own monotonic clock. Session timestamps
+        // restart at 0 with every recording, so throttling on them dropped all
+        // cursor movement until the new session outlasted the previous one.
+        let mut last_move_emit: f64 = f64::NEG_INFINITY;
+        let mut last_sample_at: f64 = f64::NEG_INFINITY;
+        let mut last_typed_at: f64 = f64::NEG_INFINITY;
 
         listen(move |event: Event| {
             if !*is_listening.lock() {
@@ -228,9 +231,10 @@ pub fn start_global_listener(app: AppHandle) {
 
             // When actively recording, elapsed is relative to recording start (starts at 0.0 ms)
             // When idle, elapsed is relative to listener start for live indicator events
+            let now = listener_start.elapsed().as_secs_f64() * 1000.0;
             let (elapsed, is_rec) = match (recording, rec_start) {
                 (true, Some(start_inst)) => (start_inst.elapsed().as_secs_f64() * 1000.0, true),
-                _ => (listener_start.elapsed().as_secs_f64() * 1000.0, false),
+                _ => (now, false),
             };
 
             match event.event_type {
@@ -265,8 +269,8 @@ pub fn start_global_listener(app: AppHandle) {
                 EventType::MouseMove { x, y } => {
                     if is_rec {
                         // Buffer high-frequency telemetry at up to 240Hz (>= 4ms between samples)
-                        if elapsed - last_sample_time >= 4.0 {
-                            last_sample_time = elapsed;
+                        if now - last_sample_at >= 4.0 {
+                            last_sample_at = now;
                             session_samples.lock().push(CursorSample {
                                 t: elapsed,
                                 x,
@@ -277,8 +281,8 @@ pub fn start_global_listener(app: AppHandle) {
                     }
 
                     // Throttle webview IPC event to ~60fps (16ms) to keep UI thread responsive
-                    if elapsed - last_move_time > 16.0 {
-                        last_move_time = elapsed;
+                    if now - last_move_emit > 16.0 {
+                        last_move_emit = now;
                         let move_evt = GlobalMoveEvent {
                             x,
                             y,
@@ -333,9 +337,9 @@ pub fn start_global_listener(app: AppHandle) {
                                         session_keystrokes.lock().push(sample.clone());
                                     }
                                     let _ = app_handle.emit("global-keystroke", &sample);
-                                } else if is_rec && elapsed - last_typed_time >= 120.0 {
+                                } else if is_rec && now - last_typed_at >= 120.0 {
                                     // Anonymous typing activity, throttled; never emitted live.
-                                    last_typed_time = elapsed;
+                                    last_typed_at = now;
                                     session_keystrokes.lock().push(KeystrokeSample {
                                         time: (elapsed / 1000.0 * 100.0).round() / 100.0,
                                         text: String::new(),
