@@ -46,6 +46,7 @@ export class StudioEngine {
         };
         if (this.webcamBlob) {
             this.webcamVideo = document.createElement('video');
+            this.webcamVideo.crossOrigin = 'anonymous';
             this.webcamVideo.src = typeof this.webcamBlob === 'string' ? this.webcamBlob : URL.createObjectURL(this.webcamBlob);
             this.webcamVideo.muted = true;
             this.webcamVideo.playsInline = true;
@@ -179,6 +180,10 @@ export class StudioEngine {
 
     init() {
         console.log('[Studio] init() called');
+        // Recordings from the desktop recorder are served from Tauri's asset
+        // protocol (another origin). Loading them in CORS mode keeps the canvas
+        // untainted; otherwise VideoFrame(canvas) throws and MP4 export fails.
+        this.video.crossOrigin = 'anonymous';
         if (typeof this.blob === 'string') {
             this.video.src = this.blob;
         } else if (this.blob instanceof Blob) {
