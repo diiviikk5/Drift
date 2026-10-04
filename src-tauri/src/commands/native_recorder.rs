@@ -48,6 +48,77 @@ fn window_frame_bounds(hwnd: isize) -> Option<(i32, i32, i32, i32)> {
     Some((r.left, r.top, r.right - r.left, r.bottom - r.top))
 }
 
+/// Capture time of a callback's first sample (the buffer ends "now").
+fn first_sample_instant(len: usize, channels: u16, sample_rate: u32) -> std::time::Instant {
+    let frames = len as f64 / channels.max(1) as f64;
+    let buffered = std::time::Duration::from_secs_f64(frames / sample_rate.max(1) as f64);
+    std::time::Instant::now().checked_sub(buffered).unwrap_or_else(std::time::Instant::now)
+}
+
+/// Keep a capture stream on the wall clock. `clock` is (first sample instant,
+/// frames written). On the first buffer the start instant is recorded; later,
+/// if the device delivered nothing for a while (WASAPI loopback goes quiet
+/// during silence), the missing time is written as zero samples first.
+fn fill_silence_gap<W: std::io::Write + std::io::Seek>(
+    clock: &mut Option<(std::time::Instant, u64)>,
+    started: &Arc<Mutex<Option<std::time::Instant>>>,
+    writer: &mut hound::WavWriter<W>,
+    len: usize,
+    channels: u16,
+    sample_rate: u32,
+) {
+    let frames = (len / channels.max(1) as usize) as u64;
+    match clock {
+        None => {
+            let t0 = first_sample_instant(len, channels, sample_rate);
+            *started.lock() = Some(t0);
+            *clock = Some((t0, frames));
+        }
+        Some((t0, written)) => {
+            let elapsed = t0.elapsed().as_secs_f64();
+            let expected_start = (elapsed * sample_rate as f64) as u64;
+            let expected_start = expected_start.saturating_sub(frames);
+            // Ignore normal jitter; fill real gaps (> 30 ms).
+            if expected_start > *written + (sample_rate as u64 * 3 / 100) {
+                let missing = expected_start - *written;
+                for _ in 0..missing * channels as u64 {
+                    let _ = writer.write_sample(0i16);
+                }
+                *written += missing;
+            }
+            *written += frames;
+        }
+    }
+}
+
+/// Shift a WAV so it starts `lead_secs` later (drop leading samples) or, for a
+/// negative lead, earlier (pad with silence).
+fn align_wav_start(path: &std::path::Path, lead_secs: f64) -> Result<(), String> {
+    if lead_secs.abs() < 0.002 {
+        return Ok(());
+    }
+    let mut reader = hound::WavReader::open(path).map_err(|e| e.to_string())?;
+    let spec = reader.spec();
+    let channels = spec.channels.max(1) as usize;
+    let shift_frames = (lead_secs.abs() * spec.sample_rate as f64).round() as usize;
+    let tmp = path.with_extension("aligned.wav");
+    {
+        let mut writer = hound::WavWriter::create(&tmp, spec).map_err(|e| e.to_string())?;
+        if lead_secs < 0.0 {
+            for _ in 0..shift_frames * channels {
+                writer.write_sample(0i16).map_err(|e| e.to_string())?;
+            }
+        }
+        let skip = if lead_secs > 0.0 { shift_frames * channels } else { 0 };
+        for sample in reader.samples::<i16>().skip(skip) {
+            writer.write_sample(sample.map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        }
+        writer.finalize().map_err(|e| e.to_string())?;
+    }
+    drop(reader);
+    std::fs::rename(&tmp, path).map_err(|e| e.to_string())
+}
+
 fn parse_window_id(id: &str) -> Option<isize> {
     id.trim_start_matches("window:").parse::<isize>().ok()
 }
@@ -103,6 +174,8 @@ pub struct NativeSessionResult {
     pub monitor_y: i32,
     /// Telemetry was shifted so t = 0 matches the first video frame.
     pub telemetry_offset_ms: f64,
+    /// Text caret positions over time (video timeline, target pixels).
+    pub caret: Vec<crate::commands::caret::CaretSample>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -217,10 +290,15 @@ pub struct NativeSessionManager {
     pub monitor_origin: Arc<Mutex<(i32, i32)>>,
     /// Window capture: the window's desktop origin over time, for cursor mapping.
     pub origin_track: Arc<Mutex<Vec<(std::time::Instant, i32, i32)>>>,
+    pub caret_track: Arc<Mutex<Vec<(std::time::Instant, i32, i32, i32)>>>,
     pub first_frame_at: Arc<Mutex<Option<std::time::Instant>>>,
     #[cfg(windows)]
     capture_control: Arc<Mutex<Option<CaptureControl<ScreenRecorderHandler, Box<dyn std::error::Error + Send + Sync>>>>>,
     audio_stop_sender: Arc<Mutex<Option<std::sync::mpsc::Sender<()>>>>,
+    audio_thread: Arc<Mutex<Option<std::thread::JoinHandle<()>>>>,
+    /// When each audio stream's first sample was captured (for A/V alignment).
+    system_audio_started: Arc<Mutex<Option<std::time::Instant>>>,
+    mic_audio_started: Arc<Mutex<Option<std::time::Instant>>>,
 }
 
 impl Default for NativeSessionManager {
@@ -237,10 +315,14 @@ impl Default for NativeSessionManager {
             target_geometry: Arc::new(Mutex::new((1920, 1080, 60))),
             monitor_origin: Arc::new(Mutex::new((0, 0))),
             origin_track: Arc::new(Mutex::new(Vec::new())),
+            caret_track: Arc::new(Mutex::new(Vec::new())),
             first_frame_at: Arc::new(Mutex::new(None)),
             #[cfg(windows)]
             capture_control: Arc::new(Mutex::new(None)),
             audio_stop_sender: Arc::new(Mutex::new(None)),
+            audio_thread: Arc::new(Mutex::new(None)),
+            system_audio_started: Arc::new(Mutex::new(None)),
+            mic_audio_started: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -382,6 +464,10 @@ pub async fn start_native_session(
 
         let sys_path_clone = sys_audio_path.clone();
         let mic_path_clone = mic_audio_path.clone();
+        *state.system_audio_started.lock() = None;
+        *state.mic_audio_started.lock() = None;
+        let sys_started = state.system_audio_started.clone();
+        let mic_started = state.mic_audio_started.clone();
 
         if with_system_audio {
             *state.system_audio_path.lock() = Some(sys_audio_path);
@@ -390,7 +476,7 @@ pub async fn start_native_session(
             *state.mic_audio_path.lock() = Some(mic_audio_path);
         }
 
-        std::thread::spawn(move || {
+        let audio_thread = std::thread::spawn(move || {
             use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
             let host = cpal::default_host();
             let mut streams = Vec::new();
@@ -412,10 +498,15 @@ pub async fn start_native_session(
                         if let Ok(writer) = hound::WavWriter::create(&sys_path_clone, spec) {
                             let writer_arc = Arc::new(Mutex::new(writer));
                             let writer_cb = writer_arc.clone();
+                            let started = sys_started.clone();
+                            let mut clock: Option<(std::time::Instant, u64)> = None;
                             let stream_res = device.build_input_stream(
                                 &supported_config.config(),
                                 move |data: &[f32], _| {
                                     let mut w = writer_cb.lock();
+                                    // Loopback capture delivers nothing while no sound plays;
+                                    // write that time as silence so the track stays in sync.
+                                    fill_silence_gap(&mut clock, &started, &mut w, data.len(), channels, sample_rate);
                                     for &s in data {
                                         let _ = w.write_sample((s.clamp(-1.0, 1.0) * 32767.0) as i16);
                                     }
@@ -451,10 +542,13 @@ pub async fn start_native_session(
                         if let Ok(writer) = hound::WavWriter::create(&mic_path_clone, spec) {
                             let writer_arc = Arc::new(Mutex::new(writer));
                             let writer_cb = writer_arc.clone();
+                            let started = mic_started.clone();
+                            let mut clock: Option<(std::time::Instant, u64)> = None;
                             let stream_res = mic_device.build_input_stream(
                                 &supported_config.config(),
                                 move |data: &[f32], _| {
                                     let mut w = writer_cb.lock();
+                                    fill_silence_gap(&mut clock, &started, &mut w, data.len(), channels, sample_rate);
                                     for &s in data {
                                         let _ = w.write_sample((s.clamp(-1.0, 1.0) * 32767.0) as i16);
                                     }
@@ -477,13 +571,16 @@ pub async fn start_native_session(
             // Wait until stop signal is sent
             let _ = audio_stop_rx.recv();
 
-            // Flush all WAV files
-            for writer_arc in writers {
-                let mut w = writer_arc.lock();
-                let _ = w.flush();
-            }
+            // Stop the streams first so their callbacks release the writers,
+            // then finalize the WAV headers.
             drop(streams);
+            for writer_arc in writers {
+                if let Ok(mutex) = Arc::try_unwrap(writer_arc) {
+                    let _ = mutex.into_inner().finalize();
+                }
+            }
         });
+        *state.audio_thread.lock() = Some(audio_thread);
 
         // 4. Start session synchronized cursor telemetry
         let _ = app.emit("native-recording-started", serde_json::json!({
@@ -493,6 +590,8 @@ pub async fn start_native_session(
             "fps": fps,
         }));
         crate::commands::input::start_session_telemetry(app.clone());
+        state.caret_track.lock().clear();
+        crate::commands::caret::spawn_caret_sampler(state.is_recording.clone(), state.caret_track.clone());
 
         // 5. Configure and launch windows-capture free-threaded
         let cursor_setting = if without_cursor {
@@ -580,9 +679,37 @@ pub async fn stop_native_session(app: AppHandle) -> Result<NativeSessionResult, 
         }
     }
 
-    // 3. Stop audio thread by sending signal
+    // 3. Stop audio and wait until the WAV files are finalized
     if let Some(stop_tx) = state.audio_stop_sender.lock().take() {
         let _ = stop_tx.send(());
+    }
+    if let Some(handle) = state.audio_thread.lock().take() {
+        let _ = handle.join();
+    }
+
+    let first_frame = *state.first_frame_at.lock();
+
+    // 4. Audio starts before the first video frame arrives (capture warm-up is
+    // ~1 s). Trim each track so its sample 0 is the first video frame.
+    if let Some(frame_at) = first_frame {
+        let tracks = [
+            (state.system_audio_path.lock().clone(), state.system_audio_started.lock().take()),
+            (state.mic_audio_path.lock().clone(), state.mic_audio_started.lock().take()),
+        ];
+        for (path, started) in tracks {
+            if let (Some(path), Some(started)) = (path, started) {
+                let lead = if frame_at >= started {
+                    frame_at.duration_since(started).as_secs_f64()
+                } else {
+                    -started.duration_since(frame_at).as_secs_f64()
+                };
+                if let Err(e) = align_wav_start(&path, lead) {
+                    log::warn!("[NativeRecorder] Could not align {:?}: {}", path, e);
+                } else {
+                    log::info!("[NativeRecorder] Aligned {:?} to video (lead {:.0} ms)", path.file_name(), lead * 1000.0);
+                }
+            }
+        }
     }
 
     let first_frame = state.first_frame_at.lock().take();
@@ -597,6 +724,7 @@ pub async fn stop_native_session(app: AppHandle) -> Result<NativeSessionResult, 
     // Align telemetry with the video: t = 0 is the first encoded frame and
     // coordinates are local to the recorded monitor or window.
     let (monitor_x, monitor_y) = *state.monitor_origin.lock();
+    let caret_out: Mutex<Vec<crate::commands::caret::CaretSample>> = Mutex::new(Vec::new());
     let telemetry_offset_ms = {
         let input_state = app.state::<crate::commands::input::InputListenerState>();
         let tele_start = crate::commands::input::session_start_instant(&input_state);
@@ -615,7 +743,7 @@ pub async fn stop_native_session(app: AppHandle) -> Result<NativeSessionResult, 
             })
             .collect();
         let fallback = (monitor_x as f64, monitor_y as f64);
-        crate::commands::input::rebase_session(&input_state, offset, |t| {
+        let origin_at = |t: f64| {
             track
                 .iter()
                 .rev()
@@ -623,7 +751,25 @@ pub async fn stop_native_session(app: AppHandle) -> Result<NativeSessionResult, 
                 .or(track.first())
                 .map(|&(_, x, y)| (x, y))
                 .unwrap_or(fallback)
-        });
+        };
+        crate::commands::input::rebase_session(&input_state, offset, origin_at);
+
+        // Caret samples onto the video timeline, local to the recorded target.
+        let samples: Vec<crate::commands::caret::CaretSample> = std::mem::take(&mut *state.caret_track.lock())
+            .into_iter()
+            .filter_map(|(at, x, y, h)| {
+                let tele_ms = tele_start
+                    .map(|t0| if at > t0 { at.duration_since(t0).as_secs_f64() * 1000.0 } else { 0.0 })
+                    .unwrap_or(0.0);
+                let t = tele_ms - offset;
+                if t < -250.0 {
+                    return None;
+                }
+                let (ox, oy) = origin_at(tele_ms);
+                Some(crate::commands::caret::CaretSample { t, x: x as f64 - ox, y: y as f64 - oy, h: h as f64 })
+            })
+            .collect();
+        *caret_out.lock() = samples;
         offset
     };
 
@@ -688,6 +834,7 @@ pub async fn stop_native_session(app: AppHandle) -> Result<NativeSessionResult, 
         monitor_x,
         monitor_y,
         telemetry_offset_ms,
+        caret: caret_out.into_inner(),
     };
 
     let _ = app.emit("native-recording-stopped", &res);

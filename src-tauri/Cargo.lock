@@ -1098,6 +1098,7 @@ dependencies = [
  "tauri-plugin-store",
  "tokio",
  "uuid",
+ "windows 0.62.2",
  "windows-capture",
  "windows-sys 0.59.0",
  "xcap",

@@ -7,6 +7,7 @@
  */
 
 import { computeCursorSwayRotation } from '../zoom/cursorTilt.js';
+import { typingPointerOpacity } from '../zoom/typingFocus.js';
 import { getSmoothedCursorPath } from '../zoom/cursorPathSmoothing.js';
 import { getCameraTrack, sampleCameraTrack, viewportCenter } from '../zoom/cameraTrack.js';
 import { WALLPAPERS, computeStageLayout, drawMeshBackground, getGrainPattern } from './stage.js';
@@ -246,6 +247,7 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
     const {
         focusSegments = [],
         mouseSamples = [],
+        cameraSamples = null,
         clicks = [],
         keystrokes = [],
     } = sessionData;
@@ -374,7 +376,7 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         cropKx: layout.cropKx,
         cropKy: layout.cropKy,
     };
-    const camera = evaluateCameraAtTime(timeSec, focusSegments, mouseSamples, cameraOptions);
+    const camera = evaluateCameraAtTime(timeSec, focusSegments, cameraSamples || mouseSamples, cameraOptions);
 
     // 6. Draw Video Frame with Camera Transformation inside video area
     ctx.save();
@@ -450,7 +452,8 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
             const press = cursorPressScale(timeSec, clicks);
             // Effects a real pointer doesn't have are opt-in.
             const idleOpacity = (renderSettings.hideIdleCursor ? cursorIdleOpacity(timeSec, mouseSamples) : 1)
-                * cursorAreaOpacity(timeSec, mouseSamples);
+                * cursorAreaOpacity(timeSec, mouseSamples)
+                * (renderSettings.hideCursorWhileTyping === false ? 1 : typingPointerOpacity(timeSec, keystrokes, mouseSamples));
             // Cursor size is relative to the recording, like a real pointer.
             const size = cursorScale * press * (contentH / 1080) * CURSOR_BASE_SCALE;
 

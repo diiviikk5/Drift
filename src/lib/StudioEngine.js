@@ -5,6 +5,7 @@
 import { isTauri } from './tauri-bridge.js';
 import { InteractionAnalyzer } from './zoom/InteractionAnalyzer.js';
 import { openSequentialFrames } from './export/frameSource.js';
+import { buildFocusSamples } from './zoom/typingFocus.js';
 import { renderFrame, getFrameMetrics, canvasToSource, evaluateCameraAtTime, getInterpolatedCursor } from './rendering/renderFrame.js';
 import { getSmoothedCursorPath } from './zoom/cursorPathSmoothing.js';
 import { ZOOM_PRESETS, DEFAULT_ZOOM_SCALE, resolveZoomPreset } from './zoom/ZoomConstruct.js';
@@ -29,6 +30,7 @@ export class StudioEngine {
         this.explicitDuration = duration;
         this.mouseMoves = mouseMoves;
         this.keystrokes = options.keystrokes || [];
+        this.caret = options.caret || [];
         this.showKeystrokes = options.showKeystrokes !== false;
 
         // Webcam PiP Video & Settings
@@ -102,7 +104,7 @@ export class StudioEngine {
         this.focusSegments = (options.focusSegments && options.focusSegments.length > 0)
             ? options.focusSegments
             : (this.autoZoomOnClicks
-                ? this.interactionAnalyzer.analyze(this.clicks, this.mouseMoves, this.explicitDuration || 10, this.keystrokes)
+                ? this.interactionAnalyzer.analyze(this.clicks, this.getFocusSamples(), this.explicitDuration || 10, this.keystrokes)
                 : []
             );
 
@@ -166,7 +168,7 @@ export class StudioEngine {
      */
     async _generateSegments() {
         const dur = this.videoDuration || this.explicitDuration || 10;
-        const auto = this.interactionAnalyzer.analyze(this.clicks, this.mouseMoves, dur, this.keystrokes);
+        const auto = this.interactionAnalyzer.analyze(this.clicks, this.getFocusSamples(), dur, this.keystrokes);
         const manual = (this.focusSegments || []).filter(s => !s.auto);
         const kept = manual.length
             ? auto.filter(a => !manual.some(m => a.startTime < m.endTime && a.endTime > m.startTime))
@@ -446,6 +448,11 @@ export class StudioEngine {
         return true;
     }
 
+    /** Camera/auto-zoom focus: the mouse, or the text caret while typing. */
+    getFocusSamples() {
+        return buildFocusSamples(this.mouseMoves || [], this.caret || [], this.keystrokes || []);
+    }
+
     getCursorAtTime(timeSec) {
         if (!this.mouseMoves || this.mouseMoves.length === 0) return null;
         const srcW = (this.video && this.video.videoWidth) ? this.video.videoWidth : (this.canvas?.width || 1920);
@@ -569,7 +576,7 @@ export class StudioEngine {
     resolveClick(normX, normY) {
         const layout = this.getStageLayout();
         const curTimeSec = this.video?.currentTime || 0;
-        const cam = evaluateCameraAtTime(curTimeSec, this.focusSegments || [], this.mouseMoves || [], {
+        const cam = evaluateCameraAtTime(curTimeSec, this.focusSegments || [], this.getFocusSamples(), {
             zoomMultiplier: 1.0,
             connectedZooms: this.connectedZooms !== false,
             tiltAngle: 0, // invert from the untilted projection
@@ -660,7 +667,7 @@ export class StudioEngine {
 
     updateCamera() {
         const curTimeSec = this.video?.currentTime || 0;
-        this.camera = evaluateCameraAtTime(curTimeSec, this.focusSegments || [], this.mouseMoves || [], {
+        this.camera = evaluateCameraAtTime(curTimeSec, this.focusSegments || [], this.getFocusSamples(), {
             zoomMultiplier: 1.0,
             connectedZooms: this.connectedZooms !== false,
             tiltAngle: this.tiltAngle ?? 0,
@@ -740,6 +747,7 @@ export class StudioEngine {
             {
                 focusSegments: this.focusSegments || [],
                 mouseSamples: this.mouseMoves || [],
+                cameraSamples: this.getFocusSamples(),
                 clicks: this.clicks || [],
                 keystrokes: this.keystrokes || [],
             },
@@ -1202,8 +1210,13 @@ export class StudioEngine {
                             return await tempCtx.decodeAudioData(buf);
                         };
 
-                        const sysBuf = await loadBuf(this.systemAudioUrl).catch(() => null);
-                        const micBuf = await loadBuf(this.micAudioUrl).catch(() => null);
+                        // An empty track (no sound during the recording) can't be decoded; that's fine.
+                        const tryLoad = (src, label) => loadBuf(src).catch((e) => {
+                            console.warn(`[Studio] ${label} audio not decodable (likely silent):`, e?.message || e);
+                            return null;
+                        });
+                        const sysBuf = await tryLoad(this.systemAudioUrl, 'System');
+                        const micBuf = await tryLoad(this.micAudioUrl, 'Microphone');
                         let audioBuffer = null;
 
                         const sVol = this.isSystemAudioMuted ? 0 : (this.systemAudioVolume ?? 1.0);
@@ -1336,7 +1349,8 @@ export class StudioEngine {
                             }
                         }
                     } catch (decodeErr) {
-                        console.log('[Studio] Audio preparation skipped:', decodeErr.message);
+                        console.warn('[Studio] Audio preparation failed:', decodeErr.message);
+                        this.lastExportWarning = `audio could not be included (${decodeErr.message})`;
                     } finally {
                         try { await tempCtx.close(); } catch (e) {}
                     }

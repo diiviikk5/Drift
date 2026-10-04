@@ -107,6 +107,7 @@ export default function RecorderPage() {
     const [showCursor, setShowCursor] = useState(true);
     const [frameFit, setFrameFit] = useState('contain');
     const [captureWindows, setCaptureWindows] = useState([]);
+    const [recordedCaret, setRecordedCaret] = useState([]);
     // Screen-capture fallback recordings have the real OS cursor baked into the
     // video; a synthetic cursor on top of those shows two pointers.
     const [cursorBakedIn, setCursorBakedIn] = useState(false);
@@ -410,6 +411,7 @@ export default function RecorderPage() {
                         playbackSpeed,
                         showKeystrokes,
                         keystrokes: recordedKeystrokes,
+                        caret: recordedCaret,
                         focusSegments: savedSegmentsRef.current,
                         showCursor: showCursor,
                         systemAudioUrl: nativeAudioTracks.systemAudioUrl,
@@ -1038,6 +1040,14 @@ export default function RecorderPage() {
                         } catch (e) {}
                     }
                     setRecordedKeystrokes(keystrokeList || []);
+                    // Text caret track (target pixels -> normalized; y is the caret top).
+                    setRecordedCaret((result.caret || []).map(c => ({
+                        time: c.t,
+                        x: Math.max(0, Math.min(1, c.x / srcW)),
+                        y: Math.max(0, Math.min(1, c.y / srcH)),
+                        h: Math.max(0, c.h / srcH),
+                        ...(c.x < 0 || c.y < 0 || c.x > srcW || c.y > srcH ? { hidden: true } : {}),
+                    })));
 
                     setNativeAudioTracks({ systemAudioUrl: sysAudioUrl, micAudioUrl });
                     setRecordedBlob(videoUrl);
@@ -1409,6 +1419,7 @@ export default function RecorderPage() {
         studioRef.current.clicks = [];
         studioRef.current.setFocusSegments([]);
         setRecordedClicks([]);
+        setRecordedCaret([]);
         setFocusSegments([]);
     };
 
@@ -1608,6 +1619,7 @@ export default function RecorderPage() {
         setRecordedBlob(null);
         setNativeAudioTracks({ systemAudioUrl: null, micAudioUrl: null });
         setRecordedClicks([]);
+        setRecordedCaret([]);
         setRecordedMoves([]);
         setDuration(0);
         setCurrentTime(0);
@@ -1628,7 +1640,7 @@ export default function RecorderPage() {
             }
             const project = await encodeProject({
                 recording: blobToSave, webcam: webcamToSave, duration,
-                clicks: recordedClicks, moves: recordedMoves, keystrokes: recordedKeystrokes,
+                clicks: recordedClicks, moves: recordedMoves, keystrokes: recordedKeystrokes, caret: recordedCaret,
                 focusSegments: studioRef.current?.getFocusSegments() ?? focusSegments,
                 annotations, captions, captionsEnabled, background,
                 customBackground: customImage?.src ?? null,
@@ -1693,6 +1705,7 @@ export default function RecorderPage() {
             setRecordedClicks(project.clicks ?? []);
             setRecordedMoves(project.moves ?? []);
             setRecordedKeystrokes(project.keystrokes ?? []);
+            setRecordedCaret(project.caret ?? []);
             savedSegmentsRef.current = project.focusSegments ?? [];
             setFocusSegments(savedSegmentsRef.current);
             recDurationRef.current = project.duration;
