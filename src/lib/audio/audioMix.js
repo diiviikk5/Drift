@@ -1,6 +1,5 @@
 /**
  * Drift Audio Mixing & Level Metering Module
- * Inspired by OpenScreen's audio architecture.
  *
  * Provides:
  * 1. mixAudioTracks: merges microphone and system audio streams with anti-pop fade-in

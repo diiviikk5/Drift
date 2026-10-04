@@ -4,8 +4,6 @@
 // NOW with Cinema Zoom + Cursor engines for live preview
 
 import drift from './tauri-bridge';
-import { CinemaZoomEngine } from './zoom/CinemaZoomEngine.js';
-import { CinemaCursorEngine } from './zoom/CinemaCursorEngine.js';
 import { mixAudioTracks } from './audio/audioMix.js';
 import { fixWebmDuration } from '@fix-webm-duration/fix';
 
@@ -41,24 +39,10 @@ export class DriftEngine {
         this.isActive = true; // For stopping render loop
         this.timerCallback = null;
 
-        // Cinema Zoom Engine (live preview)
-        this.zoomEngine = new CinemaZoomEngine({
-            width: canvas?.width || 1920,
-            height: canvas?.height || 1080,
-            zoomLevel: 2.0,
-        });
-
-        // Cinema Cursor Engine (smoothed cursor overlay)
-        this.cursorEngine = new CinemaCursorEngine({
-            screenWidth: window.screen.width || 1920,
-            screenHeight: window.screen.height || 1080,
-        });
-
-        // Camera state (driven by zoom engine)
+        // The live preview always shows the full screen; zooms are applied in the studio.
         this.camera = { x: 0.5, y: 0.5, scale: 1 };
 
         this.zoomLevel = 2.0;
-        this.zoomEnabled = false; // OpenScreen soothing recording: steady camera overview without live click zooms
 
         // Capture source resolution (for normalizing mouse coordinates)
         // Defaults to physical screen pixels taking display scaling (DPI) into account
@@ -98,12 +82,6 @@ export class DriftEngine {
                 const ny = Math.max(0, Math.min(1, data.y / srcH));
                 this.clicks.push({ time: t, x: nx, y: ny });
 
-                // Feed into Cinema Zoom Engine (live zoom preview)
-                if (this.zoomEnabled) {
-                    this.zoomEngine.addClick(t, nx, ny);
-                }
-                // Feed into Cinema Cursor Engine (normalized coords)
-                this.cursorEngine.addClick(t, data.x, data.y);
 
                 console.log('[Drift] Tauri global click:', this.clicks.length);
                 if (this.onclickCallback) this.onclickCallback(this.clicks.length);
@@ -118,11 +96,6 @@ export class DriftEngine {
                 const nx = Math.max(0, Math.min(1, data.x / srcW));
                 const ny = Math.max(0, Math.min(1, data.y / srcH));
                 this.mouseMoves.push({ time: t, x: nx, y: ny });
-
-                // Feed cursor position into zoom engine (for camera following)
-                this.zoomEngine.updateCursor(nx, ny, t);
-                // Feed into cursor engine (raw pixels — engine normalizes internally)
-                this.cursorEngine.addMove(t, data.x, data.y);
             });
 
         } else if (this._isElectron) {
@@ -134,11 +107,6 @@ export class DriftEngine {
                     const nx = data.x / this._sourceWidth;
                     const ny = data.y / this._sourceHeight;
                     this.clicks.push({ time: t, x: nx, y: ny });
-
-                    if (this.zoomEnabled) {
-                        this.zoomEngine.addClick(t, nx, ny);
-                    }
-                    this.cursorEngine.addClick(t, data.x, data.y);
 
                     if (this.onclickCallback) this.onclickCallback(this.clicks.length);
                 });
@@ -518,7 +486,6 @@ export class DriftEngine {
                 const nx = e.clientX / (this._sourceWidth || window.innerWidth || 1920);
                 const ny = e.clientY / (this._sourceHeight || window.innerHeight || 1080);
                 this.clicks.push({ time: t, x: nx, y: ny, button: 'left' });
-                this.cursorEngine.addClick(t, e.clientX, e.clientY);
                 if (this.onclickCallback) this.onclickCallback(this.clicks.length);
             };
             this._browserMoveHandler = (e) => {
@@ -527,7 +494,6 @@ export class DriftEngine {
                 const nx = e.clientX / (this._sourceWidth || window.innerWidth || 1920);
                 const ny = e.clientY / (this._sourceHeight || window.innerHeight || 1080);
                 this.mouseMoves.push({ time: t, x: nx, y: ny });
-                this.cursorEngine.addMove(t, e.clientX, e.clientY);
             };
             window.addEventListener('click', this._browserClickHandler);
             window.addEventListener('mousemove', this._browserMoveHandler);
@@ -659,14 +625,6 @@ export class DriftEngine {
                 return;
             }
 
-            // Update cinema zoom engine every frame while recording
-            if (this.isRecording && this.zoomEnabled) {
-                const t = Date.now() - this.startTime;
-                this.zoomEngine.update(t);
-                const state = this.zoomEngine.getState();
-                this.camera = { x: state.x, y: state.y, scale: state.scale };
-            }
-
             // Clear
             ctx.fillStyle = '#1a1a2e';
             ctx.fillRect(0, 0, c.width, c.height);
@@ -732,7 +690,7 @@ export class DriftEngine {
                 ctx.restore(); // Restore camera transform
 
                 // Note: Webcam is recorded as an independent parallel video stream (webcamBlob),
-                // matching OpenScreen architecture so the screen video remains clean and never has a duplicate camera burned into its pixels.
+                // so the screen video stays clean and never has a duplicate camera burned into its pixels.
 
                 // Draw zoom state indicator
                 if (this.isRecording && this.camera.scale > 1.05) {
@@ -784,8 +742,6 @@ export class DriftEngine {
         if (this.video) {
             this.video.srcObject = null;
         }
-        // Clean up engines
-        if (this.zoomEngine) this.zoomEngine.destroy();
         // Clean up Tauri global listeners
         if (this._globalClickUnlisten) {
             this._globalClickUnlisten();
@@ -806,18 +762,8 @@ export class DriftEngine {
      */
     setZoomLevel(level) {
         this.zoomLevel = level;
-        this.zoomEngine.setZoomLevel(level);
     }
 
-    /**
-     * Enable/disable live zoom preview
-     */
-    setZoomEnabled(enabled) {
-        this.zoomEnabled = enabled;
-        if (!enabled) {
-            this.camera = { x: 0.5, y: 0.5, scale: 1 };
-        }
-    }
 
     roundRect(ctx, x, y, w, h, r) {
         ctx.beginPath();

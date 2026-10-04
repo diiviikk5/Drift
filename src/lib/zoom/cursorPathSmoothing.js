@@ -1,7 +1,7 @@
 /**
  * Offline cursor-path smoothing for screen recordings.
  * 
- * Ported from OpenScreen (cursorPathSmoothing.ts & motionSmoothing.ts).
+ * Portions derived from OpenScreen (MIT) - see THIRD_PARTY_NOTICES.md.
  * 
  * Instead of a jittery causal real-time filter that introduces lag during playback,
  * we precompute once offline: resample telemetry to a fixed 240Hz grid, then drive
@@ -44,7 +44,7 @@ const CURSOR_SMOOTHING_MAX = 2;
 const CURSOR_SMOOTHING_LEGACY_MAX = 0.5;
 
 /**
- * OpenScreen spring configuration curves
+ * Spring configuration for a smoothing strength
  * Higher factor = softer, floatier cinematic motion
  */
 export function getCursorSpringConfig(smoothingFactor = 1.0) {

@@ -1,12 +1,12 @@
 /**
- * renderFrame — Deterministic Unified Screen Studio Compositor Pipeline
+ * renderFrame — deterministic studio compositor
  * 
  * Shared 1:1 between interactive Studio Preview and offline WebCodecs / MP4 export.
  * Pure stateless rendering of background, framing, camera spring transforms,
  * click ripple waves, and synthetic sub-pixel cursor.
  */
 
-import { computeCursorSwayRotation } from '../zoom/cursorSway.js';
+import { computeCursorSwayRotation } from '../zoom/cursorTilt.js';
 import { getSmoothedCursorPath } from '../zoom/cursorPathSmoothing.js';
 import { getCameraTrack, sampleCameraTrack, viewportCenter } from '../zoom/cameraTrack.js';
 import { WALLPAPERS, computeStageLayout, getGrainPattern } from './stage.js';
@@ -15,7 +15,7 @@ import { drawWallpaper } from './wallpapers.js';
 export { WALLPAPERS };
 
 /**
- * Reactive Webcam Scaling (from OpenScreen / Recordly)
+ * Reactive webcam scaling
  * Inversely scales the webcam PiP so deep zoom keeps the camera out of the way.
  */
 export function reactiveWebcamScale(zoomScale) {
@@ -79,7 +79,7 @@ export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples =
 }
 
 /**
- * OpenScreen-proven piecewise linear binary-search cursor interpolation (zero latency)
+ * Cursor position at a time: binary search + linear interpolation (no added latency).
  */
 export function getInterpolatedCursor(timeSec, mouseSamples = [], options = {}) {
     if (!mouseSamples || mouseSamples.length === 0) return null;
@@ -88,7 +88,7 @@ export function getInterpolatedCursor(timeSec, mouseSamples = [], options = {}) 
     const srcW = options.sourceWidth || options.screenWidth || 1920;
     const srcH = options.sourceHeight || options.screenHeight || 1080;
 
-    // OpenScreen 240Hz offline symplectic Euler cursor smoothing (when requested)
+    // Offline 240 Hz spring smoothing of the cursor path (when requested)
     if (options.springSmooth === true && mouseSamples.length >= 2) {
         const smoothedPath = getSmoothedCursorPath(mouseSamples, options.smoothingStrength ?? 1.0, {
             sourceWidth: srcW,
@@ -468,7 +468,7 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
     // Translate origin to center of video area
     ctx.translate(padX + frameW * 0.5, padY + headerH + videoH * 0.5);
 
-    // OpenScreen 3D Perspective Tilt (Subtle skew/scale along camera movement)
+    // Subtle 3D perspective tilt along camera movement
     if (camera.rotateX || camera.rotateY) {
         const radX = (camera.rotateX * Math.PI) / 180;
         const radY = (camera.rotateY * Math.PI) / 180;
@@ -617,7 +617,7 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         }
     }
 
-    // 10.5 Draw Keystroke Badge Overlay (Screen Studio / Cap style KeyCast)
+    // 10.5 Keystroke badges
     if (showKeystrokes !== false && keystrokes && keystrokes.length > 0) {
         _drawKeystrokeOverlay(ctx, keystrokes, timeSec, { padX, padY: padY + headerH, frameW, videoH });
     }
@@ -783,7 +783,7 @@ function _drawWebcamPiP(ctx, webcamSourceIn, settings, bounds) {
     let borderWidth = defaultBorderWidth;
     let borderColor = defaultBorderColor;
 
-    // OpenScreen Reactive Webcam Scaling
+    // Reactive webcam scaling: shrink the PiP while zoomed in
     const reactiveFactor = settings?.reactiveScale !== false && bounds.cameraScale ? reactiveWebcamScale(bounds.cameraScale) : 1.0;
     let size = Math.round(bounds.frameW * sizeRatio * reactiveFactor);
     const margin = Math.round(bounds.frameW * 0.025);
@@ -796,7 +796,7 @@ function _drawWebcamPiP(ctx, webcamSourceIn, settings, bounds) {
     let renderH = size;
 
     if (isFullCamera) {
-        // OpenScreen Full Camera Mode: presenter takes entire screen for intro/outro
+        // Full camera mode: presenter takes the whole frame (intros/outros)
         x = bounds.padX;
         y = bounds.padY;
         renderW = bounds.frameW;
@@ -1165,7 +1165,7 @@ function _drawThemedCursor(ctx, x, y, scale = 1.0, theme = 'macos', swayAngle = 
 }
 
 /**
- * Draw crisp modern macOS-style synthetic pointer (OpenScreen / Screen Studio aesthetic)
+ * Draw the synthetic arrow pointer
  */
 function _drawSyntheticCursor(ctx, x, y, scale = 1.0, swayAngle = 0) {
     ctx.save();
@@ -1213,7 +1213,7 @@ function _drawSyntheticCursor(ctx, x, y, scale = 1.0, swayAngle = 0) {
 }
 
 /**
- * Draw Screen Studio / Cap style animated floating Keystroke Overlay
+ * Draw animated floating keystroke badges
  */
 function _drawKeystrokeOverlay(ctx, keystrokes, timeSec, bounds) {
     if (!keystrokes || keystrokes.length === 0) return;

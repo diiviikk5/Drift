@@ -3,8 +3,7 @@
  *
  * Instead of evaluating the camera statelessly every frame (which forces hard
  * snaps whenever the cursor crosses a deadzone edge), the whole recording is
- * simulated once at a fixed rate with critically damped springs, the same way
- * Cap's zoom focus interpolator and Screen Studio's camera work. Preview and
+ * simulated once at a fixed rate with critically damped springs. Preview and
  * export sample the same track, so they are frame-identical, and seeking is a
  * constant-time lookup.
  *

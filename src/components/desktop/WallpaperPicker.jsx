@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { WALLPAPER_LIBRARY, WALLPAPER_CATEGORIES, drawWallpaper } from '@/lib/rendering/wallpapers';
+import { WALLPAPER_LIBRARY, WALLPAPER_CATEGORIES, drawWallpaper, getWallpaper, resolveWallpaperId } from '@/lib/rendering/wallpapers';
 
 function WallpaperThumb({ id }) {
     const ref = useRef(null);
@@ -22,10 +22,10 @@ function WallpaperThumb({ id }) {
 export default function WallpaperPicker({ background, customImage, photos = {}, onChange }) {
     const photoEntries = Object.entries(photos).filter(([, v]) => v.src);
     const categories = [...WALLPAPER_CATEGORIES, ...(photoEntries.length ? ['Photos'] : [])];
-    const current = WALLPAPER_LIBRARY.find(w => w.id === background);
-    const [category, setCategory] = useState(current?.category || (photos[background]?.src ? 'Photos' : 'macOS'));
+    const current = getWallpaper(background);
+    const [category, setCategory] = useState(current?.category || (photos[background]?.src ? 'Photos' : 'Flow'));
 
-    const isSelected = (key) => background === key && (!customImage || customImage._bgKey === key);
+    const isSelected = (key) => resolveWallpaperId(background) === key && (!customImage || customImage._bgKey === key);
 
     const tile = (key, name, content) => (
         <button

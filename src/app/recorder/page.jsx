@@ -143,7 +143,7 @@ export default function RecorderPage() {
     const isDraggingCanvasRef = useRef(false);
     const dragStartPosRef = useRef({ clientX: 0, clientY: 0, canvasX: 0, canvasY: 0, rect: null });
 
-    // OpenScreen & Recordly Features State
+    // Presentation features state
     const [isTeleprompterOpen, setIsTeleprompterOpen] = useState(false);
     const [tiltAngle, setTiltAngle] = useState(0);
     const [connectedZooms, setConnectedZooms] = useState(true);
@@ -2027,7 +2027,7 @@ export default function RecorderPage() {
                 )}
             </div>
 
-            {/* Presenter Teleprompter Notes (OpenScreen) */}
+            {/* Presenter teleprompter notes */}
             <NotesTeleprompter
                 isOpen={isTeleprompterOpen}
                 onClose={() => setIsTeleprompterOpen(false)}

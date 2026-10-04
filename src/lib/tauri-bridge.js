@@ -294,39 +294,6 @@ export async function captureScreenshot(monitorId = 0) {
 // ============================================================
 
 /**
- * Start native screen capture (captures frames in Rust via xcap)
- */
-export async function startNativeCapture(config) {
-    if (isTauri()) {
-        const api = await getTauriApi();
-        return api.invoke('start_native_capture', { config });
-    }
-    throw new Error('Native capture only available in Tauri');
-}
-
-/**
- * Stop native capture and get stats
- */
-export async function stopNativeCapture() {
-    if (isTauri()) {
-        const api = await getTauriApi();
-        return api.invoke('stop_native_capture');
-    }
-    throw new Error('Native capture only available in Tauri');
-}
-
-/**
- * Get recording stats (frames captured, fps, etc.)
- */
-export async function getRecordingStats() {
-    if (isTauri()) {
-        const api = await getTauriApi();
-        return api.invoke('get_recording_stats');
-    }
-    return null;
-}
-
-/**
  * Listen for native frame capture events
  */
 export async function onNativeFrame(callback) {
@@ -344,41 +311,6 @@ export async function onNativeFrame(callback) {
 // ============================================================
 
 /**
- * Export captured frames to MP4 using FFmpeg
- */
-export async function exportMp4(config) {
-    if (isTauri()) {
-        const api = await getTauriApi();
-        return api.invoke('export_mp4', { config });
-    }
-    throw new Error('MP4 export only available in Tauri');
-}
-
-/**
- * Export with compositing (zoom, cursor, background applied via GPU)
- */
-export async function exportCompositedMp4(config, zoomSegments, cursorData, backgroundColor) {
-    if (isTauri()) {
-        const api = await getTauriApi();
-        return api.invoke('export_composited_mp4', {
-            config, zoomSegments, cursorData, backgroundColor
-        });
-    }
-    throw new Error('Composited export only available in Tauri');
-}
-
-/**
- * Check if FFmpeg is available
- */
-export async function checkFfmpeg() {
-    if (isTauri()) {
-        const api = await getTauriApi();
-        return api.invoke('check_ffmpeg');
-    }
-    return null;
-}
-
-/**
  * Listen for export progress events
  */
 export async function onExportProgress(callback) {
@@ -389,16 +321,6 @@ export async function onExportProgress(callback) {
         });
     }
     return () => {};
-}
-
-/**
- * Clear frame buffer to free memory
- */
-export async function clearFrameBuffer() {
-    if (isTauri()) {
-        const api = await getTauriApi();
-        return api.invoke('clear_frame_buffer');
-    }
 }
 
 /**
@@ -426,7 +348,7 @@ export async function convertWebmToMp4(webmData, config = {}) {
 }
 
 /**
- * Hide Windows OS hardware cursor during screen recording (matches OpenScreen cursorHider)
+ * Hide the Windows hardware cursor during screen recording
  */
 export async function hideOsCursor() {
     if (isTauri()) {
@@ -450,17 +372,6 @@ export async function showOsCursor() {
 // ============================================================
 // GPU COMPOSITOR
 // ============================================================
-
-/**
- * Initialize GPU compositor
- */
-export async function initCompositor(width = 1920, height = 1080) {
-    if (isTauri()) {
-        const api = await getTauriApi();
-        return api.invoke('init_compositor', { width, height });
-    }
-    return 'GPU compositor not available (browser mode)';
-}
 
 // ============================================================
 // FILE SYSTEM & DIALOG
@@ -707,19 +618,11 @@ export const drift = {
     aiCompletion,
     captureScreenshot,
     // Native capture pipeline
-    startNativeCapture,
-    stopNativeCapture,
-    getRecordingStats,
     onNativeFrame,
     // MP4 export
-    exportMp4,
-    exportCompositedMp4,
     convertWebmToMp4,
-    checkFfmpeg,
     onExportProgress,
-    clearFrameBuffer,
     // GPU compositor
-    initCompositor,
     // File system & dialog
     showSaveDialog,
     saveFile,

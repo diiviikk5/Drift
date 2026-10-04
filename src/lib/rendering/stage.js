@@ -21,11 +21,11 @@ export const WALLPAPERS = {
     velvetHaze: ['#120012', '#200122', '#6f0000', '#3f0c35'],
     neonDusk: ['#2a0700', '#8e0e00', '#f12711', '#f5af19'],
     abstractFluid: ['#2a1a4a', '#654ea3', '#5b247a', '#eaafc8'],
-    bigSur: ['#1b2a5a', '#2d60b3', '#d14545', '#ebae42', '#e27b38'],
-    monterey: ['#140f3a', '#181f62', '#591e77', '#c73a4c', '#93226a'],
-    ventura: ['#1d0f3e', '#3b1c6e', '#e2385c', '#f19e38', '#e55d28'],
+    dawn: ['#1b2a5a', '#2d60b3', '#d14545', '#ebae42', '#e27b38'],
+    dusk: ['#140f3a', '#181f62', '#591e77', '#c73a4c', '#93226a'],
+    sunset: ['#1d0f3e', '#3b1c6e', '#e2385c', '#f19e38', '#e55d28'],
     bloom: ['#1b1446', '#6930c3', '#5390d9', '#48bfe3', '#4ea8de'],
-    sonoma: ['#0f1d33', '#1d3557', '#457b9d', '#a8dadc'],
+    harbor: ['#0f1d33', '#1d3557', '#457b9d', '#a8dadc'],
     emerald: ['#011a14', '#022c22', '#064e3b', '#10b981', '#059669'],
     obsidian: ['#050505', '#0a0a0c', '#121214', '#232329'],
     cyberpunk: ['#0f051d', '#3b0764', '#701a75', '#0284c7'],
@@ -43,7 +43,7 @@ const BLOB_ANCHORS = [
 
 /** CSS approximation of drawMeshBackground, for swatches in the UI. */
 export function meshCss(colors) {
-    const palette = colors && colors.length ? colors : WALLPAPERS.bigSur;
+    const palette = colors && colors.length ? colors : WALLPAPERS.dawn;
     const layers = palette.slice(1).map((color, i) => {
         const [ax, ay] = BLOB_ANCHORS[i % BLOB_ANCHORS.length];
         return `radial-gradient(circle at ${Math.round(ax * 100)}% ${Math.round(ay * 100)}%, ${rgba(color, 0.95)} 0%, ${rgba(color, 0)} 70%)`;
@@ -80,7 +80,7 @@ function mulberry32(seed) {
  * tonal base, subtle vignette). Deterministic for a given palette.
  */
 export function drawMeshBackground(ctx, width, height, colors) {
-    const palette = colors && colors.length ? colors : WALLPAPERS.bigSur;
+    const palette = colors && colors.length ? colors : WALLPAPERS.dawn;
     const long = Math.max(width, height);
 
     const base = ctx.createLinearGradient(0, 0, width, height);

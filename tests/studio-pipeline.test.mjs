@@ -1,40 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { clampFocusToScale, getFocusBoundsForScale } from '../src/lib/zoom/focusUtils.js';
-import { computeCursorSwayRotation } from '../src/lib/zoom/cursorSway.js';
+import { computeCursorSwayRotation } from '../src/lib/zoom/cursorTilt.js';
 
-test('focusUtils clamps focus strictly within visible frame boundaries', () => {
-    // At zoomScale = 2.0, half visible width is 0.5 / 2 = 0.25
-    // Margin is [0.25, 0.75]
-    const bounds = getFocusBoundsForScale(2.0);
-    assert.equal(bounds.minX, 0.25);
-    assert.equal(bounds.maxX, 0.75);
-
-    // Focus on extreme left (0.05) must clamp to minX (0.25)
-    const leftClamped = clampFocusToScale({ cx: 0.05, cy: 0.5 }, 2.0);
-    assert.equal(leftClamped.cx, 0.25);
-    assert.equal(leftClamped.cy, 0.5);
-
-    // Focus on extreme right (0.95) must clamp to maxX (0.75)
-    const rightClamped = clampFocusToScale({ cx: 0.95, cy: 0.5 }, 2.0);
-    assert.equal(rightClamped.cx, 0.75);
-
-    // At scale 1.0, focus returns neutral center (0.5, 0.5)
-    const neutral = clampFocusToScale({ cx: 0.2, cy: 0.8 }, 1.0);
-    assert.equal(neutral.cx, 0.5);
-    assert.equal(neutral.cy, 0.5);
-});
-
-test('cursorSway computes velocity-proportional directional tilt angle', () => {
-    // Stationary cursor produces zero sway
+test('cursor tilt leans into motion, scales with speed and stays bounded', () => {
     assert.equal(computeCursorSwayRotation(0, 0, 16, 1.0), 0);
-    // Sway = 0 produces zero sway
     assert.equal(computeCursorSwayRotation(10, 10, 16, 0), 0);
-
-    // Moving right and down produces positive directional rotation
-    const rot = computeCursorSwayRotation(15, 10, 16, 1.0);
-    assert.ok(rot > 0);
-    assert.ok(rot <= Math.PI / 6); // Safe organic tilt range (<= 30 deg)
+    const slow = computeCursorSwayRotation(2, 0, 16, 1.0);
+    const fast = computeCursorSwayRotation(40, 0, 16, 1.0);
+    assert.ok(slow > 0 && fast > slow);
+    assert.ok(computeCursorSwayRotation(-40, 0, 16, 1.0) < 0);
+    assert.ok(Math.abs(computeCursorSwayRotation(5000, 0, 16, 1.0)) <= (12 * Math.PI) / 180 + 1e-9);
 });
 
 test('evaluateCameraAtTime supports steady framing when trackCursor is false and dynamic tracking when enabled', async () => {

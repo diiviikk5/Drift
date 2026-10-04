@@ -126,7 +126,7 @@ export class StudioEngine {
         this.tauriReady = false;
 
         // Customizable settings
-        this.background = 'bigSur';
+        this.background = 'midnight';
         this.startPosition = 'center';
         this.trimStart = 0;
         this.trimEnd = 0;
@@ -519,7 +519,7 @@ export class StudioEngine {
     }
 
     /**
-     * Toggle automatic click-zoom generation (OpenScreen soothing style vs click zoom)
+     * Toggle automatic click-zoom generation (calm overview vs click zooms)
      */
     async setAutoZoomOnClicks(enabled) {
         this.autoZoomOnClicks = Boolean(enabled);
@@ -533,7 +533,7 @@ export class StudioEngine {
     }
 
     /**
-     * Restore pure OpenScreen-style calm overview framing (clears all auto zoom cuts)
+     * Restore calm overview framing (clears all auto zoom cuts)
      */
     resetToOverview() {
         this.focusSegments = [];
@@ -710,90 +710,6 @@ export class StudioEngine {
             click_progress: 0.0,
             motion: 0.0,
         };
-    }
-
-    // Static background definitions (created once, not per-frame)
-    static BACKGROUNDS = {
-        bigSur: {
-            type: 'radial',
-            colors: [
-                { pos: 0, color: '#ff6b9d' },
-                { pos: 0.3, color: '#c44569' },
-                { pos: 0.5, color: '#6c5ce7' },
-                { pos: 0.8, color: '#0c3483' },
-                { pos: 1, color: '#1a1a2e' }
-            ]
-        },
-        monterey: {
-            type: 'radial',
-            colors: [
-                { pos: 0, color: '#00b894' },
-                { pos: 0.25, color: '#00cec9' },
-                { pos: 0.5, color: '#0984e3' },
-                { pos: 0.8, color: '#6c5ce7' },
-                { pos: 1, color: '#2d1b4e' }
-            ]
-        },
-        ventura: {
-            type: 'diagonal',
-            colors: [
-                { pos: 0, color: '#e17055' },
-                { pos: 0.3, color: '#d63031' },
-                { pos: 0.5, color: '#fd79a8' },
-                { pos: 0.7, color: '#a855f7' },
-                { pos: 1, color: '#1e3a5f' }
-            ]
-        },
-        bloom: {
-            type: 'radial',
-            colors: [
-                { pos: 0, color: '#74b9ff' },
-                { pos: 0.3, color: '#0984e3' },
-                { pos: 0.5, color: '#6c5ce7' },
-                { pos: 0.7, color: '#a855f7' },
-                { pos: 1, color: '#1a1a2e' }
-            ]
-        },
-        sonoma: {
-            type: 'diagonal',
-            colors: [
-                { pos: 0, color: '#fdcb6e' },
-                { pos: 0.25, color: '#f39c12' },
-                { pos: 0.5, color: '#e74c3c' },
-                { pos: 0.75, color: '#9b59b6' },
-                { pos: 1, color: '#2c3e50' }
-            ]
-        },
-        midnight: {
-            type: 'radial',
-            colors: [
-                { pos: 0, color: '#2c3e50' },
-                { pos: 0.5, color: '#1a1a2e' },
-                { pos: 1, color: '#0a0a0f' }
-            ]
-        }
-    };
-
-    _getBackgroundGradient() {
-        const c = this.canvas;
-        const ctx = this.ctx;
-        const key = `${this.background}_${c.width}_${c.height}`;
-        if (this._cachedBgKey === key && this._cachedBg) return this._cachedBg;
-
-        const bgConfig = StudioEngine.BACKGROUNDS[this.background] || StudioEngine.BACKGROUNDS.bigSur;
-        let gradient;
-        if (bgConfig.type === 'radial') {
-            gradient = ctx.createRadialGradient(
-                c.width * 0.3, c.height * 0.3, 0,
-                c.width * 0.5, c.height * 0.5, c.width * 0.8
-            );
-        } else {
-            gradient = ctx.createLinearGradient(0, 0, c.width, c.height);
-        }
-        bgConfig.colors.forEach(({ pos, color }) => gradient.addColorStop(pos, color));
-        this._cachedBg = gradient;
-        this._cachedBgKey = key;
-        return gradient;
     }
 
     /**

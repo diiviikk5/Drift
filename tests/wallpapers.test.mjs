@@ -21,7 +21,7 @@ test('library has 60+ wallpapers with unique ids across the expected categories'
     assert.equal(ids.size, WALLPAPER_LIBRARY.length);
     for (const w of WALLPAPER_LIBRARY) assert.ok(WALLPAPER_CATEGORIES.includes(w.category), w.id);
     assert.ok(WALLPAPER_LIBRARY.filter(w => w.category === 'Nature').length >= 18);
-    assert.ok(WALLPAPER_LIBRARY.filter(w => w.category === 'macOS').length >= 12);
+    assert.ok(WALLPAPER_LIBRARY.filter(w => w.category === 'Flow').length >= 12);
 });
 
 test('every wallpaper renders at every aspect ratio', () => {

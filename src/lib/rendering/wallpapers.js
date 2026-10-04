@@ -4,7 +4,7 @@
  * Every wallpaper is drawn from a small spec with seeded noise, so it is
  * crisp at any resolution, composes for any aspect ratio (16:9, 9:16, 1:1,
  * 4:5) and needs no image assets. Kinds:
- *   waves     flowing layered bands (macOS-style)
+ *   waves     flowing layered bands
  *   hills     soft rolling hills under a pastel sky
  *   landscape sky, sun/moon, stars, aurora, mountain ridges, forests, water
  *   dunes     sculpted sand dunes
@@ -488,7 +488,7 @@ function drawDunes(ctx, w, h, spec) {
 
 // ---------------------------------------------------------------- library
 
-const waves = (id, name, bg, bands, extra = {}) => ({ id, name, category: 'macOS', kind: 'waves', bg, bands, ...extra });
+const waves = (id, name, bg, bands, extra = {}) => ({ id, name, category: 'Flow', kind: 'waves', bg, bands, ...extra });
 const B = (y, colors, amp, freq, phase, tilt) => ({ y, colors, amp, freq, phase, tilt });
 
 const nature = (id, name, spec) => ({ id, name, category: 'Nature', kind: 'landscape', ...spec });
@@ -498,38 +498,38 @@ const mesh = (id, name, colors, category = 'Gradients') => ({ id, name, category
 const linear = (id, name, colors, angle = 135, extra = {}) => ({ id, name, category: 'Minimal', kind: 'linear', colors, angle, ...extra });
 
 export const WALLPAPER_LIBRARY = [
-    // ---- macOS-style flowing waves
-    waves('bigSur', 'Big Sur', ['#0a1a4a', '#1b3b91'], [
+    // ---- Flowing waves
+    waves('coastline', 'Coastline', ['#0a1a4a', '#1b3b91'], [
         B(0.38, ['#3b6fe0', '#7a4ce6'], 0.07, 1.1, 0.4, -0.18),
         B(0.52, ['#e0457b', '#ff8a4c'], 0.08, 1.0, 1.9, -0.14),
         B(0.66, ['#ff7a3d', '#ffc15e'], 0.07, 1.2, 3.1, -0.10),
         B(0.80, ['#2a1660', '#120a33'], 0.06, 0.9, 4.4, -0.06),
     ], { glow: [0.75, 0.2, 0.5, '#7aa2ff'] }),
-    waves('monterey', 'Monterey', ['#140b33', '#2d1462'], [
+    waves('violetTide', 'Violet Tide', ['#140b33', '#2d1462'], [
         B(0.34, ['#5b3bd6', '#9b5cf0'], 0.08, 1.0, 0.8, -0.2),
         B(0.50, ['#c43b9e', '#f06aa8'], 0.08, 1.1, 2.2, -0.15),
         B(0.64, ['#3c6be8', '#59b8ff'], 0.07, 0.9, 3.6, -0.1),
         B(0.80, ['#1a0e45', '#0c0726'], 0.05, 1.2, 5.0, -0.05),
     ], { glow: [0.2, 0.15, 0.5, '#c084fc'] }),
-    waves('ventura', 'Ventura', ['#2a0c2e', '#5a1640'], [
+    waves('emberWave', 'Ember Wave', ['#2a0c2e', '#5a1640'], [
         B(0.36, ['#ff7b2e', '#ffb04a'], 0.09, 0.9, 0.2, -0.16),
         B(0.52, ['#e2385c', '#ff6f61'], 0.08, 1.1, 1.8, -0.12),
         B(0.67, ['#7b2ff7', '#b14aed'], 0.07, 1.0, 3.3, -0.08),
         B(0.82, ['#260b3d', '#14061f'], 0.05, 1.3, 4.7, -0.04),
     ], { glow: [0.8, 0.25, 0.45, '#ffb04a'] }),
-    waves('sequoia', 'Sequoia', ['#030b24', '#0a1f52'], [
+    waves('nightCurrent', 'Night Current', ['#030b24', '#0a1f52'], [
         B(0.40, ['#1d4ed8', '#3b82f6'], 0.09, 0.8, 1.0, 0.18),
         B(0.55, ['#dc2626', '#f97316'], 0.07, 1.0, 2.6, 0.14),
         B(0.70, ['#7c3aed', '#2563eb'], 0.07, 1.2, 4.0, 0.1),
         B(0.84, ['#0b1030', '#050816'], 0.05, 0.9, 5.4, 0.05),
     ], { glow: [0.3, 0.3, 0.5, '#3b82f6'] }),
-    waves('tahoe', 'Tahoe', ['#031a2b', '#06415c'], [
+    waves('lagoon', 'Lagoon', ['#031a2b', '#06415c'], [
         B(0.38, ['#0ea5e9', '#22d3ee'], 0.08, 1.0, 0.5, -0.15),
         B(0.54, ['#14b8a6', '#2dd4bf'], 0.07, 1.1, 2.0, -0.12),
         B(0.69, ['#2563eb', '#38bdf8'], 0.07, 0.9, 3.5, -0.08),
         B(0.84, ['#04253a', '#02121e'], 0.05, 1.2, 5.1, -0.04),
     ]),
-    waves('sonomaWaves', 'Sonoma Flow', ['#0d2a1f', '#1d5a3c'], [
+    waves('citrusFlow', 'Citrus Flow', ['#0d2a1f', '#1d5a3c'], [
         B(0.38, ['#84cc16', '#d9f99d'], 0.08, 1.0, 0.9, -0.14),
         B(0.54, ['#facc15', '#fde68a'], 0.07, 1.1, 2.4, -0.1),
         B(0.69, ['#10b981', '#34d399'], 0.07, 0.9, 3.8, -0.07),
@@ -551,7 +551,7 @@ export const WALLPAPER_LIBRARY = [
         B(0.58, ['#1f1f25', '#2b2b33'], 0.07, 1.2, 2.5, -0.1),
         B(0.74, ['#141418', '#0c0c0f'], 0.06, 0.9, 4.0, -0.06),
     ], { glow: [0.25, 0.2, 0.4, '#9ca3af'] }),
-    waves('aqua', 'Aqua', ['#0b3a6e', '#1565c0'], [
+    waves('skyRiver', 'Sky River', ['#0b3a6e', '#1565c0'], [
         B(0.38, ['#4fc3f7', '#81d4fa'], 0.08, 1.0, 0.4, -0.16),
         B(0.54, ['#29b6f6', '#00e5ff'], 0.07, 1.1, 2.0, -0.12),
         B(0.70, ['#1e88e5', '#42a5f5'], 0.07, 0.9, 3.5, -0.08),
@@ -569,8 +569,8 @@ export const WALLPAPER_LIBRARY = [
         B(0.73, ['#0f2a18', '#07140b'], 0.06, 0.9, 3.8, -0.07),
     ], { glow: [0.8, 0.25, 0.4, '#DCFE50'] }),
 
-    // ---- macOS-style rolling hills
-    { id: 'sonoma', name: 'Sonoma Hills', category: 'macOS', kind: 'hills',
+    // ---- Rolling hills
+    { id: 'vineyard', name: 'Vineyard Hills', category: 'Flow', kind: 'hills',
         sky: [[0, '#8ec5fc'], [0.55, '#c9e4ff'], [1, '#fdf6e3']], sun: [0.78, 0.22, 0.06, '#fff4c2'],
         hills: [
             { y: 0.52, colors: ['#a3c47a', '#6b9a4b'], amp: 0.05, freq: 1.1, phase: 0.3 },
@@ -578,7 +578,7 @@ export const WALLPAPER_LIBRARY = [
             { y: 0.73, colors: ['#7fb069', '#4f7f3a'], amp: 0.05, freq: 1.0, phase: 2.8 },
             { y: 0.85, colors: ['#3f6b35', '#2a4a24'], amp: 0.04, freq: 1.4, phase: 4.0 },
         ] },
-    { id: 'sonomaDusk', name: 'Sonoma Dusk', category: 'macOS', kind: 'hills',
+    { id: 'duskHills', name: 'Dusk Hills', category: 'Flow', kind: 'hills',
         sky: [[0, '#2b1b4f'], [0.5, '#8a4f9e'], [1, '#ffb07c']], sun: [0.3, 0.45, 0.07, '#ffcf8a'],
         hills: [
             { y: 0.55, colors: ['#7a4f8c', '#583a6b'], amp: 0.05, freq: 1.2, phase: 0.5 },
@@ -586,7 +586,7 @@ export const WALLPAPER_LIBRARY = [
             { y: 0.77, colors: ['#4a2f5e', '#33203f'], amp: 0.05, freq: 1.3, phase: 3.1 },
             { y: 0.88, colors: ['#24162f', '#160d1d'], amp: 0.04, freq: 1.0, phase: 4.4 },
         ] },
-    { id: 'springMeadow', name: 'Spring Meadow', category: 'macOS', kind: 'hills',
+    { id: 'springMeadow', name: 'Spring Meadow', category: 'Flow', kind: 'hills',
         sky: [[0, '#a1c4fd'], [1, '#e0f7ea']], sun: [0.2, 0.2, 0.05, '#ffffff'],
         hills: [
             { y: 0.55, colors: ['#b5e48c', '#76c893'], amp: 0.05, freq: 1.0, phase: 0.2 },
@@ -594,7 +594,7 @@ export const WALLPAPER_LIBRARY = [
             { y: 0.79, colors: ['#52b69a', '#34a0a4'], amp: 0.04, freq: 1.1, phase: 2.9 },
             { y: 0.9, colors: ['#1a759f', '#184e77'], amp: 0.03, freq: 1.4, phase: 4.1 },
         ] },
-    { id: 'lavenderHills', name: 'Lavender Hills', category: 'macOS', kind: 'hills',
+    { id: 'lavenderHills', name: 'Lavender Hills', category: 'Flow', kind: 'hills',
         sky: [[0, '#fbc2eb'], [1, '#a6c1ee']], sun: [0.72, 0.3, 0.06, '#fff0f6'],
         hills: [
             { y: 0.56, colors: ['#c7a4e8', '#a17fd1'], amp: 0.05, freq: 1.2, phase: 0.4 },
@@ -777,10 +777,21 @@ export const WALLPAPER_LIBRARY = [
 
 const LIBRARY_BY_ID = new Map(WALLPAPER_LIBRARY.map(w => [w.id, w]));
 
-export const WALLPAPER_CATEGORIES = ['macOS', 'Nature', 'Gradients', 'Minimal'];
+export const WALLPAPER_CATEGORIES = ['Flow', 'Nature', 'Gradients', 'Minimal'];
+
+// Ids used by older project files.
+const LEGACY_IDS = {
+    bigSur: 'coastline', monterey: 'violetTide', ventura: 'emberWave', sequoia: 'nightCurrent',
+    tahoe: 'lagoon', sonomaWaves: 'citrusFlow', aqua: 'skyRiver', sonoma: 'vineyard', sonomaDusk: 'duskHills',
+};
+
+/** Resolve an id (including legacy ids) to its current library id. */
+export function resolveWallpaperId(id) {
+    return LEGACY_IDS[id] || id;
+}
 
 export function getWallpaper(id) {
-    return LIBRARY_BY_ID.get(id) || null;
+    return LIBRARY_BY_ID.get(resolveWallpaperId(id)) || null;
 }
 
 /**
@@ -788,11 +799,11 @@ export function getWallpaper(id) {
  * Returns true if something was drawn.
  */
 export function drawWallpaper(ctx, width, height, id) {
-    const spec = LIBRARY_BY_ID.get(id);
+    const spec = getWallpaper(id);
     ctx.save();
     try {
         if (!spec) {
-            drawMeshBackground(ctx, width, height, WALLPAPERS[id] || WALLPAPERS.bigSur);
+            drawMeshBackground(ctx, width, height, WALLPAPERS[id] || WALLPAPERS.dawn);
         } else if (spec.kind === 'waves') {
             drawWaves(ctx, width, height, spec);
         } else if (spec.kind === 'hills') {

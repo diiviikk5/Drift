@@ -1,8 +1,6 @@
 mod commands;
-mod rendering;
 
 use commands::input::InputListenerState;
-use commands::native_capture::NativeRecorderState;
 use commands::native_recorder::NativeSessionManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -23,7 +21,6 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
         .manage(InputListenerState::default())
-        .manage(NativeRecorderState::default())
         .manage(NativeSessionManager::default())
         .setup(|app| {
             use tauri::Manager;
@@ -61,21 +58,7 @@ pub fn run() {
             commands::hotkeys::get_hotkeys,
             commands::hotkeys::set_hotkeys,
             commands::ai::ai_completion,
-            commands::native_capture::start_native_capture,
-            commands::native_capture::stop_native_capture,
-            commands::native_capture::get_recording_stats,
-            commands::native_capture::get_frame_count,
-            commands::export::export_mp4,
-            commands::export::export_composited_mp4,
-            commands::export::check_ffmpeg,
-            commands::export::clear_frame_buffer,
             commands::export::convert_webm_to_mp4,
-            commands::compositor::init_compositor,
-            commands::zoom::generate_zoom_segments,
-            commands::zoom::evaluate_zoom_at_time,
-            commands::zoom::interpolate_cursor_at_time,
-            commands::zoom::evaluate_frame,
-            commands::zoom::precompute_frames,
             commands::native_recorder::start_native_session,
             commands::native_recorder::stop_native_session,
             commands::native_recorder::get_native_session_status,

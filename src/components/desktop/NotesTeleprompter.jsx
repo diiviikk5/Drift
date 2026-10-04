@@ -17,7 +17,6 @@ import {
 
 /**
  * NotesTeleprompter — Floating Presenter Notes & Teleprompter
- * Inspired by OpenScreen's NotesWindow / notesTeleprompter architecture.
  * Allows product demo creators to paste their script and auto-scroll it while recording.
  */
 export default function NotesTeleprompter({

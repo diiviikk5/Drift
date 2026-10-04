@@ -19,7 +19,7 @@ export function autoZoomPrompt(clickEvents, duration, options = {}) {
     return [
         {
             role: 'system',
-            content: `You are a professional video editor AI for a screen recording tool called Drift. Your job is to analyze click events from a screen recording and generate optimal zoom keyframes that create smooth, cinematic camera movements — like Screen Studio or Loom.
+            content: `You are a professional video editor AI for a screen recording tool called Drift. Your job is to analyze click events from a screen recording and generate optimal zoom keyframes that create smooth, cinematic camera movements.
 
 Rules:
 - Coordinates are normalized 0-1 (x=0 is left, y=0 is top)
@@ -166,7 +166,7 @@ Available commands:
 - trim: {"action": "trim", "startTime": <ms>, "endTime": <ms>}
 - speed: {"action": "speed", "startTime": <ms>, "endTime": <ms>, "factor": <0.25-4>}
 - addCaption: {"action": "addCaption", "time": <ms>, "text": "<text>", "duration": <ms>}
-- setBackground: {"action": "setBackground", "name": "<cosmicMesh|sunsetPrism|auroraFlow|oceanBreeze|deepSpace|hyperGlow|pastelDream|velvetHaze|neonDusk|abstractFluid|midnight|neonDrift|bigSur|monterey|ventura|bloom|sonoma|emerald>"}
+- setBackground: {"action": "setBackground", "name": "<cosmicMesh|sunsetPrism|auroraFlow|oceanBreeze|deepSpace|hyperGlow|pastelDream|velvetHaze|neonDusk|abstractFluid|midnight|neonDrift|coastline|violetTide|emberWave|alpineDawn|mistyPines|auroraNight|bloom|emerald|or any wallpaper id>"}
 - setZoomLevel: {"action": "setZoomLevel", "level": <1.2-3>}
 - setSpeed: {"action": "setSpeed", "preset": "<slow|normal|fast>"}
 - clearZooms: {"action": "clearZooms"}

@@ -15,8 +15,9 @@ src/
 │   └── labs/             # Drift Labs media format conversion tools
 ├── context/              # Global React Context providers (RecordingContext)
 ├── lib/                  # Core engines, physics solvers & bridge layers
-│   ├── zoom/             # CinemaZoomEngine, CinemaCursorEngine, SpringPhysics
-│   ├── export/           # MediaExporter & WebCodecs hardware exporters
+│   ├── zoom/             # Auto-zoom planner, camera track, cursor smoothing
+│   ├── rendering/        # Compositor, stage layout, procedural wallpapers
+│   ├── export/           # Sequential WebCodecs frame source for export
 │   ├── DriftEngine.js    # Live screen recording orchestrator
 │   ├── StudioEngine.js   # Studio canvas compositor & timeline renderer
 │   └── tauri-bridge.js   # Cross-platform Tauri / Electron / Web abstraction
@@ -27,6 +28,6 @@ src/
 
 ## 🧈 Core Engines
 
-- **`CinemaZoomEngine`**: 3-layer spring-mass-damper simulation with anticipation pre-padding, attention scoring, and smooth hold-times.
-- **`CinemaCursorEngine`**: Analytical spring smoothing for high-frequency cursor telemetry (120Hz/240Hz).
-- **`StudioEngine`**: Real-time canvas compositor supporting multi-aspect framing (`16:9`, `9:16`, `1:1`, `4:3`, `4:5`, `21:9`), 12 luxury backgrounds, dynamic video blur backdrops, and WebCodecs 4K/60fps hardware MP4 export.
+- **`InteractionAnalyzer`**: plans zooms from clicks, typing and dwell, grouped into work sessions.
+- **`cameraTrack`**: simulates the whole camera path once with critically damped springs; preview and export sample the same track.
+- **`StudioEngine`**: Real-time canvas compositor supporting multi-aspect framing (`16:9`, `9:16`, `1:1`, `4:3`, `4:5`, `21:9`), 66 procedural wallpapers, dynamic video blur backdrops, and WebCodecs 4K/60fps hardware MP4 export.

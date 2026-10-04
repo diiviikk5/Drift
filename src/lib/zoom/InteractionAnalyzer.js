@@ -1,8 +1,8 @@
 /**
  * InteractionAnalyzer — automatic zoom planner.
  *
- * Decides *when* to zoom, *how much* and *where*, the way Screen Studio and
- * Cap do it, instead of zooming on every click:
+ * Decides *when* to zoom, *how much* and *where*, instead of zooming on
+ * every click:
  *
  *  1. Collect intent signals: clicks, keyboard shortcuts / navigation keys and
  *     moments where the cursor settles after a deliberate move (dwell).

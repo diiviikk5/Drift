@@ -703,7 +703,7 @@ export default function InspectorPanel({
                             <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)]">
                                 <div>
                                     <div className="text-xs font-semibold text-[var(--text-app)]">Keystroke Badges</div>
-                                    <div className="text-[10px] text-[var(--text-app-muted)]">Screen Studio style KeyCast pills</div>
+                                    <div className="text-[10px] text-[var(--text-app-muted)]">Show pressed shortcuts as on-screen badges</div>
                                 </div>
                                 <button
                                     onClick={() => onToggleKeystrokes && onToggleKeystrokes(!showKeystrokes)}
