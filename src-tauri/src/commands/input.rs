@@ -398,13 +398,16 @@ pub fn session_start_instant(state: &InputListenerState) -> Option<std::time::In
 /// Re-base the buffered session onto the video timeline: shift timestamps so
 /// t = 0 is the first captured frame, and translate global desktop
 /// coordinates into the recorded monitor's local pixel space.
-pub fn rebase_session(state: &InputListenerState, offset_ms: f64, origin: (f64, f64)) {
+/// `origin_at(t)` gives the capture target's desktop origin at telemetry time
+/// `t` (ms since telemetry start) — constant for a monitor, tracked for a window.
+pub fn rebase_session(state: &InputListenerState, offset_ms: f64, origin_at: impl Fn(f64) -> (f64, f64)) {
     {
         let mut samples = state.session_samples.lock();
         for s in samples.iter_mut() {
+            let (ox, oy) = origin_at(s.t);
             s.t -= offset_ms;
-            s.x -= origin.0;
-            s.y -= origin.1;
+            s.x -= ox;
+            s.y -= oy;
         }
         // Drop anything recorded well before the first frame.
         samples.retain(|s| s.t >= -250.0);

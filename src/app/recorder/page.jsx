@@ -9,7 +9,7 @@ import { encodeProject, decodeProject } from '@/lib/project-file';
 import { parseEditInstruction } from '@/lib/ai/nl-editor';
 import { getAIClient } from '@/lib/ai/openrouter-client';
 import { focusForCenter } from '@/lib/zoom/cameraTrack';
-import { WALLPAPER_LIBRARY } from '@/lib/rendering/wallpapers';
+import { BACKGROUNDS, DEFAULT_BACKGROUND } from '@/lib/rendering/backgrounds';
 
 // Modular Shadcn Desktop Components
 import DesktopHeader from '@/components/desktop/DesktopHeader';
@@ -23,23 +23,6 @@ import { normalizeHotkeys, formatAccelerator, matchesAccelerator } from '@/lib/h
 import AISettings from '@/app/components/settings/AISettings';
 import NotesTeleprompter from '@/components/desktop/NotesTeleprompter';
 
-// Studio Gradient Wallpapers
-const BACKGROUNDS = {
-    // Cinema Gradients (From D:\drift gradients)
-    cosmicMesh: { name: 'Cosmic Mesh', src: '/gradients/cosmic-mesh.jpg', colors: ['#4A00E0', '#8E2DE2', '#F000FF'] },
-    sunsetPrism: { name: 'Sunset Prism', src: '/gradients/sunset-prism.jpg', colors: ['#FF512F', '#DD2476', '#FF9966'] },
-    auroraFlow: { name: 'Aurora Flow', src: '/gradients/aurora-flow.jpg', colors: ['#2E0854', '#8A2BE2', '#00FFFF'] },
-    oceanBreeze: { name: 'Ocean Breeze', src: '/gradients/ocean-breeze.jpg', colors: ['#00c6ff', '#0072ff', '#1D2671'] },
-    deepSpace: { name: 'Deep Space', src: '/gradients/deep-space.jpg', colors: ['#000000', '#130CB7', '#52E5E7'] },
-    hyperGlow: { name: 'Hyper Glow', src: '/gradients/hyper-glow.jpg', colors: ['#FF0844', '#FFB199', '#7F00FF'] },
-    pastelDream: { name: 'Pastel Dream', src: '/gradients/pastel-dream.jpg', colors: ['#FFAFBD', '#C9FFBF', '#FFC3A0'] },
-    velvetHaze: { name: 'Velvet Haze', src: '/gradients/velvet-haze.jpg', colors: ['#200122', '#6f0000', '#3f0c35'] },
-    neonDusk: { name: 'Neon Dusk', src: '/gradients/neon-dusk.jpg', colors: ['#f12711', '#f5af19', '#8e0e00'] },
-    abstractFluid: { name: 'Abstract Fluid', src: '/gradients/abstract-fluid.jpg', colors: ['#654ea3', '#eaafc8', '#5b247a'] },
-
-    // Procedural library (macOS-style, nature, gradients, minimal)
-    ...Object.fromEntries(WALLPAPER_LIBRARY.map(w => [w.id, { name: w.name, category: w.category }])),
-};
 
 export default function RecorderPage() {
     // --- Refs ---
@@ -114,12 +97,13 @@ export default function RecorderPage() {
     const [duration, setDuration] = useState(0);
     const [trimStart, setTrimStart] = useState(0);
     const [trimEnd, setTrimEnd] = useState(0);
-    const [background, setBackground] = useState('midnight');
+    const [background, setBackground] = useState(DEFAULT_BACKGROUND);
     const [customImage, setCustomImage] = useState(null);
     const [zoomLevel, setZoomLevel] = useState(1.55);
     // showCursor defaults to FALSE to completely prevent double cursor!
-    const [showCursor, setShowCursor] = useState(false);
+    const [showCursor, setShowCursor] = useState(true);
     const [frameFit, setFrameFit] = useState('contain');
+    const [captureWindows, setCaptureWindows] = useState([]);
     // Screen-capture fallback recordings have the real OS cursor baked into the
     // video; a synthetic cursor on top of those shows two pointers.
     const [cursorBakedIn, setCursorBakedIn] = useState(false);
@@ -503,9 +487,23 @@ export default function RecorderPage() {
         }
     }, [aspectRatio]);
 
+    // Native window capture (records without the system cursor)
+    const loadCaptureWindows = async () => {
+        const list = await drift.listCaptureWindows();
+        setCaptureWindows(list);
+        return list;
+    };
+
+    const selectWindowMode = async () => {
+        const list = await loadCaptureWindows();
+        const keep = list.find(w => w.id === selectedSource);
+        setSelectedSource(keep ? keep.id : (list[0]?.id || 'window:'));
+    };
+
     // Source selection & live preview
     const selectSource = async (id) => {
         setSelectedSource(id);
+        if (String(id).startsWith('window:')) return;
         if (platform === 'tauri') {
             const idx = typeof id === 'number' ? id : (parseInt(String(id).replace(/\D+/g, ''), 10) || 0);
             try {
@@ -525,6 +523,7 @@ export default function RecorderPage() {
     };
 
     const handleStartPreview = async () => {
+        if (String(selectedSource || '').startsWith('window:')) return;
         if (platform === 'tauri') {
             const idx = typeof selectedSource === 'number' ? selectedSource : (parseInt(String(selectedSource || '0').replace(/\D+/g, ''), 10) || 0);
             try {
@@ -644,6 +643,11 @@ export default function RecorderPage() {
             }
         }
     };
+
+    useEffect(() => {
+        handleChangeBackground(DEFAULT_BACKGROUND);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleGenerateCaptions = async () => {
         if (!recordedBlob) return;
@@ -815,15 +819,21 @@ export default function RecorderPage() {
     const startRecordingActual = async () => {
         try {
             const isWindowTarget = selectedSource === 'browser-source';
+            const nativeWindowId = String(selectedSource || '').startsWith('window:') ? selectedSource : null;
+            if (nativeWindowId === 'window:') {
+                setNotice('Pick a window to record first');
+                return;
+            }
 
             if (isNativeSupported && drift.isTauri() && !isWindowTarget) {
                 try {
                     isNativeRecordingRef.current = true;
-                    const monitorIndex = typeof selectedSource === 'number'
+                    const monitorIndex = nativeWindowId ? 0 : typeof selectedSource === 'number'
                         ? selectedSource
                         : (parseInt(String(selectedSource || '0').replace(/\D+/g, ''), 10) || 0);
 
                     await drift.startNativeSession({
+                        windowId: nativeWindowId,
                         monitorIndex,
                         fps: 60,
                         withSystemAudio: true,
@@ -1646,11 +1656,23 @@ export default function RecorderPage() {
                     project = { recording: file, duration: mediaDuration };
                 } finally { media.removeAttribute('src'); media.load(); URL.revokeObjectURL(url); }
             }
+            // Built-in backgrounds load by id, uploads from the saved image;
+            // anything else (removed backgrounds) falls back to the default.
+            const builtIn = BACKGROUNDS[project.background];
+            const upload = !builtIn && project.customBackground && !String(project.customBackground).startsWith('/')
+                ? project.customBackground : null;
+            const bgKey = builtIn || upload ? project.background : DEFAULT_BACKGROUND;
             let image = null;
-            if (project.customBackground) {
-                image = new Image();
-                image.src = project.customBackground;
-                await image.decode();
+            const imageSrc = upload || BACKGROUNDS[bgKey]?.src;
+            if (imageSrc) {
+                try {
+                    image = new Image();
+                    image.src = imageSrc;
+                    await image.decode();
+                    if (!upload) image._bgKey = bgKey;
+                } catch {
+                    image = null;
+                }
             }
             studioRef.current?.dispose();
             studioRef.current = null;
@@ -1669,7 +1691,7 @@ export default function RecorderPage() {
             setAnnotations(project.annotations ?? []);
             setCaptions(project.captions ?? []);
             setCaptionsEnabled(project.captionsEnabled ?? true);
-            setBackground(project.background ?? 'midnight');
+            setBackground(bgKey);
             setCustomImage(image);
             setZoomLevel(project.zoomLevel ?? 1.55);
             setShowCursor(project.showCursor ?? false);
@@ -1769,6 +1791,9 @@ export default function RecorderPage() {
                             selectedSource={selectedSource}
                             onSelectSource={selectSource}
                             onSelectBrowserSource={selectBrowserSource}
+                            captureWindows={captureWindows}
+                            onSelectWindowMode={selectWindowMode}
+                            onRefreshWindows={loadCaptureWindows}
                             sourceThumbnails={sourceThumbnails}
                             loadingSources={loadingSources}
                             isRecording={isRecording}

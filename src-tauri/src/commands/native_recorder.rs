@@ -15,6 +15,72 @@ pub struct NativeSessionConfig {
     pub with_system_audio: Option<bool>,
     pub with_mic: Option<bool>,
     pub without_cursor: Option<bool>,
+    /// Record a single window ("window:<hwnd>") instead of a monitor.
+    pub window_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CaptureWindowInfo {
+    pub id: String,
+    pub title: String,
+    pub process: String,
+    pub width: i32,
+    pub height: i32,
+}
+
+/// Visible window frame in desktop pixels (left, top, width, height), without the drop shadow.
+#[cfg(windows)]
+fn window_frame_bounds(hwnd: isize) -> Option<(i32, i32, i32, i32)> {
+    use windows_sys::Win32::Foundation::RECT;
+    use windows_sys::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS};
+    let mut r = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+    let hr = unsafe {
+        DwmGetWindowAttribute(
+            hwnd as *mut std::ffi::c_void,
+            DWMWA_EXTENDED_FRAME_BOUNDS as _,
+            &mut r as *mut RECT as *mut std::ffi::c_void,
+            std::mem::size_of::<RECT>() as u32,
+        )
+    };
+    if hr != 0 || r.right <= r.left || r.bottom <= r.top {
+        return None;
+    }
+    Some((r.left, r.top, r.right - r.left, r.bottom - r.top))
+}
+
+fn parse_window_id(id: &str) -> Option<isize> {
+    id.trim_start_matches("window:").parse::<isize>().ok()
+}
+
+/// Windows that can be recorded natively (Drift's own windows excluded).
+#[command]
+pub fn list_capture_windows() -> Vec<CaptureWindowInfo> {
+    #[cfg(windows)]
+    {
+        let own_pid = std::process::id();
+        let mut out = Vec::new();
+        for w in windows_capture::window::Window::enumerate().unwrap_or_default() {
+            let title = w.title().unwrap_or_default();
+            if title.trim().is_empty() || title == "Program Manager" {
+                continue;
+            }
+            if w.process_id().map(|p| p == own_pid).unwrap_or(false) {
+                continue;
+            }
+            let hwnd = w.as_raw_hwnd() as isize;
+            let Some((_, _, width, height)) = window_frame_bounds(hwnd) else { continue };
+            if width < 120 || height < 80 {
+                continue;
+            }
+            let process = w.process_name().unwrap_or_default().trim_end_matches(".exe").to_string();
+            out.push(CaptureWindowInfo { id: format!("window:{}", hwnd), title, process, width, height });
+        }
+        out
+    }
+    #[cfg(not(windows))]
+    {
+        Vec::new()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -149,6 +215,8 @@ pub struct NativeSessionManager {
     pub mic_audio_path: Arc<Mutex<Option<PathBuf>>>,
     pub target_geometry: Arc<Mutex<(u32, u32, u32)>>, // width, height, fps
     pub monitor_origin: Arc<Mutex<(i32, i32)>>,
+    /// Window capture: the window's desktop origin over time, for cursor mapping.
+    pub origin_track: Arc<Mutex<Vec<(std::time::Instant, i32, i32)>>>,
     pub first_frame_at: Arc<Mutex<Option<std::time::Instant>>>,
     #[cfg(windows)]
     capture_control: Arc<Mutex<Option<CaptureControl<ScreenRecorderHandler, Box<dyn std::error::Error + Send + Sync>>>>>,
@@ -168,6 +236,7 @@ impl Default for NativeSessionManager {
             mic_audio_path: Arc::new(Mutex::new(None)),
             target_geometry: Arc::new(Mutex::new((1920, 1080, 60))),
             monitor_origin: Arc::new(Mutex::new((0, 0))),
+            origin_track: Arc::new(Mutex::new(Vec::new())),
             first_frame_at: Arc::new(Mutex::new(None)),
             #[cfg(windows)]
             capture_control: Arc::new(Mutex::new(None)),
@@ -238,33 +307,65 @@ pub async fn start_native_session(
         let sys_audio_path = base_dir.join("system_audio.wav");
         let mic_audio_path = base_dir.join("microphone.wav");
 
-        // 2. Resolve target monitor
-        let monitors = Monitor::enumerate()
-            .map_err(|e| format!("Failed to enumerate monitors: {:?}", e))?;
-        if monitors.is_empty() {
-            return Err("No display monitors detected for capture".to_string());
+        // 2. Resolve the capture target: a single window or a monitor
+        enum Target {
+            Monitor(Monitor),
+            Window(windows_capture::window::Window, isize),
         }
-
-        let monitor = if config.monitor_index < monitors.len() {
-            monitors[config.monitor_index].clone()
+        let window_hwnd = config.window_id.as_deref().and_then(parse_window_id);
+        let (target, natural_w, natural_h, origin) = if let Some(hwnd) = window_hwnd {
+            let (x, y, w, h) = window_frame_bounds(hwnd)
+                .ok_or_else(|| "The selected window is no longer available - pick it again".to_string())?;
+            let window = windows_capture::window::Window::from_raw_hwnd(hwnd as *mut std::ffi::c_void);
+            (Target::Window(window, hwnd), w.max(2) as u32, h.max(2) as u32, (x, y))
         } else {
-            Monitor::primary().map_err(|e| format!("Failed to acquire primary monitor: {:?}", e))?
+            let monitors = Monitor::enumerate()
+                .map_err(|e| format!("Failed to enumerate monitors: {:?}", e))?;
+            if monitors.is_empty() {
+                return Err("No display monitors detected for capture".to_string());
+            }
+            let monitor = if config.monitor_index < monitors.len() {
+                monitors[config.monitor_index].clone()
+            } else {
+                Monitor::primary().map_err(|e| format!("Failed to acquire primary monitor: {:?}", e))?
+            };
+            let (w, h) = (monitor.width().unwrap_or(1920), monitor.height().unwrap_or(1080));
+            // Same index the source picker used (xcap enumerates monitors in the same order).
+            let origin = xcap::Monitor::all()
+                .ok()
+                .and_then(|all| all.get(config.monitor_index).map(|m| (m.x(), m.y())))
+                .unwrap_or((0, 0));
+            (Target::Monitor(monitor), w, h, origin)
         };
 
-        let mut width = config.width.unwrap_or_else(|| monitor.width().unwrap_or(1920));
-        let mut height = config.height.unwrap_or_else(|| monitor.height().unwrap_or(1080));
+        let mut width = config.width.unwrap_or(natural_w);
+        let mut height = config.height.unwrap_or(natural_h);
         width = (width / 2) * 2;
         height = (height / 2) * 2;
         let fps = config.fps.unwrap_or(60).clamp(15, 120);
         let without_cursor = config.without_cursor.unwrap_or(true);
 
         *state.target_geometry.lock() = (width, height, fps);
-        // Same index the source picker used (xcap enumerates monitors in the same order).
-        let origin = xcap::Monitor::all()
-            .ok()
-            .and_then(|all| all.get(config.monitor_index).map(|m| (m.x(), m.y())))
-            .unwrap_or((0, 0));
         *state.monitor_origin.lock() = origin;
+        *state.origin_track.lock() = vec![(std::time::Instant::now(), origin.0, origin.1)];
+        if let Target::Window(_, hwnd) = &target {
+            // Follow the window if it is dragged while recording.
+            let hwnd = *hwnd;
+            let track = state.origin_track.clone();
+            let recording = state.is_recording.clone();
+            std::thread::spawn(move || {
+                let mut last = origin;
+                while recording.load(Ordering::Relaxed) {
+                    std::thread::sleep(std::time::Duration::from_millis(33));
+                    if let Some((x, y, _, _)) = window_frame_bounds(hwnd) {
+                        if (x, y) != last {
+                            last = (x, y);
+                            track.lock().push((std::time::Instant::now(), x, y));
+                        }
+                    }
+                }
+            });
+        }
         *state.first_frame_at.lock() = None;
         *state.session_id.lock() = Some(session_uuid.clone());
         *state.session_dir.lock() = Some(base_dir.clone());
@@ -410,20 +511,36 @@ pub async fn start_native_session(
             first_frame_at: state.first_frame_at.clone(),
         };
 
-        let settings = Settings::new(
-            monitor,
-            cursor_setting,
-            DrawBorderSettings::WithoutBorder,
-            SecondaryWindowSettings::Default,
-            MinimumUpdateIntervalSettings::Default,
-            DirtyRegionSettings::Default,
-            ColorFormat::Rgba8,
-            flags,
-        );
-
         *state.start_time.lock() = Some(std::time::Instant::now());
 
-        let control = match ScreenRecorderHandler::start_free_threaded(settings) {
+        let target_label = match &target {
+            Target::Window(..) => "window".to_string(),
+            Target::Monitor(_) => format!("monitor {}", config.monitor_index),
+        };
+        let started = match target {
+            Target::Monitor(monitor) => ScreenRecorderHandler::start_free_threaded(Settings::new(
+                monitor,
+                cursor_setting,
+                DrawBorderSettings::WithoutBorder,
+                SecondaryWindowSettings::Default,
+                MinimumUpdateIntervalSettings::Default,
+                DirtyRegionSettings::Default,
+                ColorFormat::Rgba8,
+                flags,
+            )),
+            Target::Window(window, _) => ScreenRecorderHandler::start_free_threaded(Settings::new(
+                window,
+                cursor_setting,
+                DrawBorderSettings::WithoutBorder,
+                SecondaryWindowSettings::Default,
+                MinimumUpdateIntervalSettings::Default,
+                DirtyRegionSettings::Default,
+                ColorFormat::Rgba8,
+                flags,
+            )),
+        };
+
+        let control = match started {
             Ok(c) => c,
             Err(e) => {
                 log::error!("[NativeRecorder] Failed to start Windows Graphics Capture: {:?}", e);
@@ -437,7 +554,7 @@ pub async fn start_native_session(
         };
 
         *state.capture_control.lock() = Some(control);
-        log::info!("[NativeRecorder] Recording monitor {} at {}x{}@{} (cursor hidden: {})", config.monitor_index, width, height, fps, without_cursor);
+        log::info!("[NativeRecorder] Recording {} at {}x{}@{} (cursor hidden: {})", target_label, width, height, fps, without_cursor);
 
         Ok(session_uuid)
     }
@@ -478,15 +595,35 @@ pub async fn stop_native_session(app: AppHandle) -> Result<NativeSessionResult, 
     };
 
     // Align telemetry with the video: t = 0 is the first encoded frame and
-    // coordinates are local to the recorded monitor.
+    // coordinates are local to the recorded monitor or window.
     let (monitor_x, monitor_y) = *state.monitor_origin.lock();
     let telemetry_offset_ms = {
         let input_state = app.state::<crate::commands::input::InputListenerState>();
-        let offset = match (first_frame, crate::commands::input::session_start_instant(&input_state)) {
+        let tele_start = crate::commands::input::session_start_instant(&input_state);
+        let offset = match (first_frame, tele_start) {
             (Some(frame), Some(tele)) if frame > tele => frame.duration_since(tele).as_secs_f64() * 1000.0,
             _ => 0.0,
         };
-        crate::commands::input::rebase_session(&input_state, offset, (monitor_x as f64, monitor_y as f64));
+        // Origin timeline in telemetry milliseconds.
+        let track: Vec<(f64, f64, f64)> = std::mem::take(&mut *state.origin_track.lock())
+            .into_iter()
+            .map(|(at, x, y)| {
+                let ms = tele_start
+                    .map(|t0| if at > t0 { at.duration_since(t0).as_secs_f64() * 1000.0 } else { 0.0 })
+                    .unwrap_or(0.0);
+                (ms, x as f64, y as f64)
+            })
+            .collect();
+        let fallback = (monitor_x as f64, monitor_y as f64);
+        crate::commands::input::rebase_session(&input_state, offset, |t| {
+            track
+                .iter()
+                .rev()
+                .find(|(ms, _, _)| *ms <= t)
+                .or(track.first())
+                .map(|&(_, x, y)| (x, y))
+                .unwrap_or(fallback)
+        });
         offset
     };
 

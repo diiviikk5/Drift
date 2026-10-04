@@ -9,8 +9,7 @@
 import { computeCursorSwayRotation } from '../zoom/cursorTilt.js';
 import { getSmoothedCursorPath } from '../zoom/cursorPathSmoothing.js';
 import { getCameraTrack, sampleCameraTrack, viewportCenter } from '../zoom/cameraTrack.js';
-import { WALLPAPERS, computeStageLayout, getGrainPattern } from './stage.js';
-import { drawWallpaper } from './wallpapers.js';
+import { WALLPAPERS, computeStageLayout, drawMeshBackground, getGrainPattern } from './stage.js';
 
 export { WALLPAPERS };
 
@@ -350,7 +349,7 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         if (customBackgroundImage && (customBackgroundImage.complete !== false)) {
             _drawCoverImage(bCtx, customBackgroundImage, 0, 0, width, height);
         } else {
-            drawWallpaper(bCtx, width, height, background);
+            drawMeshBackground(bCtx, width, height, WALLPAPERS[background] || WALLPAPERS.midnight);
         }
 
         const grain = getGrainPattern(bCtx);
@@ -679,7 +678,16 @@ function _drawCoverImage(ctx, img, x, y, w, h) {
     ctx.beginPath();
     ctx.rect(x, y, w, h);
     ctx.clip();
-    ctx.drawImage(img, offsetX, offsetY, renderW, renderH);
+    // Enlarged images get a soft blur so they read as a backdrop, not pixels.
+    if (scale > 1.3 && 'filter' in ctx) {
+        const blur = Math.min(24, (scale - 1) * 2.2 * Math.max(1, Math.min(w, h) / 1080));
+        ctx.filter = `blur(${blur.toFixed(1)}px)`;
+        const pad = blur * 2; // hide the transparent fringe the blur pulls in
+        ctx.drawImage(img, offsetX - pad, offsetY - pad, renderW + pad * 2, renderH + pad * 2);
+        ctx.filter = 'none';
+    } else {
+        ctx.drawImage(img, offsetX, offsetY, renderW, renderH);
+    }
     ctx.restore();
 }
 

@@ -5,7 +5,7 @@
 
 import { getAIClient } from './openrouter-client.js';
 import { nlEditPrompt } from './prompts.js';
-import { WALLPAPER_LIBRARY } from '../rendering/wallpapers.js';
+import { BACKGROUND_LIST } from '../rendering/backgrounds.js';
 
 /**
  * Parse a natural language editing instruction into structured commands
@@ -51,11 +51,11 @@ function parseLocally(instruction, state) {
     const lower = instruction.toLowerCase().trim();
 
     // "set background to <name>" or "use <name> background"
-    const bgNames = WALLPAPER_LIBRARY.flatMap(w => [w.id.toLowerCase(), w.name.toLowerCase()])
+    const bgNames = BACKGROUND_LIST.flatMap(w => [w.id.toLowerCase(), w.name.toLowerCase()])
         .sort((x, y) => y.length - x.length);
     const foundBg = bgNames.find(n => lower.includes(n));
     if (foundBg && (lower.includes('background') || lower.includes('wallpaper') || lower.includes('theme') || lower.includes('set') || lower.includes('use') || lower.includes('change'))) {
-        const match = WALLPAPER_LIBRARY.find(w => w.id.toLowerCase() === foundBg || w.name.toLowerCase() === foundBg);
+        const match = BACKGROUND_LIST.find(w => w.id.toLowerCase() === foundBg || w.name.toLowerCase() === foundBg);
         return [{ action: 'setBackground', name: match ? match.id : foundBg.replace(/\s+/g, '') }];
     }
 

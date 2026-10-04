@@ -166,7 +166,7 @@ Available commands:
 - trim: {"action": "trim", "startTime": <ms>, "endTime": <ms>}
 - speed: {"action": "speed", "startTime": <ms>, "endTime": <ms>, "factor": <0.25-4>}
 - addCaption: {"action": "addCaption", "time": <ms>, "text": "<text>", "duration": <ms>}
-- setBackground: {"action": "setBackground", "name": "<cosmicMesh|sunsetPrism|auroraFlow|oceanBreeze|deepSpace|hyperGlow|pastelDream|velvetHaze|neonDusk|abstractFluid|midnight|neonDrift|coastline|violetTide|emberWave|alpineDawn|mistyPines|auroraNight|bloom|emerald|or any wallpaper id>"}
+- setBackground: {"action": "setBackground", "name": "<redwoodForest|silkWave|blueHorizon|sunsetRidge|violetPeaks|fujiDusk|crimsonLayers|mistyPines|auroraLake|redSun|spectrumHills|...>"}
 - setZoomLevel: {"action": "setZoomLevel", "level": <1.2-3>}
 - setSpeed: {"action": "setSpeed", "preset": "<slow|normal|fast>"}
 - clearZooms: {"action": "clearZooms"}

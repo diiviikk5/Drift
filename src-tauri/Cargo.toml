@@ -43,6 +43,7 @@ hound = "3.5"
 windows-capture = "2.0.1"
 windows-sys = { version = "0.59", features = [
     "Win32_Foundation",
+    "Win32_Graphics_Dwm",
     "Win32_UI_WindowsAndMessaging",
 ] }
 

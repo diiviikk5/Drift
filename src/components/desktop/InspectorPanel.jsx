@@ -26,6 +26,7 @@ import {
     Gauge
 } from 'lucide-react';
 import WallpaperPicker from './WallpaperPicker';
+import { DEFAULT_BACKGROUND } from '@/lib/rendering/backgrounds';
 
 export default function InspectorPanel({
     background,
@@ -241,7 +242,6 @@ export default function InspectorPanel({
                             <WallpaperPicker
                                 background={background}
                                 customImage={customImage}
-                                photos={backgrounds}
                                 onChange={onChangeBackground}
                             />
 
@@ -249,7 +249,7 @@ export default function InspectorPanel({
                                 <div className="p-2.5 rounded-lg bg-[var(--bg-card-subtle)] border border-[var(--accent-app)] flex items-center justify-between text-xs">
                                     <span className="text-[var(--accent-app)] font-mono font-medium">Uploaded Image Active</span>
                                     <button
-                                        onClick={() => onChangeBackground('midnight')}
+                                        onClick={() => onChangeBackground(DEFAULT_BACKGROUND)}
                                         className="text-[10px] text-[var(--text-app-muted)] hover:text-red-400"
                                     >
                                         Remove

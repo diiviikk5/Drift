@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Monitor, Mic, MicOff, Timer, Camera, ExternalLink, Sparkles, Check, Play, Square, AppWindow } from 'lucide-react';
+import { Monitor, Mic, MicOff, Timer, Camera, ExternalLink, Sparkles, Check, Play, Square, AppWindow, RefreshCw } from 'lucide-react';
 import AudioLevelMeter from './AudioLevelMeter';
 import { createAudioLevelMeter } from '@/lib/audio/audioMix';
 
@@ -10,6 +10,9 @@ export default function CaptureCockpit({
     selectedSource,
     onSelectSource,
     onSelectBrowserSource,
+    captureWindows = [],
+    onSelectWindowMode = null,
+    onRefreshWindows = null,
     sourceThumbnails = {},
     loadingSources = false,
     isRecording,
@@ -57,9 +60,14 @@ export default function CaptureCockpit({
         return () => cancelAnimationFrame(frame);
     }, [micEnabled, micStream]);
 
-    const isWindowMode = selectedSource === 'browser-source';
+    const isNativeWindowMode = String(selectedSource || '').startsWith('window:');
+    const isWindowMode = selectedSource === 'browser-source' || isNativeWindowMode;
+    const nativeWindow = isNativeWindowMode ? captureWindows.find(w => w.id === selectedSource) : null;
+    const useNativeWindows = isNativeSupported && Boolean(onSelectWindowMode);
 
-    const activeSource = !isWindowMode
+    const activeSource = nativeWindow
+        ? { name: nativeWindow.title, width: nativeWindow.width, height: nativeWindow.height, is_window: true }
+        : !isWindowMode
         ? (sources.find(s => s.id === selectedSource) || sources[0] || {
             name: 'Primary Display',
             width: 1920,
@@ -118,7 +126,7 @@ export default function CaptureCockpit({
                     </button>
                     <button
                         type="button"
-                        onClick={onSelectBrowserSource}
+                        onClick={useNativeWindows ? onSelectWindowMode : onSelectBrowserSource}
                         className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                             isWindowMode
                                 ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] shadow-xs'
@@ -158,8 +166,44 @@ export default function CaptureCockpit({
                     </div>
                 )}
 
+                {/* Native window list */}
+                {isNativeWindowMode && (
+                    <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-app-muted)]">Open windows</span>
+                            {onRefreshWindows && (
+                                <button type="button" onClick={onRefreshWindows} className="flex items-center gap-1 text-[11px] text-[var(--accent-app)] hover:underline cursor-pointer">
+                                    <RefreshCw className="w-3 h-3" />
+                                    <span>Refresh</span>
+                                </button>
+                            )}
+                        </div>
+                        <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                            {captureWindows.length === 0 && (
+                                <div className="text-[11px] text-[var(--text-app-muted)] px-2 py-3 text-center">No windows found - open the app you want to record, then Refresh.</div>
+                            )}
+                            {captureWindows.map((w) => (
+                                <button
+                                    key={w.id}
+                                    type="button"
+                                    onClick={() => onSelectSource(w.id)}
+                                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-left transition-all cursor-pointer ${
+                                        selectedSource === w.id
+                                            ? 'bg-[var(--bg-card-subtle)] border-[var(--accent-app)] text-[var(--text-app)]'
+                                            : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
+                                    }`}
+                                >
+                                    <AppWindow className="w-3.5 h-3.5 flex-shrink-0 text-[var(--accent-app)]" />
+                                    <span className="text-xs truncate flex-1">{w.title}</span>
+                                    <span className="text-[10px] font-mono opacity-70 flex-shrink-0">{w.process} · {w.width}×{w.height}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* Active Window Status Banner when in window mode */}
-                {isWindowMode && (
+                {isWindowMode && !isNativeWindowMode && (
                     <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400">
                         <div className="flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -203,20 +247,20 @@ export default function CaptureCockpit({
                             </div>
                             <div>
                                 <p className="text-xs font-semibold text-[var(--text-app)]">
-                                    {isWindowMode ? (hasActiveStream ? 'Application Window Selected' : 'No Window Selected') : (activeSource.name || 'Primary Display')}
+                                    {isNativeWindowMode ? (nativeWindow ? nativeWindow.title : 'Pick a window above') : isWindowMode ? (hasActiveStream ? 'Application Window Selected' : 'No Window Selected') : (activeSource.name || 'Primary Display')}
                                 </p>
                                 <p className="text-[11px] text-[var(--text-app-muted)] font-mono mt-0.5">
-                                    {isWindowMode ? 'Capture only the chosen app or tab' : `${activeSource.width ? `${activeSource.width} × ${activeSource.height}` : '1920 × 1080'} • 60 FPS`}
+                                    {isNativeWindowMode ? 'Only this window is recorded - no system cursor' : isWindowMode ? 'Capture only the chosen app or tab' : `${activeSource.width ? `${activeSource.width} × ${activeSource.height}` : '1920 × 1080'} • 60 FPS`}
                                 </p>
                             </div>
-                            <button
+                            {!isNativeWindowMode && <button
                                 type="button"
                                 onClick={onSelectBrowserSource || onStartPreview}
                                 className="px-3.5 py-1.5 rounded-lg bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-semibold text-xs flex items-center gap-1.5 shadow-lg hover:brightness-110 active:scale-95 transition-all cursor-pointer"
                             >
                                 {isWindowMode ? <AppWindow className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
                                 <span>{isWindowMode ? 'Choose Window to Record' : 'Preview Screen'}</span>
-                            </button>
+                            </button>}
                         </div>
                     ))}
 

@@ -71,6 +71,7 @@ pub fn run() {
             commands::native_recorder::stop_native_session,
             commands::native_recorder::get_native_session_status,
             commands::native_recorder::is_native_capture_supported,
+            commands::native_recorder::list_capture_windows,
         ]);
 
     let app = builder

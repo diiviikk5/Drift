@@ -561,7 +561,22 @@ export async function isNativeCaptureSupported() {
 }
 
 /**
- * Start a native screen capture session writing directly to disk
+ * Windows that can be recorded natively: [{ id: 'window:<hwnd>', title, process, width, height }]
+ */
+export async function listCaptureWindows() {
+    if (!isTauri()) return [];
+    try {
+        const api = await getTauriApi();
+        return await api.invoke('list_capture_windows');
+    } catch (e) {
+        console.warn('[drift] Window list failed:', e);
+        return [];
+    }
+}
+
+/**
+ * Start a native screen capture session writing directly to disk.
+ * Pass `windowId` ('window:<hwnd>') to record a single window.
  */
 export async function startNativeSession(config = {}) {
     if (isTauri()) {
@@ -653,6 +668,7 @@ export const drift = {
     // Native Multi-Track Cinema Session Pipeline
     isNativeCaptureSupported,
     startNativeSession,
+    listCaptureWindows,
     stopNativeSession,
     getNativeSessionStatus,
     resolveAssetUrl,
