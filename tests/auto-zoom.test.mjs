@@ -208,3 +208,20 @@ test('click press squashes the pointer and springs back', async () => {
     assert.ok(cursorPressScale(1.07, clicks) < 0.92);
     assert.ok(Math.abs(cursorPressScale(1.5, clicks) - 1) < 1e-9);
 });
+
+test('auto zooms open on the full frame and the video ends on it', () => {
+    const segs = new InteractionAnalyzer().analyze([{ time: 400, x: 0.3, y: 0.4 }, { time: 3000, x: 0.32, y: 0.42 }], [], 6.5);
+    assert.ok(segs.length >= 1 && segs[0].auto);
+    assert.ok(evaluateCameraAtTime(0.45, segs, [], { duration: 6.5 }).scale < 1.01, 'establishing shot');
+    assert.ok(evaluateCameraAtTime(6.5, segs, [], { duration: 6.5 }).scale < 1.02, 'ends on the full frame');
+
+    // Not enough time after the last action to get out: stay on it rather
+    // than end the video mid zoom-out.
+    const late = new InteractionAnalyzer().analyze([{ time: 400, x: 0.3, y: 0.4 }, { time: 5200, x: 0.32, y: 0.42 }], [], 6.5);
+    assert.ok(evaluateCameraAtTime(6.5, late, [], { duration: 6.5 }).scale > 1.5);
+});
+
+test('a zoom placed by hand at the very start is honoured', () => {
+    const segs = [{ startTime: 0, endTime: 3, targetX: 0.4, targetY: 0.5, zoomScale: 1.6 }];
+    assert.ok(evaluateCameraAtTime(0.45, segs).scale > 1.05);
+});
