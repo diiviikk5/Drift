@@ -64,3 +64,24 @@ export function minimumJerk(u) {
     const t = u <= 0 ? 0 : u >= 1 ? 1 : u;
     return t * t * t * (10 + t * (-15 + 6 * t));
 }
+
+/**
+ * Join paths end to end into one path parameterized by total length, so a
+ * single easing runs across all of them (e.g. out to the full frame and back
+ * in, without stopping at the top).
+ */
+export function chainPaths(...paths) {
+    const lengths = paths.map(p => p.length);
+    const length = lengths.reduce((a, b) => a + b, 0);
+    return {
+        length,
+        at(s) {
+            let rest = Math.min(length, Math.max(0, s));
+            for (let i = 0; i < paths.length; i++) {
+                if (rest <= lengths[i] || i === paths.length - 1) return paths[i].at(Math.min(rest, lengths[i]));
+                rest -= lengths[i];
+            }
+            return paths[paths.length - 1].at(lengths[lengths.length - 1]);
+        },
+    };
+}
