@@ -130,10 +130,11 @@ export default function HotkeyModal({
                         const currentVal = localHotkeys[item.key] || DEFAULT_HOTKEYS[item.key];
                         const formatted = formatAccelerator(currentVal);
                         const isGlobal = isDesktopApp && GLOBAL_HOTKEY_ACTIONS.includes(item.key);
+                        const bare = isGlobal && !/(ctrl|cmd|alt|shift|super|meta|option)/i.test(currentVal);
 
                         return (
+                            <React.Fragment key={item.key}>
                             <button
-                                key={item.key}
                                 onClick={() => setCapturing(isBinding ? null : item.key)}
                                 className={`w-full flex items-center justify-between p-2.5 rounded-xl border transition-all text-left ${
                                     isBinding
@@ -159,6 +160,12 @@ export default function HotkeyModal({
                                     {isBinding ? '⏎ Press keys...' : formatted}
                                 </kbd>
                             </button>
+                            {bare && !isBinding && (
+                                <p className="text-[10px] text-amber-400 px-1 -mt-1">
+                                    Without Ctrl, Alt or Shift, {formatted} is taken in every app while Drift runs (you can't type it elsewhere).
+                                </p>
+                            )}
+                            </React.Fragment>
                         );
                     })}
                 </div>
