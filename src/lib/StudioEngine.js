@@ -101,6 +101,7 @@ export class StudioEngine {
         this.interactionAnalyzer = new InteractionAnalyzer({
             sourceWidth: initialSrcW,
             sourceHeight: initialSrcH,
+            defaultZoomScale: options.zoomLevel || DEFAULT_ZOOM_SCALE,
         });
         this.focusSegments = (options.focusSegments && options.focusSegments.length > 0)
             ? options.focusSegments
@@ -793,15 +794,20 @@ export class StudioEngine {
         this.zoomLevel = Math.max(1.0, Math.min(4.0, Number(level) || DEFAULT_ZOOM_SCALE));
         this.interactionAnalyzer.options.defaultZoomScale = this.zoomLevel;
         if (this.focusSegments && this.focusSegments.length > 0) {
+            // Auto zooms are re-planned at the new depth (keeping their variety:
+            // deeper for detail work, wider for spread-out work); manual zooms
+            // take the new level.
+            const hasAuto = this.focusSegments.some(s => s.auto);
             this.focusSegments.forEach(s => {
-                if (s.auto && Number.isFinite(s.zoomScale)) {
-                    // Auto zooms keep their fitted depth relative to the preset.
-                    const scaled = s.zoomScale * (this.zoomLevel / prevLevel);
-                    s.zoomScale = Math.round(Math.max(1.15, Math.min(this.zoomLevel, scaled)) * 100) / 100;
-                } else {
-                    s.zoomScale = this.zoomLevel;
-                }
+                if (!s.auto) s.zoomScale = this.zoomLevel;
             });
+            if (hasAuto && prevLevel !== this.zoomLevel) {
+                const dur = this.videoDuration || this.explicitDuration || 10;
+                const auto = this.interactionAnalyzer.analyze(this.clicks, this.getFocusSamples(), dur, this.keystrokes);
+                const manual = this.focusSegments.filter(s => !s.auto);
+                const kept = auto.filter(a => !manual.some(m => a.startTime < m.endTime && a.endTime > m.startTime));
+                this.focusSegments = [...manual, ...kept].sort((a, b) => a.startTime - b.startTime);
+            }
             this.zoomSegments = this.focusSegments.map(s => ({
                 start: s.startTime,
                 end: s.endTime,
