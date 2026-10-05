@@ -349,3 +349,28 @@ test('camera motion blur: several video draws while the camera moves, one when s
     assert.ok(moving > 1, `expected blur draws while moving, got ${moving}`);
     assert.equal(draws.n, 1, 'blur can be turned off');
 });
+
+test('changing the zoom preset re-plans auto zooms and keeps their variety', async () => {
+    const { StudioEngine } = await import('../src/lib/StudioEngine.js');
+    const noop = () => {};
+    const ctx = new Proxy({ canvas: { width: 1920, height: 1080 } }, {
+        get(target, key) {
+            if (key in target) return target[key];
+            if (key === 'createLinearGradient' || key === 'createRadialGradient') return () => ({ addColorStop: noop });
+            return noop;
+        },
+        set(target, key, value) { target[key] = value; return true; },
+    });
+    const canvas = { width: 1920, height: 1080, getContext: () => ctx };
+    const video = { addEventListener: noop, removeEventListener: noop, pause: noop };
+    // Tight detail work early, spread-out work later.
+    const clicks = [
+        { time: 1000, x: 0.5, y: 0.5 }, { time: 1600, x: 0.51, y: 0.5 }, { time: 2200, x: 0.5, y: 0.51 },
+        { time: 9000, x: 0.25, y: 0.5 }, { time: 9900, x: 0.62, y: 0.55 },
+    ];
+    const engine = new StudioEngine(canvas, video, null, clicks, 14, [], {});
+    engine.setZoomLevel(1.35);
+    const [tight, spread] = engine.focusSegments;
+    assert.ok(tight.zoomScale > 1.35, `detail work should go deeper than the preset, got ${tight.zoomScale}`);
+    assert.ok(spread.zoomScale <= 1.35);
+});
