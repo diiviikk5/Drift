@@ -94,10 +94,11 @@ export class InteractionAnalyzer {
 
         if (!signals.length) return [];
 
-        const sessions = this._buildSessions(signals);
+        const scrolls = this._scrollBursts(moves);
+        const sessions = this._buildSessions(signals, scrolls);
         const planned = sessions
             .filter(sess => sess.signals.some(s => s.strong))
-            .map(sess => this._planSession(sess, moves, duration));
+            .map(sess => this._planSession(sess, moves, duration, scrolls));
 
         return this._finalize(this._economize(planned), duration);
     }
@@ -117,6 +118,7 @@ export class InteractionAnalyzer {
                 x: this._normalizeX(s.cx ?? s.x ?? 0.5),
                 y: this._normalizeY(s.cy ?? s.y ?? 0.5),
                 hidden: Boolean(s.hidden),
+                scroll: Boolean(s.scroll),
             }))
             .filter(s => Number.isFinite(s.t) && Number.isFinite(s.x) && Number.isFinite(s.y))
             .sort((a, b) => a.t - b.t);
@@ -212,12 +214,30 @@ export class InteractionAnalyzer {
         return out;
     }
 
-    _buildSessions(signals) {
+    /** Scroll bursts [start, end] (seconds): wheel events less than 0.6 s apart. */
+    _scrollBursts(moves) {
+        const out = [];
+        for (const m of moves) {
+            if (!m.scroll) continue;
+            const last = out[out.length - 1];
+            if (last && m.t - last[1] <= 0.6) last[1] = m.t;
+            else out.push([m.t, m.t]);
+        }
+        return out;
+    }
+
+    _buildSessions(signals, scrolls = []) {
         const o = this.options;
         const sessions = [];
         let cur = null;
+        // Scrolling moves the whole page: what follows is a new shot.
+        const scrolledBetween = (a, b) => scrolls.some(([s]) => s > a && s < b);
 
         for (const sig of signals) {
+            if (cur && scrolledBetween(cur.lastTime, sig.time)) {
+                sessions.push(cur);
+                cur = null;
+            }
             if (cur) {
                 const gap = sig.time - cur.lastTime;
                 const minX = Math.min(cur.minX, sig.x);
@@ -244,14 +264,16 @@ export class InteractionAnalyzer {
         return sessions;
     }
 
-    _planSession(sess, moves, duration) {
+    _planSession(sess, moves, duration, scrolls = []) {
         const o = this.options;
         const strong = sess.signals.filter(s => s.strong);
         const anchors = strong.length ? strong : sess.signals;
 
         const startTime = Math.max(0, anchors[0].time - o.preRoll);
         const lastAction = sess.signals[sess.signals.length - 1].time;
-        const endTime = Math.min(duration - o.endGuard * 0.5, lastAction + o.holdAfter);
+        // Pull back once a scroll starts (the page is about to move).
+        const scrollAfter = scrolls.find(([s]) => s > lastAction);
+        const endTime = Math.min(duration - o.endGuard * 0.5, lastAction + o.holdAfter, scrollAfter ? Math.max(lastAction + 0.5, scrollAfter[0] + 0.2) : Infinity);
 
         // Activity box: action points plus where the cursor actually spent the
         // session (robust 10-90% range so a stray flick doesn't widen the zoom).
