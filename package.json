@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "clean": "npx rimraf dist out",
-    "build:tauri": "cross-env NEXT_PUBLIC_IS_DESKTOP=true TAURI_ENV_PLATFORM=windows next build",
+    "build:tauri": "cross-env NEXT_PUBLIC_IS_DESKTOP=true TAURI_ENV_PLATFORM=windows next build && node scripts/prune-desktop-bundle.mjs",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
