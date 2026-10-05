@@ -761,6 +761,8 @@ export class StudioEngine {
                 background: this.background,
                 customBackgroundImage: this.customBackgroundImage,
                 frameRate: this._renderFps || 60,
+                // Live preview uses a lighter blur so playback stays smooth.
+                motionBlurSamples: this._renderFps ? 8 : 4,
                 insetPadding: this.insetPadding ?? 0.08,
                 borderRadius: this.borderRadius ?? 18,
                 windowChrome: this.windowChrome !== false,

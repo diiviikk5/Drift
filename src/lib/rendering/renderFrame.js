@@ -412,7 +412,7 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         const travel = Math.hypot((camera.x - prev.x) * contentW, (camera.y - prev.y) * contentH) * camera.scale
             + Math.abs(camera.scale - prev.scale) * Math.max(contentW, contentH) * 0.5;
         if (travel > 1.5) {
-            const n = Math.min(8, Math.ceil(travel / 2));
+            const n = Math.min(renderSettings.motionBlurSamples ?? 8, Math.ceil(travel / 2));
             for (let i = 0; i < n; i++) {
                 const k = (i + 1) / n;
                 blurSamples.push({
