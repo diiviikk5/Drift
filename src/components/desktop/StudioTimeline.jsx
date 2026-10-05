@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef } from 'react';
-import { Play, Pause, ZoomIn, ArrowUpRight, Square, Type, Gauge } from 'lucide-react';
+import { Play, Pause, ZoomIn, ArrowUpRight, Square, Type, Gauge, Plus, X, Scissors } from 'lucide-react';
 
 export default function StudioTimeline({
     isPlaying,
@@ -59,12 +59,13 @@ export default function StudioTimeline({
         window.addEventListener('mouseup', onMouseUp);
     };
 
+    // m:ss.d (tabular), e.g. 0:02.3 or 12:04.0
     const formatTime = (s) => {
-        if (!s || isNaN(s)) return '00:00.0';
-        const m = Math.floor(s / 60).toString().padStart(2, '0');
+        if (!s || isNaN(s)) return '0:00.0';
+        const m = Math.floor(s / 60);
         const sec = Math.floor(s % 60).toString().padStart(2, '0');
-        const ms = Math.floor((s % 1) * 10);
-        return `${m}:${sec}.${ms}`;
+        const tenth = Math.floor((s % 1) * 10);
+        return `${m}:${sec}.${tenth}`;
     };
 
     const handleTrackClick = (e) => {
@@ -79,102 +80,93 @@ export default function StudioTimeline({
     const effectiveTrimEnd = (trimEnd > 0 && trimEnd <= duration) ? trimEnd : duration;
 
     return (
-        <div className="bg-[var(--bg-card)] border-t border-[var(--border-app)] p-4 select-none flex-shrink-0 space-y-3 transition-colors">
-            {/* Top Bar: Controls & Zoom Tools */}
-            <div className="flex items-center justify-between">
-                {/* Transport Buttons */}
-                <div className="flex items-center gap-3">
+        <div className="bg-[var(--bg-card)] border-t border-[var(--border-app)] px-4 py-3 select-none flex-shrink-0 space-y-3">
+            {/* Top bar: transport, trim, annotations, zoom */}
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
                     <button
                         onClick={onTogglePlay}
-                        className="w-9 h-9 rounded-xl bg-[var(--accent-app)] text-[var(--accent-app-fg)] hover:opacity-90 flex items-center justify-center shadow-sm transition-all font-bold"
+                        className="w-9 h-9 rounded-full bg-[var(--accent-app)] text-[var(--accent-app-fg)] hover:brightness-105 flex items-center justify-center"
                         title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+                        aria-label={isPlaying ? 'Pause' : 'Play'}
                     >
                         {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
                     </button>
 
-                    {/* Timecode */}
-                    <div className="flex items-center gap-1.5 font-mono text-xs bg-[var(--bg-card-subtle)] px-3 py-1.5 rounded-lg border border-[var(--border-app)]">
-                        <span className="font-bold text-[var(--text-app)]">{formatTime(currentTime)}</span>
-                        <span className="text-[var(--text-app-muted)]">/</span>
-                        <span className="text-[var(--text-app-muted)]">{formatTime(duration)}</span>
+                    <div className="font-mono text-[13px] px-1">
+                        <span className="text-[var(--text-app)]">{formatTime(currentTime)}</span>
+                        <span className="text-[var(--text-app-faint)]"> / {formatTime(duration)}</span>
                     </div>
 
-                    {/* Timeline Range In/Out Trim */}
-                    <div className="flex items-center bg-[var(--bg-card-subtle)] border border-[var(--border-app)] rounded-lg p-0.5 gap-1 text-[11px] font-mono">
+                    <div className="flex items-center h-8 rounded-lg bg-[var(--bg-card-subtle)] border border-[var(--border-app)] p-0.5 text-xs">
+                        <span className="flex items-center gap-1 px-2 text-[var(--text-app-muted)]">
+                            <Scissors className="w-3.5 h-3.5" />
+                            Trim
+                        </span>
                         <button
                             onClick={() => onChangeTrimStart && onChangeTrimStart(currentTime)}
-                            className="px-2 py-1 rounded-md text-[var(--text-app-muted)] hover:text-[var(--accent-app)] hover:bg-[var(--bg-card)] transition-all font-semibold"
-                            title="Set In-Point / Trim Start at current playhead"
+                            className="h-full px-2 rounded-md text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:bg-[var(--bg-card)] transition-colors"
+                            title="Start the video at the playhead"
                         >
-                            [ In ({formatTime(trimStart)})
+                            Start <span className="font-mono text-[var(--text-app)]">{formatTime(trimStart)}</span>
                         </button>
                         <button
                             onClick={() => onChangeTrimEnd && onChangeTrimEnd(currentTime)}
-                            className="px-2 py-1 rounded-md text-[var(--text-app-muted)] hover:text-[var(--accent-app)] hover:bg-[var(--bg-card)] transition-all font-semibold"
-                            title="Set Out-Point / Trim End at current playhead"
+                            className="h-full px-2 rounded-md text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:bg-[var(--bg-card)] transition-colors"
+                            title="End the video at the playhead"
                         >
-                            ] Out ({formatTime(effectiveTrimEnd)})
+                            End <span className="font-mono text-[var(--text-app)]">{formatTime(effectiveTrimEnd)}</span>
                         </button>
                         {(trimStart > 0 || (trimEnd > 0 && trimEnd < duration)) && (
                             <button
                                 onClick={() => {
-                                    if (onChangeTrimStart) onChangeTrimStart(0);
-                                    if (onChangeTrimEnd) onChangeTrimEnd(duration);
+                                    onChangeTrimStart?.(0);
+                                    onChangeTrimEnd?.(duration);
                                 }}
-                                className="px-1.5 py-1 text-red-400 hover:text-red-300 transition-colors"
-                                title="Reset Trim Range"
+                                className="h-full px-1.5 rounded-md text-[var(--text-app-muted)] hover:text-red-500 transition-colors"
+                                title="Clear trim"
+                                aria-label="Clear trim"
                             >
-                                Reset
+                                <X className="w-3.5 h-3.5" />
                             </button>
                         )}
                     </div>
                 </div>
 
-                {/* Keyframe Badges, Annotation Tools & Actions */}
                 <div className="flex items-center gap-2">
-                    {/* Annotation Presets */}
-                    <div className="flex items-center bg-[var(--bg-card-subtle)] border border-[var(--border-app)] rounded-lg p-0.5 gap-0.5">
-                        <button
-                            onClick={() => onAddAnnotation && onAddAnnotation('arrow')}
-                            className="p-1.5 rounded-md text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:bg-[var(--bg-card)] transition-all"
-                            title="Add Directional Arrow"
-                        >
-                            <ArrowUpRight className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                            onClick={() => onAddAnnotation && onAddAnnotation('rect')}
-                            className="p-1.5 rounded-md text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:bg-[var(--bg-card)] transition-all"
-                            title="Add Box Highlight"
-                        >
-                            <Square className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                            onClick={() => onAddAnnotation && onAddAnnotation('text')}
-                            className="p-1.5 rounded-md text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:bg-[var(--bg-card)] transition-all"
-                            title="Add Text Callout"
-                        >
-                            <Type className="w-3.5 h-3.5" />
-                        </button>
+                    <div className="flex items-center h-8 rounded-lg bg-[var(--bg-card-subtle)] border border-[var(--border-app)] p-0.5 gap-0.5">
+                        {[
+                            { kind: 'arrow', Icon: ArrowUpRight, title: 'Add an arrow' },
+                            { kind: 'rect', Icon: Square, title: 'Add a highlight box' },
+                            { kind: 'text', Icon: Type, title: 'Add a text callout' },
+                        ].map(({ kind, Icon, title }) => (
+                            <button
+                                key={kind}
+                                onClick={() => onAddAnnotation && onAddAnnotation(kind)}
+                                className="h-full px-1.5 rounded-md text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:bg-[var(--bg-card)] transition-colors"
+                                title={title}
+                                aria-label={title}
+                            >
+                                <Icon className="w-3.5 h-3.5" />
+                            </button>
+                        ))}
                     </div>
 
-                    {/* Global Zoom Construct Presets */}
-                    <div className="flex items-center bg-[var(--bg-card-subtle)] border border-[var(--border-app)] rounded-lg p-0.5 gap-0.5 text-[11px] font-mono">
+                    <div className="flex items-center h-8 rounded-lg bg-[var(--pill-bg)] border border-[var(--border-app)] p-0.5 gap-0.5 text-xs" title="How close auto-zoom gets">
                         {[
-                            { id: 'subtle', scale: 1.35, label: 'Subtle 1.35×' },
-                            { id: 'cinema', scale: 1.55, label: 'Cinema 1.55×' },
-                            { id: 'focus', scale: 1.85, label: 'Focus 1.85×' },
+                            { id: 'subtle', scale: 1.35, label: 'Subtle' },
+                            { id: 'cinema', scale: 1.55, label: 'Balanced' },
+                            { id: 'focus', scale: 1.85, label: 'Close' },
                         ].map((preset) => {
                             const isCurrent = Math.abs((zoomLevel || 1.55) - preset.scale) < 0.05;
                             return (
                                 <button
                                     key={preset.id}
                                     onClick={() => onChangeZoomLevel && onChangeZoomLevel(preset.scale)}
-                                    className={`px-2 py-1 rounded-md transition-all font-semibold ${
-                                        isCurrent
-                                            ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] shadow-xs font-bold'
-                                            : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:bg-[var(--bg-card)]'
+                                    className={`h-full px-2.5 rounded-md font-medium transition-colors ${
+                                        isCurrent ? 'bg-[var(--pill-active-bg)] text-[var(--pill-active-fg)] shadow-sm' : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
                                     }`}
-                                    title={`Set global recording zoom depth to ${preset.label}`}
+                                    title={`${preset.label} zoom (${preset.scale}×)`}
                                 >
                                     {preset.label}
                                 </button>
@@ -182,23 +174,25 @@ export default function StudioTimeline({
                         })}
                     </div>
 
-                    <div className="flex items-center gap-1.5 text-xs text-[var(--text-app-muted)] bg-[var(--bg-card-subtle)] px-2.5 py-1.5 rounded-lg border border-[var(--border-app)]">
-                        <ZoomIn className="w-3.5 h-3.5 text-[var(--accent-app)]" />
-                        <span className="font-mono font-bold text-[var(--text-app)]">{focusSegments?.length || clicks.length}</span>
-                        <span>{focusSegments?.length ? 'Focus Tracks' : 'Zooms'}</span>
-                    </div>
+                    <span className="flex items-center gap-1.5 h-8 px-2 text-xs text-[var(--text-app-muted)]">
+                        <ZoomIn className="w-3.5 h-3.5" />
+                        {focusSegments?.length || 0} {(focusSegments?.length || 0) === 1 ? 'zoom' : 'zooms'}
+                    </span>
 
                     <button
                         onClick={onAddZoom}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-app)] text-[var(--accent-app-fg)] hover:opacity-90 text-xs font-bold transition-all shadow-xs"
+                        className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[var(--accent-app)] text-[var(--accent-app-fg)] hover:brightness-105 text-xs font-medium"
+                        title="Add a zoom at the playhead"
                     >
-                        <span>+ Zoom Point</span>
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add zoom</span>
                     </button>
 
-                    {clicks.length > 0 && (
+                    {(focusSegments?.length > 0 || clicks.length > 0) && (
                         <button
                             onClick={onClearZooms}
-                            className="text-xs text-[var(--text-app-muted)] hover:text-red-500 transition-colors px-1"
+                            className="h-8 px-2 rounded-lg text-xs text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:bg-[var(--bg-card-subtle)] transition-colors"
+                            title="Re-plan zooms automatically"
                         >
                             Reset
                         </button>
@@ -211,7 +205,7 @@ export default function StudioTimeline({
                 <div className="flex items-center justify-between p-2 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--accent-app)] text-xs animate-fadeIn">
                     {/* Scene Mode Selector */}
                     <div className="flex items-center gap-1.5 border-r border-[var(--border-app)] pr-2.5">
-                        <span className="font-mono font-bold text-[var(--accent-app)] text-[10px] uppercase">
+                        <span className="text-[var(--accent-app)] text-xs font-medium">
                             Scene:
                         </span>
                         <div className="flex gap-1">
@@ -225,7 +219,7 @@ export default function StudioTimeline({
                                 <button
                                     key={mode.id}
                                     onClick={() => onUpdateSegment && onUpdateSegment(selectedSeg.id, { sceneMode: mode.id })}
-                                    className={`px-2 py-0.5 rounded-md font-mono text-[10px] transition-all ${
+                                    className={`px-2 py-0.5 rounded-md font-mono text-[11px] transition-all ${
                                         (selectedSeg.sceneMode || 'focus') === mode.id
                                             ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold shadow-xs'
                                             : 'bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
@@ -238,7 +232,7 @@ export default function StudioTimeline({
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 font-mono font-bold text-[var(--accent-app)] text-[10px] uppercase">
+                        <div className="flex items-center gap-1 text-[var(--accent-app)] text-xs font-medium">
                             <Gauge className="w-3 h-3" />
                             <span>Segment Speed:</span>
                         </div>
@@ -247,7 +241,7 @@ export default function StudioTimeline({
                                 <button
                                     key={spd}
                                     onClick={() => onUpdateSegment && onUpdateSegment(selectedSeg.id, { speed: spd })}
-                                    className={`px-2 py-0.5 rounded-md font-mono text-[10px] transition-all ${
+                                    className={`px-2 py-0.5 rounded-md font-mono text-[11px] transition-all ${
                                         (selectedSeg.speed || 1.0) === spd
                                             ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold shadow-xs'
                                             : 'bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
@@ -262,7 +256,7 @@ export default function StudioTimeline({
                     <button
                         onClick={() => onUpdateSegment && onUpdateSegment(selectedSeg.id, { followCursor: selectedSeg.followCursor === false })}
                         title="When on, the camera calmly follows the cursor inside this zoom. When off, it holds the chosen framing."
-                        className={`px-2 py-0.5 rounded-md font-mono text-[10px] transition-all ${
+                        className={`px-2 py-0.5 rounded-md font-mono text-[11px] transition-all ${
                             selectedSeg.followCursor !== false
                                 ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold'
                                 : 'bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
@@ -272,7 +266,7 @@ export default function StudioTimeline({
                     </button>
 
                     <div className="flex items-center gap-2">
-                        <span className="font-mono text-[10px] text-[var(--text-app-muted)]">
+                        <span className="font-mono text-[11px] text-[var(--text-app-muted)]">
                             Depth:
                         </span>
                         <div className="flex gap-1">
@@ -285,7 +279,7 @@ export default function StudioTimeline({
                                 <button
                                     key={z}
                                     onClick={() => onUpdateSegment && onUpdateSegment(selectedSeg.id, { zoomScale: z })}
-                                    className={`px-2 py-0.5 rounded-md font-mono text-[10px] transition-all ${
+                                    className={`px-2 py-0.5 rounded-md font-mono text-[11px] transition-all ${
                                         Math.abs((selectedSeg.zoomScale || 1.55) - z) < 0.05
                                             ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold'
                                             : 'bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
@@ -314,7 +308,7 @@ export default function StudioTimeline({
                                         });
                                     }
                                 }}
-                                className="px-2 py-0.5 bg-[var(--accent-app)]/20 text-[var(--accent-app)] hover:bg-[var(--accent-app)] hover:text-[var(--accent-app-fg)] rounded text-[10px] font-mono font-bold transition-all flex items-center gap-1"
+                                className="px-2 py-0.5 bg-[var(--accent-app)]/20 text-[var(--accent-app)] hover:bg-[var(--accent-app)] hover:text-[var(--accent-app-fg)] rounded text-[11px] font-mono font-bold transition-all flex items-center gap-1"
                                 title="Split segment into two at current playhead"
                             >
                                 <span>✂ Split</span>
@@ -334,7 +328,7 @@ export default function StudioTimeline({
                                     });
                                 }
                             }}
-                            className="px-1.5 py-0.5 bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)] rounded text-[10px] font-mono"
+                            className="px-1.5 py-0.5 bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)] rounded text-[11px] font-mono"
                             title="Duplicate this segment at playhead"
                         >
                             + Copy
@@ -344,7 +338,7 @@ export default function StudioTimeline({
                                 const newStart = Math.max(0, selectedSeg.startTime - 0.5);
                                 onUpdateSegment && onUpdateSegment(selectedSeg.id, { startTime: newStart });
                             }}
-                            className="px-1.5 py-0.5 bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)] rounded text-[10px] font-mono"
+                            className="px-1.5 py-0.5 bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)] rounded text-[11px] font-mono"
                             title="Expand start by 0.5s"
                         >
                             -0.5s
@@ -354,14 +348,14 @@ export default function StudioTimeline({
                                 const newEnd = Math.min(duration, selectedSeg.endTime + 0.5);
                                 onUpdateSegment && onUpdateSegment(selectedSeg.id, { endTime: newEnd });
                             }}
-                            className="px-1.5 py-0.5 bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)] rounded text-[10px] font-mono"
+                            className="px-1.5 py-0.5 bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)] rounded text-[11px] font-mono"
                             title="Extend end by 0.5s"
                         >
                             +0.5s
                         </button>
                         <button
                             onClick={() => onDeleteSegment && onDeleteSegment(selectedSeg.id)}
-                            className="text-[10px] text-red-400 hover:text-red-300 font-mono ml-1 font-semibold"
+                            className="text-[11px] text-red-400 hover:text-red-300 font-mono ml-1 font-semibold"
                         >
                             Delete
                         </button>
@@ -458,7 +452,7 @@ export default function StudioTimeline({
                                 <div className="w-0.5 h-3 bg-white/70 rounded-full" />
                             </div>
 
-                            <span className="text-[9px] font-mono font-bold truncate select-none flex items-center gap-1 pl-1">
+                            <span className="text-[11px] font-mono font-bold truncate select-none flex items-center gap-1 pl-1">
                                 {seg.sceneMode === 'spotlight' ? '🎙️ Spotlight' :
                                  seg.sceneMode === 'overview' ? '🖥️ Overview' :
                                  seg.sceneMode === 'speed' ? `⏩ ${seg.speed || 2}x Speed` :
