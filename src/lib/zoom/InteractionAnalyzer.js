@@ -1,24 +1,25 @@
 /**
- * InteractionAnalyzer — automatic zoom planner.
+ * InteractionAnalyzer — automatic zoom planner (the "editor").
  *
  * Decides *when* to zoom, *how much* and *where*, instead of zooming on
  * every click:
  *
- *  1. Collect intent signals: clicks, keyboard shortcuts / navigation keys and
- *     moments where the cursor settles after a deliberate move (dwell).
+ *  1. Collect intent signals: clicks, keyboard shortcuts / navigation keys,
+ *     typing bursts and moments where the cursor settles after a deliberate
+ *     move (dwell). Actions off the recorded screen are ignored.
  *  2. Group signals into work sessions. A session continues while signals keep
  *     arriving (gap below `idleGap`) and stay in an area that still fits a
- *     zoomed viewport. A spatial jump starts a new session that the camera
- *     pans to; a long pause lets the camera return to the full frame.
- *  3. Each session gets a zoom depth that fits everything that happened in it
- *     (deeper for tight work like a form field, shallower when the work spans
- *     a panel) and a focus at the weighted centre of that activity.
- *  4. Sessions separated by a short gap are bridged so the camera never
- *     zooms out and straight back in (no yo-yo); tiny sessions are dropped.
+ *     zoomed viewport.
+ *  3. Each session gets a depth (the preset for ordinary work, deeper for
+ *     sustained detail work, shallower when spread out) and a focus at the
+ *     weighted centre of that activity.
+ *  4. Shot economy: quick neighbours merge into a wider shot, bursts of quick
+ *     hops across the screen stay on the full frame, and shots that couldn't
+ *     be watched for a moment are skipped.
  *
- * Segments are emitted in the studio's focus-segment format. The camera track
- * (cameraTrack.js) zooms in from `startTime`, follows the cursor calmly while
- * the segment is active and zooms out after `endTime`.
+ * Segments are emitted in the studio's focus-segment format with the time of
+ * their first and last action. The camera (cameraTrack.js) plans the actual
+ * moves: it lands on the first action, holds, and reframes only when needed.
  */
 
 import { DEFAULT_ZOOM_SCALE } from './ZoomConstruct.js';
