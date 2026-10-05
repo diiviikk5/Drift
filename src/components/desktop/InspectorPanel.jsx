@@ -109,7 +109,7 @@ export default function InspectorPanel({
         { id: '9:16', label: '9:16', desc: 'Vertical (TikTok, Shorts)' },
         { id: '1:1', label: '1:1', desc: 'Square (LinkedIn, Feed)' },
         { id: '4:5', label: '4:5', desc: 'Portrait (Instagram)' },
-        { id: 'native', label: 'Fit Video', desc: 'Native Dimensions' },
+        { id: 'native', label: 'Original', desc: 'Keep the recording size' },
     ];
 
     const handleFileChange = (e) => {
@@ -136,31 +136,31 @@ export default function InspectorPanel({
     };
 
     return (
-        <aside className="w-80 flex-shrink-0 border-l border-[var(--border-app)] bg-[var(--bg-card)] flex flex-col h-full select-none transition-colors">
+        <aside className="w-80 flex-shrink-0 border-l border-[var(--border-app)] bg-[var(--bg-card)] flex flex-col h-full select-none">
             {/* Tab Bar */}
-            <div className="flex border-b border-[var(--border-app)] bg-[var(--bg-card-subtle)] p-1 overflow-x-auto">
+            <div className="grid grid-cols-6 gap-0.5 p-1.5 border-b border-[var(--border-app)]">
                 {[
                     { id: 'style', label: 'Canvas', icon: Palette },
                     { id: 'camera', label: 'Zoom', icon: Camera },
                     { id: 'cursor', label: 'Cursor', icon: MousePointer },
                     { id: 'audio', label: 'Audio', icon: Volume2 },
-                    { id: 'webcam', label: 'Webcam', icon: Video },
-                    { id: 'ai', label: 'AI Studio', icon: Sparkles },
+                    { id: 'webcam', label: 'Camera', icon: Video },
+                    { id: 'ai', label: 'AI', icon: Sparkles },
                 ].map((tab) => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
-
                     return (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex-1 py-1.5 px-2 text-[11px] font-medium flex items-center justify-center gap-1.5 rounded-md transition-all whitespace-nowrap ${
+                            title={tab.label}
+                            className={`flex flex-col items-center gap-1 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
                                 isActive
-                                    ? 'bg-[var(--bg-card)] text-[var(--text-app)] shadow-xs font-bold'
-                                    : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
+                                    ? 'bg-[var(--accent-soft)] text-[var(--text-app)]'
+                                    : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:bg-[var(--bg-card-subtle)]'
                             }`}
                         >
-                            <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                            <Icon className="w-4 h-4" />
                             <span>{tab.label}</span>
                         </button>
                     );
@@ -174,8 +174,8 @@ export default function InspectorPanel({
                     <>
                         {/* Aspect Ratio */}
                         <div className="space-y-2">
-                            <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
-                                Framing Aspect Ratio
+                            <label className="text-xs text-[var(--text-app-muted)] font-medium">
+                                Aspect ratio
                             </label>
                             <div className="grid grid-cols-2 gap-1.5">
                                 {aspectRatios.map((item) => (
@@ -188,8 +188,8 @@ export default function InspectorPanel({
                                                 : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
                                         }`}
                                     >
-                                        <div className="font-mono text-xs">{item.id}</div>
-                                        <div className="text-[10px] opacity-75">{item.desc}</div>
+                                        <div className={`text-[13px] ${item.id === 'native' ? '' : 'font-mono'}`}>{item.label}</div>
+                                        <div className="text-[11px] opacity-75">{item.desc}</div>
                                     </button>
                                 ))}
                             </div>
@@ -209,8 +209,8 @@ export default function InspectorPanel({
                                                     : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
                                             }`}
                                         >
-                                            <div className="font-mono text-xs">{opt.label}</div>
-                                            <div className="text-[10px] opacity-75">{opt.desc}</div>
+                                            <div className="text-[13px]">{opt.label}</div>
+                                            <div className="text-[11px] opacity-75">{opt.desc}</div>
                                         </button>
                                     ))}
                                 </div>
@@ -220,8 +220,8 @@ export default function InspectorPanel({
                         {/* Wallpapers */}
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                                <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
-                                    Studio Wallpaper
+                                <label className="text-xs text-[var(--text-app-muted)] font-medium">
+                                    Background
                                 </label>
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
@@ -250,7 +250,7 @@ export default function InspectorPanel({
                                     <span className="text-[var(--accent-app)] font-mono font-medium">Uploaded Image Active</span>
                                     <button
                                         onClick={() => onChangeBackground(DEFAULT_BACKGROUND)}
-                                        className="text-[10px] text-[var(--text-app-muted)] hover:text-red-400"
+                                        className="text-[11px] text-[var(--text-app-muted)] hover:text-red-400"
                                     >
                                         Remove
                                     </button>
@@ -260,8 +260,8 @@ export default function InspectorPanel({
 
                         {/* Framing & Presentation Presets */}
                         <div className="space-y-2 pt-2 border-t border-[var(--border-app)]">
-                            <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
-                                Framing & Presentation
+                            <label className="text-xs text-[var(--text-app-muted)] font-medium">
+                                Layout
                             </label>
                             <div className="grid grid-cols-3 gap-1.5">
                                 <button
@@ -283,7 +283,7 @@ export default function InspectorPanel({
                                 >
                                     <Square className="w-3.5 h-3.5 text-[var(--accent-app)]" />
                                     <span>Full Frame</span>
-                                    <span className="text-[9px] text-[var(--text-app-muted)]">Edge-to-edge</span>
+                                    <span className="text-[11px] text-[var(--text-app-muted)]">Edge-to-edge</span>
                                 </button>
 
                                 <button
@@ -305,7 +305,7 @@ export default function InspectorPanel({
                                 >
                                     <RectangleHorizontal className="w-3.5 h-3.5 text-[var(--accent-app)]" />
                                     <span>Studio</span>
-                                    <span className="text-[9px] text-[var(--text-app-muted)]">Floating canvas</span>
+                                    <span className="text-[11px] text-[var(--text-app-muted)]">Floating canvas</span>
                                 </button>
 
                                 <button
@@ -327,7 +327,7 @@ export default function InspectorPanel({
                                 >
                                     <AppWindow className="w-3.5 h-3.5 text-[var(--accent-app)]" />
                                     <span>Mockup</span>
-                                    <span className="text-[9px] text-[var(--text-app-muted)]">Titlebar dots</span>
+                                    <span className="text-[11px] text-[var(--text-app-muted)]">Titlebar dots</span>
                                 </button>
                             </div>
                         </div>
@@ -335,8 +335,8 @@ export default function InspectorPanel({
                         {/* Canvas Inset / Padding */}
                         <div className="space-y-2 pt-2 border-t border-[var(--border-app)]">
                             <div className="flex items-center justify-between">
-                                <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
-                                    Canvas Margin (Padding)
+                                <label className="text-xs text-[var(--text-app-muted)] font-medium">
+                                    Padding
                                 </label>
                                 <span className="text-xs font-mono font-bold text-[var(--accent-app)]">{Math.round(insetPadding * 100)}%</span>
                             </div>
@@ -349,7 +349,7 @@ export default function InspectorPanel({
                                 onChange={(e) => onChangeInsetPadding && onChangeInsetPadding(parseFloat(e.target.value))}
                                 className="w-full accent-[var(--accent-app)] cursor-pointer"
                             />
-                            <div className="flex justify-between text-[10px] text-[var(--text-app-muted)] font-mono">
+                            <div className="flex justify-between text-[11px] text-[var(--text-app-muted)] font-mono">
                                 <span>0% (Flush)</span>
                                 <span>8% (Studio)</span>
                                 <span>16% (Wide)</span>
@@ -359,8 +359,8 @@ export default function InspectorPanel({
                         {/* Corner Radius & Window Header */}
                         <div className="space-y-3 pt-2 border-t border-[var(--border-app)]">
                             <div className="flex items-center justify-between">
-                                <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
-                                    Window Rounding
+                                <label className="text-xs text-[var(--text-app-muted)] font-medium">
+                                    Corner radius
                                 </label>
                                 <span className="text-xs font-mono font-bold text-[var(--accent-app)]">{borderRadius}px</span>
                             </div>
@@ -373,7 +373,7 @@ export default function InspectorPanel({
                                 onChange={(e) => onChangeBorderRadius && onChangeBorderRadius(parseInt(e.target.value))}
                                 className="w-full accent-[var(--accent-app)] cursor-pointer"
                             />
-                            <div className="flex justify-between text-[10px] text-[var(--text-app-muted)] font-mono">
+                            <div className="flex justify-between text-[11px] text-[var(--text-app-muted)] font-mono">
                                 <span>0px (Sharp)</span>
                                 <span>18px (Modern)</span>
                                 <span>32px (Soft)</span>
@@ -382,7 +382,7 @@ export default function InspectorPanel({
                             <div className="flex items-center justify-between pt-1">
                                 <div>
                                     <div className="text-xs font-semibold text-[var(--text-app)]">Window Title Bar</div>
-                                    <div className="text-[10px] text-[var(--text-app-muted)]">Show macOS style header chrome with traffic lights</div>
+                                    <div className="text-[11px] text-[var(--text-app-muted)]">Show macOS style header chrome with traffic lights</div>
                                 </div>
                                 <button
                                     onClick={() => onToggleWindowChrome && onToggleWindowChrome(!windowChrome)}
@@ -405,14 +405,14 @@ export default function InspectorPanel({
 
                         {/* Global Core Zoom Construct Presets */}
                         <div className="space-y-2">
-                            <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
-                                Zoom Construct Depth
+                            <label className="text-xs text-[var(--text-app-muted)] font-medium">
+                                Zoom depth
                             </label>
                             <div className="grid grid-cols-3 gap-1.5">
                                 {[
-                                    { id: 'subtle', scale: 1.35, label: 'Subtle', desc: '1.35× • Lil Zoom' },
-                                    { id: 'cinema', scale: 1.55, label: 'Cinema', desc: '1.55× • Balanced' },
-                                    { id: 'focus', scale: 1.85, label: 'Focus', desc: '1.85× • Detail' },
+                                    { id: 'subtle', scale: 1.35, label: 'Subtle', desc: 'More context' },
+                                    { id: 'cinema', scale: 1.55, label: 'Balanced', desc: 'Recommended' },
+                                    { id: 'focus', scale: 1.85, label: 'Close', desc: 'Small details' },
                                 ].map((preset) => {
                                     const isSelected = Math.abs((zoomLevel || 1.55) - preset.scale) < 0.05;
                                     return (
@@ -426,7 +426,7 @@ export default function InspectorPanel({
                                             }`}
                                         >
                                             <span className="text-xs font-semibold">{preset.label}</span>
-                                            <span className="text-[9px] opacity-80 font-mono">{preset.desc}</span>
+                                            <span className="text-[11px] opacity-80 font-mono">{preset.desc}</span>
                                         </button>
                                     );
                                 })}
@@ -436,8 +436,8 @@ export default function InspectorPanel({
                         {/* Fine-Tune Slider */}
                         <div className="space-y-2 pt-1">
                             <div className="flex items-center justify-between">
-                                <span className="text-[10px] text-[var(--text-app-muted)] font-mono">
-                                    Fine-Tune Depth
+                                <span className="text-[11px] text-[var(--text-app-muted)] font-mono">
+                                    Fine-tune
                                 </span>
                                 <span className="text-xs font-mono font-bold text-[var(--accent-app)]">{(zoomLevel || 1.55).toFixed(2)}×</span>
                             </div>
@@ -450,7 +450,7 @@ export default function InspectorPanel({
                                 onChange={(e) => onChangeZoomLevel(parseFloat(e.target.value))}
                                 className="w-full accent-[var(--accent-app)] cursor-pointer"
                             />
-                            <div className="flex justify-between text-[10px] text-[var(--text-app-muted)] font-mono">
+                            <div className="flex justify-between text-[11px] text-[var(--text-app-muted)] font-mono">
                                 <span>1.15× (Overview)</span>
                                 <span>1.55× (Cinema)</span>
                                 <span>2.80× (Deep)</span>
@@ -459,8 +459,8 @@ export default function InspectorPanel({
 
                         {/* Motion Presets */}
                         <div className="space-y-2">
-                            <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
-                                Spring Easing Profile
+                            <label className="text-xs text-[var(--text-app-muted)] font-medium">
+                                Camera pace
                             </label>
                             <div className="grid grid-cols-3 gap-1">
                                 {[
@@ -486,7 +486,7 @@ export default function InspectorPanel({
                         {/* Recording Tempo & Pacing (Cinema Aesthetic Slowness) */}
                         <div className="space-y-2 pt-2 border-t border-[var(--border-app)]">
                             <div className="flex items-center justify-between">
-                                <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono flex items-center gap-1.5">
+                                <label className="text-xs text-[var(--text-app-muted)] flex items-center gap-1.5 font-medium">
                                     <Gauge className="w-3.5 h-3.5 text-[var(--accent-app)]" />
                                     <span>Pacing & Tempo</span>
                                 </label>
@@ -497,9 +497,9 @@ export default function InspectorPanel({
 
                             <div className="grid grid-cols-3 gap-1.5">
                                 {[
-                                    { speed: 1.00, label: 'Realtime', desc: '1.00× • Exact 1:1' },
-                                    { speed: 1.10, label: 'Brisk', desc: '1.10× • Tighter' },
-                                    { speed: 1.25, label: 'Fast', desc: '1.25× • Long demos' },
+                                    { speed: 1.00, label: 'Normal', desc: '1×' },
+                                    { speed: 1.10, label: 'Brisk', desc: '1.1×' },
+                                    { speed: 1.25, label: 'Fast', desc: '1.25×' },
                                 ].map((p) => {
                                     const isSelected = Math.abs((playbackSpeed || 1) - p.speed) < 0.02;
                                     return (
@@ -513,7 +513,7 @@ export default function InspectorPanel({
                                             }`}
                                         >
                                             <span className="text-xs font-semibold">{p.label}</span>
-                                            <span className="text-[9px] opacity-80 font-mono">{p.desc}</span>
+                                            <span className="text-[11px] opacity-80 font-mono">{p.desc}</span>
                                         </button>
                                     );
                                 })}
@@ -528,7 +528,7 @@ export default function InspectorPanel({
                                 onChange={(e) => onChangePlaybackSpeed && onChangePlaybackSpeed(parseFloat(e.target.value))}
                                 className="w-full accent-[var(--accent-app)] cursor-pointer"
                             />
-                            <div className="flex justify-between text-[10px] text-[var(--text-app-muted)] font-mono">
+                            <div className="flex justify-between text-[11px] text-[var(--text-app-muted)] font-mono">
                                 <span>0.75× (Relaxed)</span>
                                 <span>1.00× (Realtime)</span>
                                 <span>1.25× (Brisk)</span>
@@ -540,7 +540,7 @@ export default function InspectorPanel({
                             <div className="flex items-center justify-between">
                                 <div>
                                     <div className="text-xs font-semibold text-[var(--text-app)]">Smart Auto-Zoom</div>
-                                    <div className="text-[10px] text-[var(--text-app-muted)]">Zooms into where you work, follows calmly, zooms out when idle</div>
+                                    <div className="text-[11px] text-[var(--text-app-muted)]">Zooms into where you work, follows calmly, zooms out when idle</div>
                                 </div>
                                 <button
                                     onClick={() => onToggleAutoZoomOnClicks && onToggleAutoZoomOnClicks(!autoZoomOnClicks)}
@@ -561,7 +561,7 @@ export default function InspectorPanel({
                             <div className="flex items-center justify-between">
                                 <div>
                                     <div className="text-xs font-semibold text-[var(--text-app)]">Connected Zooms</div>
-                                    <div className="text-[10px] text-[var(--text-app-muted)]">Pan between nearby zooms instead of zooming out and back in</div>
+                                    <div className="text-[11px] text-[var(--text-app-muted)]">Pan between nearby zooms instead of zooming out and back in</div>
                                 </div>
                                 <button
                                     onClick={() => onToggleConnectedZooms && onToggleConnectedZooms(!connectedZooms)}
@@ -579,7 +579,7 @@ export default function InspectorPanel({
                         {/* 3D Isometric Perspective Tilt */}
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                                <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
+                                <label className="text-xs text-[var(--text-app-muted)] font-medium">
                                     3D Perspective Tilt
                                 </label>
                                 <span className="text-xs font-mono font-bold text-[var(--accent-app)]">
@@ -595,7 +595,7 @@ export default function InspectorPanel({
                                 onChange={(e) => onChangeTiltAngle && onChangeTiltAngle(parseFloat(e.target.value))}
                                 className="w-full accent-[var(--accent-app)] cursor-pointer"
                             />
-                            <div className="flex justify-between text-[10px] text-[var(--text-app-muted)] font-mono">
+                            <div className="flex justify-between text-[11px] text-[var(--text-app-muted)] font-mono">
                                 <span>0° (Flat)</span>
                                 <span>3.5° (Cinema)</span>
                                 <span>8° (High Tilt)</span>
@@ -611,7 +611,7 @@ export default function InspectorPanel({
                             <div className="flex items-center justify-between">
                                 <div>
                                     <div className="text-xs font-semibold text-[var(--text-app)]">Synthetic Cursor Overlay</div>
-                                    <div className="text-[10px] text-[var(--text-app-muted)]">
+                                    <div className="text-[11px] text-[var(--text-app-muted)]">
                                         {cursorBakedIn
                                             ? 'This recording already contains the system cursor'
                                             : 'Smooth, resizable pointer drawn over the recording'}
@@ -633,8 +633,8 @@ export default function InspectorPanel({
 
                             {/* Cursor Themes */}
                             <div className="space-y-2">
-                                <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
-                                    Cursor Style Theme
+                                <label className="text-xs text-[var(--text-app-muted)] font-medium">
+                                    Pointer style
                                 </label>
                                 <div className="grid grid-cols-3 gap-1">
                                     {[
@@ -663,8 +663,8 @@ export default function InspectorPanel({
                             {/* Cursor Scale */}
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
-                                    <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
-                                        Pointer Size
+                                    <label className="text-xs text-[var(--text-app-muted)] font-medium">
+                                        Pointer size
                                     </label>
                                     <span className="text-xs font-mono font-bold text-[var(--accent-app)]">
                                         {(cursorScale || 1.0).toFixed(1)}×
@@ -685,7 +685,7 @@ export default function InspectorPanel({
                             <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)]">
                                 <div>
                                     <div className="text-xs font-semibold text-[var(--text-app)]">Smooth Movement</div>
-                                    <div className="text-[10px] text-[var(--text-app-muted)]">Removes hand jitter without lag</div>
+                                    <div className="text-[11px] text-[var(--text-app-muted)]">Removes hand jitter without lag</div>
                                 </div>
                                 <button
                                     onClick={() => onToggleSplineSmoothing && onToggleSplineSmoothing(!splineSmoothing)}
@@ -703,7 +703,7 @@ export default function InspectorPanel({
                             <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)]">
                                 <div>
                                     <div className="text-xs font-semibold text-[var(--text-app)]">Keystroke Badges</div>
-                                    <div className="text-[10px] text-[var(--text-app-muted)]">Show pressed shortcuts as on-screen badges</div>
+                                    <div className="text-[11px] text-[var(--text-app-muted)]">Show pressed shortcuts as on-screen badges</div>
                                 </div>
                                 <button
                                     onClick={() => onToggleKeystrokes && onToggleKeystrokes(!showKeystrokes)}
@@ -744,7 +744,7 @@ export default function InspectorPanel({
                                     </button>
                                     <div>
                                         <div className="text-xs font-semibold text-[var(--text-app)]">Desktop Audio</div>
-                                        <div className="text-[10px] text-[var(--text-app-muted)]">WASAPI Loopback</div>
+                                        <div className="text-[11px] text-[var(--text-app-muted)]">WASAPI Loopback</div>
                                     </div>
                                 </div>
                                 <span className="font-mono text-xs font-bold text-[var(--accent-app)]">
@@ -780,7 +780,7 @@ export default function InspectorPanel({
                                     </button>
                                     <div>
                                         <div className="text-xs font-semibold text-[var(--text-app)]">Microphone Voice</div>
-                                        <div className="text-[10px] text-[var(--text-app-muted)]">Voice Narration</div>
+                                        <div className="text-[11px] text-[var(--text-app-muted)]">Voice Narration</div>
                                     </div>
                                 </div>
                                 <span className="font-mono text-xs font-bold text-[var(--accent-app)]">
@@ -803,7 +803,7 @@ export default function InspectorPanel({
                         <div className="flex items-center justify-between p-3.5 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)]">
                             <div>
                                 <div className="text-xs font-semibold text-[var(--text-app)]">Smart Voice Ducking</div>
-                                <div className="text-[10px] text-[var(--text-app-muted)] leading-tight mt-0.5">
+                                <div className="text-[11px] text-[var(--text-app-muted)] leading-tight mt-0.5">
                                     Auto-dip desktop volume 70% during speech
                                 </div>
                             </div>
@@ -837,7 +837,7 @@ export default function InspectorPanel({
                         <div className="flex items-center justify-between">
                             <div>
                                 <div className="text-xs font-semibold text-[var(--text-app)]">Webcam Overlay (PiP)</div>
-                                <div className="text-[10px] text-[var(--text-app-muted)]">Show facecam in preview & export</div>
+                                <div className="text-[11px] text-[var(--text-app-muted)]">Show facecam in preview & export</div>
                             </div>
                             <button
                                 onClick={() => onChangeWebcamSettings && onChangeWebcamSettings({ enabled: !webcamSettings?.enabled })}
@@ -853,8 +853,8 @@ export default function InspectorPanel({
 
                         {/* Shape Selector */}
                         <div className="space-y-2">
-                            <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
-                                PiP Shape
+                            <label className="text-xs text-[var(--text-app-muted)] font-medium">
+                                Bubble shape
                             </label>
                             <div className="grid grid-cols-4 gap-1">
                                 {[
@@ -876,7 +876,7 @@ export default function InspectorPanel({
                                             }`}
                                         >
                                             <Icon className="w-4 h-4" />
-                                            <span className="text-[10px]">{s.label}</span>
+                                            <span className="text-[11px]">{s.label}</span>
                                         </button>
                                     );
                                 })}
@@ -885,16 +885,16 @@ export default function InspectorPanel({
 
                         {/* Position Selector */}
                         <div className="space-y-2">
-                            <label className="text-[11px] font-semibold text-[var(--text-app-muted)] uppercase tracking-wider font-mono">
-                                Corner Position
+                            <label className="text-xs text-[var(--text-app-muted)] font-medium">
+                                Position
                             </label>
                             <div className="grid grid-cols-2 gap-1.5">
                                 {[
-                                    { id: 'top-left', label: 'Top-Left' },
-                                    { id: 'top-right', label: 'Top-Right' },
-                                    { id: 'bottom-left', label: 'Bottom-Left' },
-                                    { id: 'bottom-right', label: 'Bottom-Right' },
-                                    { id: 'center', label: '🎙️ Center Spotlight (Intro/Outro)', colSpan: true },
+                                    { id: 'top-left', label: 'Top left' },
+                                    { id: 'top-right', label: 'Top right' },
+                                    { id: 'bottom-left', label: 'Bottom left' },
+                                    { id: 'bottom-right', label: 'Bottom right' },
+                                    { id: 'center', label: 'Center (intro or outro)', colSpan: true },
                                 ].map((p) => {
                                     const isSel = (webcamSettings?.position || 'bottom-right') === p.id;
                                     return (
@@ -935,7 +935,7 @@ export default function InspectorPanel({
                         <div className="pt-2 border-t border-[var(--border-app)] flex items-center justify-between">
                             <div>
                                 <div className="text-xs font-semibold text-[var(--text-app)]">Reactive Zoom Scaling</div>
-                                <div className="text-[10px] text-[var(--text-app-muted)]">Auto-shrink facecam during deep zooms so UI is visible</div>
+                                <div className="text-[11px] text-[var(--text-app-muted)]">Auto-shrink facecam during deep zooms so UI is visible</div>
                             </div>
                             <button
                                 onClick={() => onToggleReactiveWebcam && onToggleReactiveWebcam(!reactiveWebcam)}
@@ -953,7 +953,7 @@ export default function InspectorPanel({
                         <div className="flex items-center justify-between">
                             <div>
                                 <div className="text-xs font-semibold text-[var(--text-app)]">Full Camera Mode</div>
-                                <div className="text-[10px] text-[var(--text-app-muted)]">Presenter fills entire viewport (intro / outro speech)</div>
+                                <div className="text-[11px] text-[var(--text-app-muted)]">Presenter fills entire viewport (intro / outro speech)</div>
                             </div>
                             <button
                                 onClick={() => onChangeWebcamSettings && onChangeWebcamSettings({ fullCamera: !webcamSettings?.fullCamera })}
@@ -978,7 +978,7 @@ export default function InspectorPanel({
                                 <div className="flex items-center gap-2">
                                     <Subtitles className="w-4 h-4 text-[var(--accent-app)]" />
                                     <span className="text-xs font-semibold text-[var(--text-app)]">
-                                        On-Device Captions
+                                        Captions
                                     </span>
                                 </div>
                                 <button
@@ -1013,7 +1013,7 @@ export default function InspectorPanel({
                                 <div className="flex items-center gap-2">
                                     <Sparkles className="w-4 h-4 text-[var(--accent-app)]" />
                                     <span className="text-xs font-semibold text-[var(--text-app)]">
-                                        AI Editing Assistant
+                                        AI editing
                                     </span>
                                 </div>
                                 {onOpenAISettings && (
@@ -1062,7 +1062,7 @@ export default function InspectorPanel({
                 <button
                     onClick={onTriggerExport}
                     disabled={isExporting}
-                    className="w-full py-3 rounded-xl bg-[var(--accent-app)] text-[var(--accent-app-fg)] hover:opacity-90 font-bold text-xs uppercase tracking-wide shadow-sm transition-all flex items-center justify-center gap-2"
+                    className="w-full py-3 rounded-xl bg-[var(--accent-app)] text-[var(--accent-app-fg)] hover:opacity-90 text-xs shadow-sm transition-all flex items-center justify-center gap-2 font-medium"
                 >
                     <Download className="w-3.5 h-3.5" />
                     <span>{isExporting ? 'Exporting...' : 'Export Video'}</span>
