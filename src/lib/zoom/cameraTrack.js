@@ -1,46 +1,67 @@
 /**
- * cameraTrack — precomputed, physically smoothed camera path.
+ * cameraTrack — the planned camera path for a recording.
  *
- * Instead of evaluating the camera statelessly every frame (which forces hard
- * snaps whenever the cursor crosses a deadzone edge), the whole recording is
- * simulated once at a fixed rate with critically damped springs. Preview and
- * export sample the same track, so they are frame-identical, and seeking is a
- * constant-time lookup.
+ * The whole recording is known up front, so the camera is planned like an
+ * edit rather than driven like a chase cam:
  *
- * Camera model
- *   focus (fx, fy) — the point of interest, in normalized source coordinates.
- *   scale s        — zoom factor (1 = full frame).
- *   The visible viewport centre is c = f - (f - 0.5) / s, i.e. "zoom into f":
- *   the focus point stays at its natural screen position while the frame grows
- *   around it. For any f in [0, 1] and s >= 1 the viewport never leaves the
- *   source frame, so no clamping (and no clamp-induced kinks) is needed.
+ *  1. Shots. Every focus segment is a shot: a framing (centre + zoom) that is
+ *     held. Between shots the camera either moves straight to the next one
+ *     (short gap) or returns to the full frame (long gap).
+ *  2. Moves. Each move follows the smooth zoom-and-pan path (smoothZoomPath)
+ *     and its duration grows with how big the move *feels*, so a far move is
+ *     slower, never faster. Moves are eased with minimum jerk and never
+ *     overlap; a move always starts from rest.
+ *  3. Reframes. While a shot is held the camera stays still. Only when the
+ *     cursor is about to leave the comfortable middle of the frame does it
+ *     glide once to cover where the cursor is heading (we know the future),
+ *     widening the shot a little if the work no longer fits. Reframes are
+ *     rate limited, so busy clicking never turns into a busy camera.
+ *  4. A light zero-phase smoothing pass rounds off the joins between moves.
+ *
+ * Preview and export sample the same precomputed track (120 Hz), so they are
+ * frame-identical and seeking is constant time.
+ *
+ * Coordinates: normalized source space. Scale s >= 1; the visible window is
+ * 1/s wide (per axis also divided by the fill-crop factor k).
  */
 
 import { DEFAULT_ZOOM_SCALE } from './ZoomConstruct.js';
-import { getHoldGapMs } from './cursorPathSmoothing.js';
+import { smoothZoomPath, minimumJerk } from './smoothZoomPath.js';
 
 export const TRACK_HZ = 120;
-const FOLLOW_LOOKAHEAD = 0.3; // seconds
 
 const NON_ZOOM_SCENES = new Set(['overview', 'spotlight', 'full-camera']);
 
 /**
- * Angular frequencies (rad/s) for critically damped springs. A critically
- * damped spring reaches ~95% of a step in 4.74 / omega seconds.
+ * Motion tuning. Durations are in seconds; `perUnit` converts the perceived
+ * size of a move (smooth-path length) into extra time.
  */
-export const CAMERA_PROFILES = Object.freeze({
-    cinematic: { zoomIn: 5.2, zoomOut: 3.9, pan: 3.6, follow: 3.0 },
-    natural: { zoomIn: 6.6, zoomOut: 5.0, pan: 4.6, follow: 3.8 },
-    gentle: { zoomIn: 6.6, zoomOut: 5.0, pan: 4.6, follow: 3.8 },
-    snappy: { zoomIn: 11.0, zoomOut: 8.5, pan: 8.0, follow: 6.0 },
-    punchy: { zoomIn: 11.0, zoomOut: 8.5, pan: 8.0, follow: 6.0 },
+export const CAMERA_MOTION = Object.freeze({
+    rho: 1.25,              // willingness to pull back while panning
+    minMove: 0.95,          // shortest camera move
+    maxMove: 2.6,           // longest camera move
+    baseMove: 0.75,
+    perUnit: 1.15,
+    zoomOutFactor: 1.2,     // returning to the full frame is a touch slower
+    minOverviewRest: 0.9,   // only zoom out if we can rest at overview this long
+    minHold: 0.8,           // a reframe holds at least this long before the next
+    safeZone: 0.68,         // fraction of the half-window the cursor may roam freely
+    anticipate: 0.35,       // look this far ahead when deciding to reframe
+    urgentAnticipate: 0.9,  // ...and this far for "about to leave the frame"
+    lookahead: 1.6,         // reframes frame the cursor's next N seconds of work
+    minReframeShift: 0.04,  // ignore reframes smaller than this (normalized)
+    minWidenScale: 1.18,    // a reframe may widen the shot down to this zoom
+    smoothTau: 0.06,        // final rounding of joins (seconds)
 });
 
-export function resolveCameraProfile(name) {
-    return CAMERA_PROFILES[name] || CAMERA_PROFILES.cinematic;
+/** Overall pace of the camera; 1 = default. */
+const PACE = Object.freeze({ cinematic: 1, gentle: 1.15, natural: 0.9, snappy: 0.72, punchy: 0.72 });
+
+export function resolveCameraPace(name) {
+    return PACE[name] ?? 1;
 }
 
-/** Viewport centre for a focus point at a given scale (see header). */
+/** Viewport centre for a focus point at a given scale ("zoom into f"). */
 export function viewportCenter(focus, scale) {
     const s = scale > 1 ? scale : 1;
     return focus - (focus - 0.5) / s;
@@ -72,26 +93,13 @@ function sampleY(s) {
 }
 
 /**
- * Advance a critically damped spring by dt (closed form, unconditionally stable).
- * Returns [position, velocity].
- */
-function springStep(x, v, target, omega, dt) {
-    const d = x - target;
-    const e = Math.exp(-omega * dt);
-    const c = v + omega * d;
-    const nx = target + (d + c * dt) * e;
-    const nv = (v - omega * c * dt) * e;
-    return [nx, nv];
-}
-
-/**
  * Cheap signature so the cached track is rebuilt whenever anything that
  * affects it changes (segments are edited in place by the studio UI).
  */
 export function cameraTrackSignature(segments, samples, options = {}) {
     let sig = `${options.springProfile || 'cinematic'}|${options.zoomMultiplier ?? 1}|${options.connectedZooms !== false}|${options.trackCursor !== false}|${options.duration ?? ''}|${options.cropKx ?? 1}|${options.cropKy ?? 1}|`;
     for (const s of segments || []) {
-        sig += `${s.startTime},${s.endTime},${s.targetX},${s.targetY},${s.zoomScale},${s.sceneMode || ''},${s.followCursor === false ? 0 : 1};`;
+        sig += `${s.startTime},${s.endTime},${s.actionTime ?? ''},${s.targetX},${s.targetY},${s.zoomScale},${s.sceneMode || ''},${s.followCursor === false ? 0 : 1};`;
     }
     const n = samples ? samples.length : 0;
     if (n > 0) {
@@ -100,22 +108,57 @@ export function cameraTrackSignature(segments, samples, options = {}) {
     return sig;
 }
 
+/** Cursor lookup over sorted samples (holds still through gaps, like the recorder). */
+function makeCursorLookup(cursor) {
+    const times = new Float64Array(cursor.length);
+    for (let i = 0; i < cursor.length; i++) times[i] = sampleTimeMs(cursor[i]) / 1000;
+    const index = (t) => {
+        let lo = 0;
+        let hi = times.length - 1;
+        if (hi < 0 || t < times[0]) return -1;
+        while (lo < hi) {
+            const mid = (lo + hi + 1) >> 1;
+            if (times[mid] <= t) lo = mid; else hi = mid - 1;
+        }
+        return lo;
+    };
+    return {
+        times,
+        at(t) {
+            if (!cursor.length) return null;
+            const i = Math.max(0, index(t));
+            return { x: sampleX(cursor[i]), y: sampleY(cursor[i]) };
+        },
+        /** Samples (and clicks) in [t0, t1]. */
+        range(t0, t1) {
+            if (!cursor.length) return [];
+            const out = [];
+            let i = Math.max(0, index(t0));
+            for (; i < cursor.length && times[i] <= t1; i++) out.push(cursor[i]);
+            return out;
+        },
+    };
+}
+
+/** One framing: centre (x, y) and scale s. */
+function framing(x, y, s) {
+    return { x, y, s };
+}
+
 /**
  * Build the camera track.
  *
  * @param {Array} segments focus segments ({startTime, endTime, targetX, targetY, zoomScale, sceneMode, followCursor})
  * @param {Array} samples cursor samples ({time(ms), x, y} normalized)
  * @param {Object} options
- * @returns {{hz:number, start:number, frames:number, fx:Float32Array, fy:Float32Array, s:Float32Array, seg:Int32Array, segments:Array}}
+ * @returns {{hz:number, frames:number, fx:Float32Array, fy:Float32Array, s:Float32Array, seg:Int32Array, segments:Array, moves:Array}}
  */
 export function buildCameraTrack(segments = [], samples = [], options = {}) {
-    const profile = resolveCameraProfile(options.springProfile);
+    const M = CAMERA_MOTION;
+    const pace = resolveCameraPace(options.springProfile);
     const zoomMultiplier = options.zoomMultiplier ?? 1;
     const connected = options.connectedZooms !== false;
     const trackCursor = options.trackCursor !== false;
-    const chainGap = options.chainGapSec ?? 1.6;
-    // Fill-mode crop factors (>1 on an axis means the frame shows only part of
-    // the source on that axis even when unzoomed, so the camera must reframe).
     const kx = Math.max(1, options.cropKx ?? 1);
     const ky = Math.max(1, options.cropKy ?? 1);
     const cropped = kx > 1.001 || ky > 1.001;
@@ -127,215 +170,233 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
 
     const cursor = (samples || []).filter(s => Number.isFinite(sampleTimeMs(s)));
     cursor.sort((a, b) => sampleTimeMs(a) - sampleTimeMs(b));
+    const look = makeCursorLookup(cursor);
 
     const lastSegEnd = sorted.length ? sorted[sorted.length - 1].endTime : 0;
     const lastSample = cursor.length ? sampleTimeMs(cursor[cursor.length - 1]) / 1000 : 0;
     const end = Math.max(options.duration ?? 0, lastSegEnd + 3, lastSample + 0.5, 1);
 
+    // --- framing helpers --------------------------------------------------
+    const halfX = (s) => 0.5 / (s * kx);
+    const halfY = (s) => 0.5 / (s * ky);
+    const fit = (f) => framing(clamp(f.x, halfX(f.s), 1 - halfX(f.s)), clamp(f.y, halfY(f.s), 1 - halfY(f.s)), f.s);
+
+    const segScale = (seg) => {
+        if (!seg || NON_ZOOM_SCENES.has(seg.sceneMode)) return 1;
+        return Math.max(1, (seg.zoomScale ?? DEFAULT_ZOOM_SCALE) * zoomMultiplier);
+    };
+    const segFraming = (seg) => {
+        const s = segScale(seg);
+        const tx = clamp(seg.targetX ?? 0.5, 0, 1);
+        const ty = clamp(seg.targetY ?? 0.5, 0, 1);
+        if (s <= 1.001) return fit(framing(cropped ? tx : 0.5, cropped ? ty : 0.5, 1));
+        return fit(framing(viewportCenter(tx, s * kx), viewportCenter(ty, s * ky), s));
+    };
+    const overview = (near) => fit(framing(cropped && near ? near.x : 0.5, cropped && near ? near.y : 0.5, 1));
+    const zoomed = (f) => f.s > 1.001;
+
+    // Perceived size of a move -> duration.
+    const pathFor = (a, b) => smoothZoomPath(
+        { x: a.x, y: a.y, w: 1 / a.s },
+        { x: b.x, y: b.y, w: 1 / b.s },
+        M.rho,
+    );
+    const moveDuration = (a, b, slower = 1) => {
+        const len = pathFor(a, b).length;
+        return clamp(M.baseMove + M.perUnit * len, M.minMove, M.maxMove) * slower * pace;
+    };
+
+    // --- plan ------------------------------------------------------------
+    const moves = [];  // { t0, d, from, to }
+    let state = cropped ? overview(look.at(0)) : overview();
+    const initial = state;
+    let free = 0;      // time the camera is free to start its next move
+
+    const emit = (t0, to, slower = 1) => {
+        const from = state;
+        const dest = fit(to);
+        if (Math.abs(dest.x - from.x) < 1e-4 && Math.abs(dest.y - from.y) < 1e-4 && Math.abs(dest.s - from.s) < 1e-4) {
+            return t0;
+        }
+        const start = Math.max(t0, free);
+        const d = moveDuration(from, dest, slower);
+        moves.push({ t0: start, d, from, to: dest });
+        state = dest;
+        free = start + d;
+        return free;
+    };
+
+    // Start a move into a shot so it is ~90% there at the shot's first
+    // action (manual segments without one simply start at startTime).
+    const arrivalStart = (seg, target) => {
+        if (!Number.isFinite(seg.actionTime)) return seg.startTime;
+        const d = moveDuration(state, fit(target));
+        return Math.max(0, Math.min(seg.startTime, seg.actionTime - d * 0.72));
+    };
+
+    // Cursor positions on a fixed time grid (the recorder writes nothing
+    // while the mouse rests, so raw sample counts say little about time).
+    const positions = (t0, t1, step = 0.05) => {
+        const out = [];
+        for (let t = t0; t <= t1 + 1e-9; t += step) out.push(look.at(t));
+        return out;
+    };
+
+    // Adjust a framing so the cursor's work in [t0, t1] sits inside its safe
+    // area: shift just enough (leaning a little towards the work), and widen
+    // down to minWidenScale if it doesn't fit.
+    const frameWork = (base, t0, t1, widen = true) => {
+        const pts = positions(t0, t1);
+        if (!pts.length) return base;
+        const clicks = look.range(t0, t1).filter(c => c.click).map(c => ({ x: sampleX(c), y: sampleY(c) }));
+        const xs = pts.map(p => p.x).sort((p, q) => p - q);
+        const ys = pts.map(p => p.y).sort((p, q) => p - q);
+        const q = (arr, f) => arr[Math.round((arr.length - 1) * f)];
+        const minX = Math.min(q(xs, 0.08), ...clicks.map(c => c.x));
+        const maxX = Math.max(q(xs, 0.92), ...clicks.map(c => c.x));
+        const minY = Math.min(q(ys, 0.08), ...clicks.map(c => c.y));
+        const maxY = Math.max(q(ys, 0.92), ...clicks.map(c => c.y));
+
+        let ns = base.s;
+        if (widen) {
+            // The safe area spans safeZone / (s * k) of the source per axis.
+            const fitScale = M.safeZone / Math.max((maxX - minX) * kx, (maxY - minY) * ky, 1e-6);
+            if (fitScale < ns) ns = Math.max(Math.min(base.s, M.minWidenScale), fitScale);
+        }
+        const shift = (c, lo, hi, h) => {
+            let n = c;
+            if (hi - lo > 2 * h) n = (lo + hi) / 2;
+            else if (lo < c - h) n = lo + h;
+            else if (hi > c + h) n = hi - h;
+            return n === c ? c : n + ((lo + hi) / 2 - n) * 0.3;
+        };
+        const nx = kx * ns > 1.001 ? shift(base.x, minX, maxX, halfX(ns) * M.safeZone) : base.x;
+        const ny = ky * ns > 1.001 ? shift(base.y, minY, maxY, halfY(ns) * M.safeZone) : base.y;
+        return fit(framing(nx, ny, ns));
+    };
+
+    // While a framing is held, glide only when the cursor is about to leave
+    // the comfortable middle of the frame.
+    const holdAndReframe = (from, until, follows) => {
+        if (!follows || !trackCursor || !cursor.length) return;
+        const step = 1 / 30;
+        let t = Math.max(from, free);
+        let calmUntil = t; // after a reframe, hold unless the cursor is leaving the frame
+        while (t < until) {
+            const s = state.s;
+            const hx = halfX(s) * M.safeZone;
+            const hy = halfY(s) * M.safeZone;
+            const outside = (p) => (kx * s > 1.001 && Math.abs(p.x - state.x) > hx) || (ky * s > 1.001 && Math.abs(p.y - state.y) > hy);
+            const leaving = (p) => (kx * s > 1.001 && Math.abs(p.x - state.x) > halfX(s) * 0.92) || (ky * s > 1.001 && Math.abs(p.y - state.y) > halfY(s) * 0.92);
+            // Heading out of the frame: act now, a move needs time to get going.
+            const later = positions(t + M.urgentAnticipate - 0.4, t + M.urgentAnticipate);
+            const urgent = later.filter(leaving).length >= later.length * 0.6;
+            if (!urgent) {
+                // Drifting out of the comfortable middle: wait for the calm
+                // hold, and make sure it is a real excursion, not a flick.
+                if (t < calmUntil || !outside(look.at(t + M.anticipate))) { t += step; continue; }
+                const soon = positions(t, t + 0.5);
+                const clickAway = look.range(t, t + 0.5).some(c => c.click && outside({ x: sampleX(c), y: sampleY(c) }));
+                if (!clickAway && soon.filter(outside).length < soon.length * 0.4) { t += step; continue; }
+            }
+
+            const target = frameWork(state, t, t + M.lookahead);
+            const moved = Math.hypot(target.x - state.x, target.y - state.y) * Math.max(s, 1);
+            if (moved < M.minReframeShift && Math.abs(target.s - s) < 0.02) { t += step; continue; }
+
+            const d = moveDuration(state, target);
+            if (t + d > until - 0.2) break; // leave room for the next shot's move
+            emit(t, target);
+            t = free;
+            calmUntil = free + M.minHold;
+        }
+    };
+
+    for (let i = 0; i < sorted.length; i++) {
+        const seg = sorted[i];
+        const next = sorted[i + 1];
+        let target = segFraming(seg);
+        const follows = seg.followCursor !== false && zoomed(target);
+
+        // Arrive at this shot just as its first action happens, framed on
+        // where the cursor will be by then (not where it was).
+        const start = Math.max(arrivalStart(seg, target), free);
+        if (follows && trackCursor && cursor.length) {
+            const d = moveDuration(state, target);
+            target = frameWork(target, start + d * 0.6, start + d + 0.6, false);
+        }
+        emit(start, target);
+        const arrived = free;
+
+        // Leave: straight to the next shot when it is close, else back out.
+        const toNext = next && connected && zoomed(target) && zoomed(segFraming(next));
+        const outDur = moveDuration(state, overview(), M.zoomOutFactor);
+        const leave = Math.max(seg.endTime, arrived);
+        const nextStart = next ? Math.min(next.startTime, Number.isFinite(next.actionTime) ? next.actionTime - 1.2 : Infinity) : Infinity;
+        const canRest = !next || nextStart >= leave + outDur + M.minOverviewRest;
+        const bridge = toNext && !canRest;
+
+        const holdUntil = bridge ? Math.max(arrived, nextStart) : leave;
+        holdAndReframe(arrived, holdUntil, follows);
+
+        if (bridge) continue;
+        if (zoomed(state) || cropped) {
+            const near = cropped ? look.at(leave) : null;
+            emit(leave, overview(near), M.zoomOutFactor);
+        }
+        if (cropped) holdAndReframe(free, next ? next.startTime : end, true);
+    }
+    if (!sorted.length && cropped) holdAndReframe(0, end, true);
+
+    // --- render the plan into a 120 Hz track -------------------------------
     const hz = TRACK_HZ;
-    const dt = 1 / hz;
     const frames = Math.ceil(end * hz) + 2;
     const fx = new Float32Array(frames);
     const fy = new Float32Array(frames);
     const sc = new Float32Array(frames);
     const segIdx = new Int32Array(frames);
 
-    const holdGap = getHoldGapMs(cursor);
-    // Cursor lookup with a monotonic pointer (time only moves forward here).
-    let ci = 0;
-    const cursorAt = (tSec) => {
-        if (!cursor.length) return null;
-        const tMs = tSec * 1000;
-        while (ci < cursor.length - 1 && sampleTimeMs(cursor[ci + 1]) <= tMs) ci++;
-        const a = cursor[ci];
-        const ta = sampleTimeMs(a);
-        if (tMs <= ta || ci === cursor.length - 1) return { x: sampleX(a), y: sampleY(a) };
-        const b = cursor[ci + 1];
-        const tb = sampleTimeMs(b);
-        // Sparse samples mean the mouse sat still: hold, then move in at the end.
-        const k = tb - ta > holdGap ? clamp((tMs - (tb - 16)) / 16, 0, 1) : (tb > ta ? (tMs - ta) / (tb - ta) : 0);
-        return { x: sampleX(a) + (sampleX(b) - sampleX(a)) * k, y: sampleY(a) + (sampleY(b) - sampleY(a)) * k };
-    };
-
-    let ai = 0;
-    const cursorAhead = (tSec) => {
-        if (!cursor.length) return null;
-        const tMs = tSec * 1000;
-        while (ai < cursor.length - 1 && sampleTimeMs(cursor[ai + 1]) <= tMs) ai++;
-        const a = cursor[ai];
-        const ta = sampleTimeMs(a);
-        if (tMs <= ta || ai === cursor.length - 1) return { x: sampleX(a), y: sampleY(a) };
-        const b = cursor[ai + 1];
-        const tb = sampleTimeMs(b);
-        // Sparse samples mean the mouse sat still: hold, then move in at the end.
-        const k = tb - ta > holdGap ? clamp((tMs - (tb - 16)) / 16, 0, 1) : (tb > ta ? (tMs - ta) / (tb - ta) : 0);
-        return { x: sampleX(a) + (sampleX(b) - sampleX(a)) * k, y: sampleY(a) + (sampleY(b) - sampleY(a)) * k };
-    };
-
-    const segScale = (seg) => {
-        if (!seg || NON_ZOOM_SCENES.has(seg.sceneMode)) return 1;
-        return Math.max(1, (seg.zoomScale ?? DEFAULT_ZOOM_SCALE) * zoomMultiplier);
-    };
-    const segFollows = (seg) => trackCursor && seg && seg.followCursor !== false && segScale(seg) > 1.001;
-
-    // Initial state: unzoomed, focus parked on the first point of interest so
-    // the first zoom is a pure dolly into it (or on the cursor when cropped).
-    const first = sorted.find(s => segScale(s) > 1.001);
-    const c0 = cropped && trackCursor ? cursorAt(0) : null;
-    ci = 0;
-    let x = c0 ? c0.x : (first ? clamp(first.targetX ?? 0.5, 0, 1) : 0.5);
-    let y = c0 ? c0.y : (first ? clamp(first.targetY ?? 0.5, 0, 1) : 0.5);
-    let s = 1;
-    let vx = 0;
-    let vy = 0;
-    let vs = 0;
-
-    // Follow target with hysteresis: only moves once the cursor leaves the
-    // calm zone around it, so small hand movements never wobble the camera.
-    let followX = x;
-    let followY = y;
-    let activeSegIndex = -1;
+    let mi = 0;
+    let cur = initial;
+    const paths = moves.map(m => pathFor(m.from, m.to));
     let si = 0;
-
-    // Move the follow target so the cursor stays in a calm zone and, with a
-    // margin, inside the visible frame. ex/ey are the effective per-axis
-    // scales (zoom x fill crop); an axis that shows the whole source is left alone.
-    const follow = (t, ex, ey) => {
-        const c = cursorAt(t);
-        if (!c) return;
-        const radius = 0.16 / Math.max(ex, ey);
-        const dx = ex > 1.001 ? c.x - followX : 0;
-        const dy = ey > 1.001 ? c.y - followY : 0;
-        const dist = Math.hypot(dx, dy);
-        if (dist > radius) {
-            const pull = (dist - radius) / dist;
-            followX += dx * pull;
-            followY += dy * pull;
-        }
-        // Keep the cursor (now and a moment ahead, to cancel spring lag) visible.
-        const margin = 0.1;
-        const ahead = cursorAhead(t + FOLLOW_LOOKAHEAD) || c;
-        const keep = (f, v, va, e) => {
-            if (e <= 1.001) return f;
-            const lo = (u) => (u * e - (1 - margin)) / (e - 1);
-            const hi = (u) => (u * e - margin) / (e - 1);
-            let l = Math.max(lo(v), lo(va));
-            let h = Math.min(hi(v), hi(va));
-            if (l > h) { l = lo(v); h = hi(v); }
-            return clamp(clamp(f, l, h), 0, 1);
-        };
-        followX = keep(followX, c.x, ahead.x, ex);
-        followY = keep(followY, c.y, ahead.y, ey);
-    };
-
     for (let i = 0; i < frames; i++) {
-        const t = i * dt;
+        const t = i / hz;
+        while (mi < moves.length && moves[mi].t0 + moves[mi].d <= t) {
+            cur = moves[mi].to;
+            mi++;
+        }
+        let f = cur;
+        if (mi < moves.length && moves[mi].t0 <= t) {
+            const m = moves[mi];
+            const p = paths[mi];
+            const at = p.at(minimumJerk((t - m.t0) / m.d) * p.length);
+            f = framing(at.x, at.y, Math.max(1, 1 / at.w));
+        }
+        fx[i] = f.x;
+        fy[i] = f.y;
+        sc[i] = Math.log(f.s);
 
         while (si < sorted.length && sorted[si].endTime <= t) si++;
-        let idx = -1;
-        if (si < sorted.length && sorted[si].startTime <= t) idx = si;
-
-        let seg = idx >= 0 ? sorted[idx] : null;
-        let bridging = false;
-        if (!seg && connected) {
-            // Short gap between two zooms: stay zoomed and pan instead of yo-yoing.
-            const prev = si > 0 ? sorted[si - 1] : null;
-            const next = si < sorted.length ? sorted[si] : null;
-            if (prev && next && segScale(prev) > 1.001 && segScale(next) > 1.001 && next.startTime - prev.endTime <= chainGap) {
-                seg = next;
-                idx = si;
-                bridging = true;
-            }
-        }
-
-        let targetScale = segScale(seg);
-        let tx;
-        let ty;
-
-        if (seg && targetScale > 1.001) {
-            if (idx !== activeSegIndex) {
-                activeSegIndex = idx;
-                followX = clamp(seg.targetX ?? 0.5, 0, 1);
-                followY = clamp(seg.targetY ?? 0.5, 0, 1);
-            }
-            if (segFollows(seg) && !bridging) {
-                follow(t, targetScale * kx, targetScale * ky);
-            }
-            tx = followX;
-            ty = followY;
-        } else {
-            // Overview. Keep the focus where it is while zooming out (the
-            // viewport mapping recentres it automatically), then park it on the
-            // next point of interest once we are fully out.
-            targetScale = 1;
-            tx = x;
-            ty = y;
-            if (cropped && trackCursor) {
-                // Fill crop: keep reframing on the action even when unzoomed.
-                if (activeSegIndex !== -1) {
-                    followX = x;
-                    followY = y;
-                }
-                follow(t, kx, ky);
-                tx = followX;
-                ty = followY;
-            } else if (s < 1.01) {
-                const next = sorted.slice(si).find(n => segScale(n) > 1.001);
-                if (next) {
-                    tx = clamp(next.targetX ?? 0.5, 0, 1);
-                    ty = clamp(next.targetY ?? 0.5, 0, 1);
-                }
-            }
-            activeSegIndex = -1;
-        }
-
-        // Pull back a little while the camera travels far, then settle back in
-        // (a dolly-out during long pans reads much calmer than a whip pan).
-        if (targetScale > 1.001 && s > 1.01) {
-            const travel = Math.hypot(tx - x, ty - y);
-            const pullBack = clamp((travel - 0.05) * 1.1, 0, 0.45);
-            targetScale = 1 + (targetScale - 1) * (1 - pullBack);
-        }
-
-        const zoomOmega = targetScale >= s ? profile.zoomIn : profile.zoomOut;
-        const following = (segFollows(seg) && !bridging) || (!seg && cropped && trackCursor);
-        const panOmega = s < 1.01 && !cropped ? 14 : (following ? profile.follow : profile.pan);
-
-        [s, vs] = springStep(s, vs, targetScale, zoomOmega, dt);
-        [x, vx] = springStep(x, vx, tx, panOmega, dt);
-        [y, vy] = springStep(y, vy, ty, panOmega, dt);
-        if (s < 1) {
-            s = 1;
-            if (vs < 0) vs = 0;
-        }
-
-        // Soft wall: if a very fast flick still outruns the spring, nudge the
-        // focus just enough that the cursor stays on screen.
-        if (following) {
-            const c = cursorAt(t);
-            if (c) {
-                const edge = 0.03;
-                const wall = (f, v, e) => {
-                    if (e <= 1.02) return f;
-                    return clamp(f, (v * e - (1 - edge)) / (e - 1), (v * e - edge) / (e - 1));
-                };
-                const nx = wall(x, c.x, s * kx);
-                const ny = wall(y, c.y, s * ky);
-                if (nx !== x) { vx += (nx - x) / dt * 0.5; x = nx; }
-                if (ny !== y) { vy += (ny - y) / dt * 0.5; y = ny; }
-            }
-        }
-
-        if (x < 0 || x > 1) { x = clamp(x, 0, 1); vx = 0; }
-        if (y < 0 || y > 1) { y = clamp(y, 0, 1); vy = 0; }
-
-        fx[i] = x;
-        fy[i] = y;
-        sc[i] = s;
-        segIdx[i] = idx;
+        segIdx[i] = si < sorted.length && sorted[si].startTime <= t ? si : -1;
     }
 
-    return { hz, frames, fx, fy, s: sc, seg: segIdx, segments: sorted };
+    // Round the joins between consecutive moves (forward-backward, so no lag).
+    const a = 1 - Math.exp(-1 / (hz * M.smoothTau));
+    for (const arr of [fx, fy, sc]) {
+        for (let pass = 0; pass < 2; pass++) {
+            for (let i = 1; i < frames; i++) arr[i] += (arr[i - 1] - arr[i]) * (1 - a);
+            for (let i = frames - 2; i >= 0; i--) arr[i] += (arr[i + 1] - arr[i]) * (1 - a);
+        }
+    }
+    for (let i = 0; i < frames; i++) {
+        const s = Math.max(1, Math.exp(sc[i]));
+        sc[i] = s < 1.0005 ? 1 : s;
+        fx[i] = clamp(fx[i], halfX(sc[i]), 1 - halfX(sc[i]));
+        fy[i] = clamp(fy[i], halfY(sc[i]), 1 - halfY(sc[i]));
+    }
+
+    return { hz, frames, fx, fy, s: sc, seg: segIdx, segments: sorted, moves };
 }
 
 /**
@@ -349,17 +410,17 @@ export function sampleCameraTrack(track, timeSec) {
     const i = Math.min(track.frames - 2, Math.floor(pos));
     const k = Math.max(0, Math.min(1, pos - i));
     const j = i + 1 < track.frames ? i + 1 : i;
-    const focusX = track.fx[i] + (track.fx[j] - track.fx[i]) * k;
-    const focusY = track.fy[i] + (track.fy[j] - track.fy[i]) * k;
+    const x = track.fx[i] + (track.fx[j] - track.fx[i]) * k;
+    const y = track.fy[i] + (track.fy[j] - track.fy[i]) * k;
     let scale = track.s[i] + (track.s[j] - track.s[i]) * k;
     if (scale < 1.0005) scale = 1;
     const segI = track.seg[k < 0.5 ? i : j];
     return {
-        x: viewportCenter(focusX, scale),
-        y: viewportCenter(focusY, scale),
+        x,
+        y,
         scale,
-        focusX,
-        focusY,
+        focusX: scale > 1 ? clamp(focusForCenter(x, scale), 0, 1) : x,
+        focusY: scale > 1 ? clamp(focusForCenter(y, scale), 0, 1) : y,
         activeSeg: segI >= 0 ? track.segments[segI] : null,
     };
 }

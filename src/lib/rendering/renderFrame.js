@@ -9,7 +9,7 @@
 import { computeCursorSwayRotation } from '../zoom/cursorTilt.js';
 import { typingPointerOpacity } from '../zoom/typingFocus.js';
 import { getSmoothedCursorPath } from '../zoom/cursorPathSmoothing.js';
-import { getCameraTrack, sampleCameraTrack, viewportCenter } from '../zoom/cameraTrack.js';
+import { getCameraTrack, sampleCameraTrack } from '../zoom/cameraTrack.js';
 import { WALLPAPERS, computeStageLayout, drawMeshBackground, getGrainPattern } from './stage.js';
 
 export { WALLPAPERS };
@@ -67,8 +67,8 @@ export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples =
     const tilt = calculate3DTilt(cam.x, cam.y, cam.scale, options.tiltAngle ?? 0);
 
     return {
-        x: kx > 1 ? viewportCenter(cam.focusX, cam.scale * kx) : cam.x,
-        y: ky > 1 ? viewportCenter(cam.focusY, cam.scale * ky) : cam.y,
+        x: cam.x,
+        y: cam.y,
         scale: cam.scale,
         focusX: cam.focusX,
         focusY: cam.focusY,
