@@ -100,7 +100,7 @@ function sampleY(s) {
 export function cameraTrackSignature(segments, samples, options = {}) {
     let sig = `${options.springProfile || 'cinematic'}|${options.zoomMultiplier ?? 1}|${options.connectedZooms !== false}|${options.trackCursor !== false}|${options.duration ?? ''}|${options.cropKx ?? 1}|${options.cropKy ?? 1}|`;
     for (const s of segments || []) {
-        sig += `${s.startTime},${s.endTime},${s.actionTime ?? ''},${s.targetX},${s.targetY},${s.zoomScale},${s.sceneMode || ''},${s.followCursor === false ? 0 : 1};`;
+        sig += `${s.startTime},${s.endTime},${s.actionTime ?? ''},${s.lastActionTime ?? ''},${s.targetX},${s.targetY},${s.zoomScale},${s.sceneMode || ''},${s.followCursor === false ? 0 : 1};`;
     }
     const n = samples ? samples.length : 0;
     if (n > 0) {
@@ -128,7 +128,7 @@ function makeCursorLookup(cursor) {
         at(t) {
             if (!cursor.length) return null;
             const i = Math.max(0, index(t));
-            return { x: sampleX(cursor[i]), y: sampleY(cursor[i]) };
+            return { x: sampleX(cursor[i]), y: sampleY(cursor[i]), hidden: Boolean(cursor[i].hidden) };
         },
         /** Samples (and clicks) in [t0, t1]. */
         range(t0, t1) {
@@ -236,7 +236,7 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
             prev = f;
             if (trackCursor && cursor.length) {
                 const c = look.at(start + (d * k) / n);
-                if (Math.abs(c.x - f.x) > halfX(sc) * 0.97 || Math.abs(c.y - f.y) > halfY(sc) * 0.97) off++;
+                if (!c.hidden && (Math.abs(c.x - f.x) > halfX(sc) * 0.97 || Math.abs(c.y - f.y) > halfY(sc) * 0.97)) off++;
             }
         }
         return { off: off / (n + 1), peak, widest };
@@ -305,10 +305,20 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
 
     // Cursor positions on a fixed time grid (the recorder writes nothing
     // while the mouse rests, so raw sample counts say little about time).
+    // Positions while the cursor is off the recorded screen are left out.
     const positions = (t0, t1, step = 0.05) => {
         const out = [];
-        for (let t = t0; t <= t1 + 1e-9; t += step) out.push(look.at(t));
+        for (let t = t0; t <= t1 + 1e-9; t += step) {
+            const p = look.at(t);
+            if (p && !p.hidden) out.push(p);
+        }
         return out;
+    };
+    const awayFor = (t0, t1) => {
+        let n = 0;
+        let k = 0;
+        for (let t = t0; t <= t1 + 1e-9; t += 0.05, n++) if (look.at(t)?.hidden) k++;
+        return n ? k / n : 0;
     };
 
     // Adjust a framing so the cursor's work in [t0, t1] sits inside its safe
@@ -317,7 +327,7 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
     const frameWork = (base, t0, t1, widen = true) => {
         const pts = t1 > t0 ? positions(t0, t1) : [];
         if (!pts.length) return base;
-        const clicks = look.range(t0, t1).filter(c => c.click).map(c => ({ x: sampleX(c), y: sampleY(c) }));
+        const clicks = look.range(t0, t1).filter(c => c.click && !c.hidden).map(c => ({ x: sampleX(c), y: sampleY(c) }));
         const xs = pts.map(p => p.x).sort((p, q) => p - q);
         const ys = pts.map(p => p.y).sort((p, q) => p - q);
         const q = (arr, f) => arr[Math.round((arr.length - 1) * f)];
@@ -360,18 +370,20 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
             const s = state.s;
             const hx = halfX(s) * M.safeZone;
             const hy = halfY(s) * M.safeZone;
-            const outside = (p) => (kx * s > 1.001 && Math.abs(p.x - state.x) > hx) || (ky * s > 1.001 && Math.abs(p.y - state.y) > hy);
-            const leaving = (p) => (kx * s > 1.001 && Math.abs(p.x - state.x) > halfX(s) * 0.92) || (ky * s > 1.001 && Math.abs(p.y - state.y) > halfY(s) * 0.92);
+            // The cursor working on another screen: ease out rather than chase.
+            if (awayFor(t, t + 0.8) > 0.9) return t;
+            const outside = (p) => !p.hidden && ((kx * s > 1.001 && Math.abs(p.x - state.x) > hx) || (ky * s > 1.001 && Math.abs(p.y - state.y) > hy));
+            const leaving = (p) => !p.hidden && ((kx * s > 1.001 && Math.abs(p.x - state.x) > halfX(s) * 0.92) || (ky * s > 1.001 && Math.abs(p.y - state.y) > halfY(s) * 0.92));
             // Heading out of the frame: act now, a move needs time to get going.
             const later = positions(t + M.urgentAnticipate - 0.4, t + M.urgentAnticipate);
-            const urgent = later.filter(leaving).length >= later.length * 0.6;
+            const urgent = later.length > 0 && later.filter(leaving).length >= later.length * 0.6;
             if (!urgent) {
                 // Drifting out of the comfortable middle: wait for the calm
                 // hold, and make sure it is a real excursion, not a flick.
                 if (t < calmUntil || !outside(look.at(t + M.anticipate))) { t += step; continue; }
                 const soon = positions(t, t + 0.5);
-                const clickAway = look.range(t, t + 0.5).some(c => c.click && outside({ x: sampleX(c), y: sampleY(c) }));
-                if (!clickAway && soon.filter(outside).length < soon.length * 0.4) { t += step; continue; }
+                const clickAway = look.range(t, t + 0.5).some(c => c.click && !c.hidden && outside({ x: sampleX(c), y: sampleY(c) }));
+                if (!clickAway && (!soon.length || soon.filter(outside).length < soon.length * 0.4)) { t += step; continue; }
             }
 
             const target = frameWork(state, t, t + M.lookahead);
@@ -388,6 +400,7 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
     };
 
     let departEarly = null;
+    let holdFloor = 0;
     for (let i = 0; i < sorted.length; i++) {
         const seg = sorted[i];
         const next = sorted[i + 1];
@@ -396,9 +409,10 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
 
         // Arrive at this shot just as its first action happens, framed on
         // where the cursor will be by then (not where it was).
-        const planned = arrivalStart(seg, target);
+        const planned = Math.max(arrivalStart(seg, target), holdFloor);
         const start = Math.max(departEarly != null ? Math.min(planned, departEarly) : planned, free);
         departEarly = null;
+        holdFloor = 0;
         if (follows && trackCursor && cursor.length) {
             // Only this shot's own work, never the next shot's.
             const d = moveDuration(state, target);
@@ -416,16 +430,19 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
         const canRest = !next || nextStart >= leave + outDur + M.minOverviewRest;
         const bridge = toNext && !canRest;
 
-        const holdUntil = bridge ? Math.max(arrived, nextStart) : leave;
+        // Never leave before the shot's last action has been seen.
+        const minLeave = Number.isFinite(seg.lastActionTime) ? seg.lastActionTime + 0.5 : arrived;
+        const holdUntil = bridge ? Math.max(arrived, nextStart, minLeave) : leave;
         const early = holdAndReframe(arrived, holdUntil, follows);
 
         if (bridge) {
             // The next shot's move may start as soon as the cursor heads off.
-            departEarly = early;
+            departEarly = early != null ? Math.max(early, minLeave) : null;
+            holdFloor = minLeave;
             continue;
         }
         if (zoomed(state) || cropped) {
-            const at = early != null ? Math.max(free, Math.min(leave, early)) : leave;
+            const at = early != null ? Math.max(free, minLeave, Math.min(leave, early)) : leave;
             const near = cropped ? look.at(at) : null;
             emit(at, overview(near), M.zoomOutFactor);
         }
