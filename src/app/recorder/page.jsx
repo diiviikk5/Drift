@@ -1022,6 +1022,7 @@ export default function RecorderPage() {
                         x: normalizeX(s.x),
                         y: normalizeY(s.y),
                         button: s.click,
+                        ...(outside(s) ? { hidden: true } : {}),
                     }));
 
                     let keystrokeList = [];
