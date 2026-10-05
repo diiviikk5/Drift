@@ -22,7 +22,13 @@ function loadSession(dir) {
     const meta = read('session.json') || {};
     const w = meta.width || 1920;
     const h = meta.height || 1080;
-    const moves = (read('telemetry.json') || []).map(s => ({ time: s.t, x: Math.max(0, Math.min(1, s.x / w)), y: Math.max(0, Math.min(1, s.y / h)), click: s.click || undefined }));
+    // Same as the app: positions off the recorded screen are flagged hidden.
+    const moves = (read('telemetry.json') || []).map(s => {
+        const u = s.x / w;
+        const v = s.y / h;
+        const hidden = u < -0.005 || u > 1.005 || v < -0.005 || v > 1.005;
+        return { time: s.t, x: Math.max(0, Math.min(1, u)), y: Math.max(0, Math.min(1, v)), click: s.click || undefined, ...(hidden ? { hidden } : {}) };
+    });
     return {
         moves,
         clicks: moves.filter(m => m.click),
@@ -82,13 +88,15 @@ export function measure(scenario) {
         if (f.s < 1.05) continue;
         while (mi < moves.length - 1 && moves[mi + 1].time <= f.t * 1000) mi++;
         const c = moves[mi];
+        if (c.hidden) continue;
         cursorSeen++;
         const half = 0.5 / f.s;
         if (Math.abs(c.x - f.x) > half || Math.abs(c.y - f.y) > half) cursorOut++;
     }
     const zoomed = frames.filter(f => f.s > 1.05).length / frames.length;
     const peakScale = Math.max(...frames.map(f => f.s));
-    const clickSeen = clicks.filter(c => {
+    const visibleClicks = clicks.filter(c => !c.hidden);
+    const clickSeen = visibleClicks.filter(c => {
         const f = frames[Math.max(0, Math.min(frames.length - 1, Math.round((c.time / 1000) * FPS)))];
         const half = 0.5 / f.s;
         return Math.abs(c.x - f.x) <= half * 0.92 && Math.abs(c.y - f.y) <= half * 0.92;
@@ -107,7 +115,7 @@ export function measure(scenario) {
         zoomedPct: zoomed * 100,
         peakScale,
         cursorOffPct: cursorSeen ? (cursorOut / cursorSeen) * 100 : 0,
-        clicksFramed: `${clickSeen}/${clicks.length}`,
+        clicksFramed: `${clickSeen}/${visibleClicks.length}`,
     };
 }
 
