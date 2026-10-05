@@ -629,65 +629,241 @@ body {
   box-shadow: 0 0 20px rgba(220, 254, 80, 0.35);
 }
 
-/* === Desktop App Theme Tokens === */
+/* === Desktop App ===========================================================
+ * Everything below is scoped to the desktop app root (.drift-app) so the
+ * marketing site's brutalist styles stay untouched.
+ */
+
+.drift-app {
+  /* Self-hosted fonts from next/font (work offline in the desktop app). */
+  font-family: var(--font-inter), system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --app-mono: var(--font-mono), ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-feature-settings: 'cv11', 'ss01';
+  letter-spacing: -0.006em;
+  --radius-app: 12px;
+  --shadow-app: 0 1px 2px rgba(0, 0, 0, 0.18), 0 8px 24px -12px rgba(0, 0, 0, 0.35);
+  --shadow-pop: 0 12px 40px -12px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.2);
+  --danger: #ef4444;
+}
+
+.drift-app .font-mono {
+  font-family: var(--app-mono) !important;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Quiet scrollbars: thin, themed, only noticeable when used. */
+.drift-app * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+.drift-app ::-webkit-scrollbar { width: 10px; height: 10px; }
+.drift-app ::-webkit-scrollbar-track { background: transparent; }
+.drift-app ::-webkit-scrollbar-thumb {
+  background: var(--scrollbar);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.drift-app ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); background-clip: content-box; }
+
+.drift-app :focus-visible {
+  outline: 2px solid var(--accent-app);
+  outline-offset: 2px;
+}
+
+.drift-app ::selection { background: var(--accent-soft); }
+
+/* Shared building blocks */
+.drift-app .app-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-app-muted);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.drift-app .app-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-app);
+  border-radius: var(--radius-app);
+  box-shadow: var(--shadow-app);
+}
+
+/* === Themes ===
+ * Tokens: bg-app (window), bg-card (panels), bg-card-subtle (wells, inputs),
+ * bg-elevated (menus, dialogs), border-app(-hover), text-app / -muted / -faint,
+ * accent-app / -fg / accent-soft, pill-*, scrollbar(-hover).
+ */
 .theme-dark {
-  --bg-app: #09090b;
-  --bg-card: #111115;
-  --bg-card-subtle: #18181b;
-  --border-app: rgba(255, 255, 255, 0.08);
-  --border-app-hover: rgba(255, 255, 255, 0.16);
-  --text-app: #fafafa;
+  color-scheme: dark;
+  --bg-app: #111113;
+  --bg-card: #18181b;
+  --bg-card-subtle: #1f1f23;
+  --bg-elevated: #1c1c20;
+  --border-app: rgba(255, 255, 255, 0.07);
+  --border-app-hover: rgba(255, 255, 255, 0.14);
+  --text-app: #ececef;
   --text-app-muted: #a1a1aa;
-  --accent-app: #fafafa;
-  --accent-app-fg: #09090b;
-  --pill-bg: #18181b;
-  --pill-active-bg: #fafafa;
-  --pill-active-fg: #09090b;
+  --text-app-faint: #71717a;
+  --accent-app: #e4e4e7;
+  --accent-app-fg: #111113;
+  --accent-soft: rgba(228, 228, 231, 0.14);
+  --pill-bg: #1f1f23;
+  --pill-active-bg: #2e2e33;
+  --pill-active-fg: #fafafa;
+  --scrollbar: rgba(255, 255, 255, 0.12);
+  --scrollbar-hover: rgba(255, 255, 255, 0.22);
+}
+
+.theme-ember {
+  color-scheme: dark;
+  --bg-app: #262624;
+  --bg-card: #2c2c29;
+  --bg-card-subtle: #33332f;
+  --bg-elevated: #30302d;
+  --border-app: rgba(250, 249, 245, 0.08);
+  --border-app-hover: rgba(250, 249, 245, 0.16);
+  --text-app: #f3f1ea;
+  --text-app-muted: #b0ada4;
+  --text-app-faint: #85827a;
+  --accent-app: #d97757;
+  --accent-app-fg: #1f1e1d;
+  --accent-soft: rgba(217, 119, 87, 0.18);
+  --pill-bg: #33332f;
+  --pill-active-bg: #3f3e3a;
+  --pill-active-fg: #faf9f5;
+  --scrollbar: rgba(250, 249, 245, 0.12);
+  --scrollbar-hover: rgba(250, 249, 245, 0.22);
+}
+
+.theme-paper {
+  color-scheme: light;
+  --bg-app: #faf9f5;
+  --bg-card: #ffffff;
+  --bg-card-subtle: #f3f1ea;
+  --bg-elevated: #ffffff;
+  --border-app: rgba(31, 30, 29, 0.10);
+  --border-app-hover: rgba(31, 30, 29, 0.20);
+  --text-app: #1f1e1d;
+  --text-app-muted: #6b6963;
+  --text-app-faint: #9a978f;
+  --accent-app: #c96442;
+  --accent-app-fg: #ffffff;
+  --accent-soft: rgba(201, 100, 66, 0.14);
+  --pill-bg: #f0eee6;
+  --pill-active-bg: #ffffff;
+  --pill-active-fg: #1f1e1d;
+  --scrollbar: rgba(31, 30, 29, 0.14);
+  --scrollbar-hover: rgba(31, 30, 29, 0.26);
+  --shadow-app: 0 1px 2px rgba(31, 30, 29, 0.06), 0 6px 20px -10px rgba(31, 30, 29, 0.14);
+  --shadow-pop: 0 12px 36px -10px rgba(31, 30, 29, 0.22), 0 2px 6px rgba(31, 30, 29, 0.08);
 }
 
 .theme-light {
-  --bg-app: #f8fafc;
+  color-scheme: light;
+  --bg-app: #f6f7f9;
   --bg-card: #ffffff;
-  --bg-card-subtle: #f1f5f9;
-  --border-app: rgba(0, 0, 0, 0.08);
-  --border-app-hover: rgba(0, 0, 0, 0.16);
+  --bg-card-subtle: #eef0f4;
+  --bg-elevated: #ffffff;
+  --border-app: rgba(15, 23, 42, 0.09);
+  --border-app-hover: rgba(15, 23, 42, 0.18);
   --text-app: #0f172a;
-  --text-app-muted: #64748b;
-  --accent-app: #0f172a;
+  --text-app-muted: #5b6577;
+  --text-app-faint: #8a94a6;
+  --accent-app: #2563eb;
   --accent-app-fg: #ffffff;
-  --pill-bg: #f1f5f9;
-  --pill-active-bg: #0f172a;
-  --pill-active-fg: #ffffff;
+  --accent-soft: rgba(37, 99, 235, 0.12);
+  --pill-bg: #e9ecf1;
+  --pill-active-bg: #ffffff;
+  --pill-active-fg: #0f172a;
+  --scrollbar: rgba(15, 23, 42, 0.14);
+  --scrollbar-hover: rgba(15, 23, 42, 0.26);
+  --shadow-app: 0 1px 2px rgba(15, 23, 42, 0.05), 0 6px 20px -10px rgba(15, 23, 42, 0.14);
+  --shadow-pop: 0 12px 36px -10px rgba(15, 23, 42, 0.22), 0 2px 6px rgba(15, 23, 42, 0.08);
 }
 
 .theme-midnight {
-  --bg-app: #030712;
-  --bg-card: #0b0f19;
-  --bg-card-subtle: #111827;
-  --border-app: rgba(56, 189, 248, 0.12);
-  --border-app-hover: rgba(56, 189, 248, 0.28);
-  --text-app: #f9fafb;
-  --text-app-muted: #9ca3af;
+  color-scheme: dark;
+  --bg-app: #0b1020;
+  --bg-card: #111831;
+  --bg-card-subtle: #18213f;
+  --bg-elevated: #151d38;
+  --border-app: rgba(148, 197, 255, 0.09);
+  --border-app-hover: rgba(148, 197, 255, 0.2);
+  --text-app: #eef3ff;
+  --text-app-muted: #9aa8c7;
+  --text-app-faint: #6a789a;
   --accent-app: #38bdf8;
-  --accent-app-fg: #030712;
-  --pill-bg: #111827;
-  --pill-active-bg: #38bdf8;
-  --pill-active-fg: #030712;
+  --accent-app-fg: #04111f;
+  --accent-soft: rgba(56, 189, 248, 0.16);
+  --pill-bg: #18213f;
+  --pill-active-bg: #243058;
+  --pill-active-fg: #eef3ff;
+  --scrollbar: rgba(148, 197, 255, 0.14);
+  --scrollbar-hover: rgba(148, 197, 255, 0.26);
 }
 
 .theme-drift {
-  --bg-app: #08090e;
-  --bg-card: #0e1017;
-  --bg-card-subtle: #161924;
-  --border-app: rgba(220, 254, 80, 0.15);
-  --border-app-hover: rgba(220, 254, 80, 0.35);
-  --text-app: #ffffff;
-  --text-app-muted: #94a3b8;
+  color-scheme: dark;
+  --bg-app: #0b0c10;
+  --bg-card: #12141b;
+  --bg-card-subtle: #1a1d27;
+  --bg-elevated: #161922;
+  --border-app: rgba(255, 255, 255, 0.07);
+  --border-app-hover: rgba(220, 254, 80, 0.28);
+  --text-app: #f4f6fb;
+  --text-app-muted: #9aa3b5;
+  --text-app-faint: #6b7385;
   --accent-app: #dcfe50;
-  --accent-app-fg: #08090e;
-  --pill-bg: #141722;
-  --pill-active-bg: #dcfe50;
-  --pill-active-fg: #08090e;
+  --accent-app-fg: #0b0c10;
+  --accent-soft: rgba(220, 254, 80, 0.14);
+  --pill-bg: #1a1d27;
+  --pill-active-bg: #262a37;
+  --pill-active-fg: #f4f6fb;
+  --scrollbar: rgba(255, 255, 255, 0.12);
+  --scrollbar-hover: rgba(220, 254, 80, 0.35);
+}
+
+.theme-nord {
+  color-scheme: dark;
+  --bg-app: #2e3440;
+  --bg-card: #343b49;
+  --bg-card-subtle: #3b4252;
+  --bg-elevated: #3b4252;
+  --border-app: rgba(216, 222, 233, 0.09);
+  --border-app-hover: rgba(216, 222, 233, 0.18);
+  --text-app: #eceff4;
+  --text-app-muted: #b3bccb;
+  --text-app-faint: #8892a4;
+  --accent-app: #88c0d0;
+  --accent-app-fg: #2e3440;
+  --accent-soft: rgba(136, 192, 208, 0.18);
+  --pill-bg: #3b4252;
+  --pill-active-bg: #4c566a;
+  --pill-active-fg: #eceff4;
+  --scrollbar: rgba(216, 222, 233, 0.16);
+  --scrollbar-hover: rgba(216, 222, 233, 0.28);
+}
+
+.theme-rose {
+  color-scheme: dark;
+  --bg-app: #191724;
+  --bg-card: #1f1d2e;
+  --bg-card-subtle: #26233a;
+  --bg-elevated: #232136;
+  --border-app: rgba(224, 222, 244, 0.08);
+  --border-app-hover: rgba(235, 188, 186, 0.28);
+  --text-app: #e0def4;
+  --text-app-muted: #a9a5c4;
+  --text-app-faint: #6e6a86;
+  --accent-app: #ebbcba;
+  --accent-app-fg: #191724;
+  --accent-soft: rgba(235, 188, 186, 0.16);
+  --pill-bg: #26233a;
+  --pill-active-bg: #393552;
+  --pill-active-fg: #e0def4;
+  --scrollbar: rgba(224, 222, 244, 0.14);
+  --scrollbar-hover: rgba(235, 188, 186, 0.32);
 }
 
 /* Hide Next.js dev toast/badge in desktop app */
@@ -698,4 +874,4 @@ nextjs-portal,
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;
-}
+}
