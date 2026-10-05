@@ -52,6 +52,7 @@ export const CAMERA_MOTION = Object.freeze({
     minReframeShift: 0.04,  // ignore reframes smaller than this (normalized)
     minWidenScale: 1.18,    // a reframe may widen the shot down to this zoom
     smoothTau: 0.06,        // final rounding of joins (seconds)
+    calmSpeed: 0.9,         // perceived speed (widths/s) above which moves are penalized
 });
 
 /** Overall pace of the camera; 1 = default. */
@@ -195,11 +196,12 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
     const overview = (near) => fit(framing(cropped && near ? near.x : 0.5, cropped && near ? near.y : 0.5, 1));
     const zoomed = (f) => f.s > 1.001;
 
-    // Perceived size of a move -> duration.
-    const pathFor = (a, b) => smoothZoomPath(
+    // Perceived size of a move -> duration (measured at the base rho, so a
+    // move that pulls back further is not also made slower).
+    const pathFor = (a, b, rho = M.rho) => smoothZoomPath(
         { x: a.x, y: a.y, w: 1 / a.s },
         { x: b.x, y: b.y, w: 1 / b.s },
-        M.rho,
+        rho,
     );
     const moveDuration = (a, b, slower = 1) => {
         const len = pathFor(a, b).length;
@@ -212,26 +214,93 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
     const initial = state;
     let free = 0;      // time the camera is free to start its next move
 
-    const emit = (t0, to, slower = 1) => {
+    // Evaluate a candidate move: fraction of time the cursor is off screen,
+    // and peak perceived speed (viewport widths/s of pan + log-zoom rate).
+    const evaluate = (from, to, start, d, rho) => {
+        const p = pathFor(from, to, rho);
+        const n = 24;
+        let off = 0;
+        let peak = 0;
+        let widest = 0;
+        let prev = null;
+        for (let k = 0; k <= n; k++) {
+            const f = p.at(minimumJerk(k / n) * p.length);
+            if (f.w > widest) widest = f.w;
+            const sc = Math.max(1, 1 / f.w);
+            if (prev) {
+                const dt = d / n;
+                const w = (prev.w + f.w) / 2;
+                const speed = Math.hypot(Math.hypot(f.x - prev.x, f.y - prev.y) / w, Math.log(prev.w / f.w)) / dt;
+                if (speed > peak) peak = speed;
+            }
+            prev = f;
+            if (trackCursor && cursor.length) {
+                const c = look.at(start + (d * k) / n);
+                if (Math.abs(c.x - f.x) > halfX(sc) * 0.97 || Math.abs(c.y - f.y) > halfY(sc) * 0.97) off++;
+            }
+        }
+        return { off: off / (n + 1), peak, widest };
+    };
+
+    // Emit a move. Being offline, try a few variants (start a little earlier,
+    // pull back further mid-move, take a little longer) and keep the one that
+    // best keeps the cursor in view without moving faster than feels calm.
+    const emit = (t0, to, slower = 1, { flexible = true } = {}) => {
         const from = state;
         const dest = fit(to);
         if (Math.abs(dest.x - from.x) < 1e-4 && Math.abs(dest.y - from.y) < 1e-4 && Math.abs(dest.s - from.s) < 1e-4) {
             return t0;
         }
-        const start = Math.max(t0, free);
-        const d = moveDuration(from, dest, slower);
-        moves.push({ t0: start, d, from, to: dest });
+        const base = Math.max(t0, free);
+        const d0 = moveDuration(from, dest, slower);
+        const leads = flexible ? [0, 0.2, 0.4] : [0];
+        const rhos = flexible && zoomed(from) && zoomed(dest) ? [M.rho, 1.8, 2.6] : [M.rho];
+        const stretches = flexible ? [1, 1.25] : [1];
+        let best = null;
+        for (const lead of leads) {
+            const start = Math.max(free, base - lead);
+            for (const rho of rhos) {
+                for (const k of stretches) {
+                    const d = Math.min(M.maxMove * 1.25, d0 * k);
+                    const { off, peak, widest } = evaluate(from, dest, start, d, rho);
+                    // A pull-back past the full frame would be clipped (a kink).
+                    if (rho !== M.rho && widest > 0.96) continue;
+                    const score = off * 10
+                        + Math.max(0, peak - M.calmSpeed) * 6
+                        + (base - start) * 0.4
+                        + (rho - M.rho) * 0.15
+                        + (k - 1) * 0.6;
+                    if (!best || score < best.score - 1e-9) best = { start, rho, d, score };
+                }
+            }
+        }
+        moves.push({ t0: best.start, d: best.d, from, to: dest, rho: best.rho });
         state = dest;
-        free = start + d;
+        free = best.start + best.d;
         return free;
     };
 
     // Start a move into a shot so it is ~90% there at the shot's first
     // action (manual segments without one simply start at startTime).
+    // The cursor usually reaches its target a moment before the click: land
+    // when it settles inside the shot's safe area (up to 1.5 s early).
+    const settleTime = (seg, target) => {
+        const t1 = seg.actionTime;
+        if (!cursor.length) return t1;
+        const hx = halfX(target.s) * M.safeZone;
+        const hy = halfY(target.s) * M.safeZone;
+        let t = t1;
+        for (let u = t1; u >= t1 - 1.5; u -= 0.05) {
+            const p = look.at(u);
+            if (Math.abs(p.x - target.x) > hx || Math.abs(p.y - target.y) > hy) break;
+            t = u;
+        }
+        return t;
+    };
     const arrivalStart = (seg, target) => {
         if (!Number.isFinite(seg.actionTime)) return seg.startTime;
         const d = moveDuration(state, fit(target));
-        return Math.max(0, Math.min(seg.startTime, seg.actionTime - d * 0.72));
+        return Math.max(0, Math.min(seg.startTime, settleTime(seg, fit(target)) - d * 0.8));
     };
 
     // Cursor positions on a fixed time grid (the recorder writes nothing
@@ -246,7 +315,7 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
     // area: shift just enough (leaning a little towards the work), and widen
     // down to minWidenScale if it doesn't fit.
     const frameWork = (base, t0, t1, widen = true) => {
-        const pts = positions(t0, t1);
+        const pts = t1 > t0 ? positions(t0, t1) : [];
         if (!pts.length) return base;
         const clicks = look.range(t0, t1).filter(c => c.click).map(c => ({ x: sampleX(c), y: sampleY(c) }));
         const xs = pts.map(p => p.x).sort((p, q) => p - q);
@@ -263,15 +332,19 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
             const fitScale = M.safeZone / Math.max((maxX - minX) * kx, (maxY - minY) * ky, 1e-6);
             if (fitScale < ns) ns = Math.max(Math.min(base.s, M.minWidenScale), fitScale);
         }
-        const shift = (c, lo, hi, h) => {
+        // When the work can't fit even after widening, keep the framing on
+        // the clicks (the point of the shot) rather than splitting the difference.
+        const cx = clicks.length ? clicks.reduce((a, c) => a + c.x, 0) / clicks.length : null;
+        const cy = clicks.length ? clicks.reduce((a, c) => a + c.y, 0) / clicks.length : null;
+        const shift = (c, lo, hi, h, anchor) => {
             let n = c;
-            if (hi - lo > 2 * h) n = (lo + hi) / 2;
+            if (hi - lo > 2 * h) return anchor ?? (widen ? (lo + hi) / 2 : c);
             else if (lo < c - h) n = lo + h;
             else if (hi > c + h) n = hi - h;
             return n === c ? c : n + ((lo + hi) / 2 - n) * 0.3;
         };
-        const nx = kx * ns > 1.001 ? shift(base.x, minX, maxX, halfX(ns) * M.safeZone) : base.x;
-        const ny = ky * ns > 1.001 ? shift(base.y, minY, maxY, halfY(ns) * M.safeZone) : base.y;
+        const nx = kx * ns > 1.001 ? shift(base.x, minX, maxX, halfX(ns) * M.safeZone, cx) : base.x;
+        const ny = ky * ns > 1.001 ? shift(base.y, minY, maxY, halfY(ns) * M.safeZone, cy) : base.y;
         return fit(framing(nx, ny, ns));
     };
 
@@ -322,8 +395,10 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
         // where the cursor will be by then (not where it was).
         const start = Math.max(arrivalStart(seg, target), free);
         if (follows && trackCursor && cursor.length) {
+            // Only this shot's own work, never the next shot's.
             const d = moveDuration(state, target);
-            target = frameWork(target, start + d * 0.6, start + d + 0.6, false);
+            const limit = Math.min(seg.endTime, next && Number.isFinite(next.actionTime) ? next.actionTime - 0.6 : Infinity);
+            target = frameWork(target, start + d * 0.6, Math.min(start + d + 0.6, limit), false);
         }
         emit(start, target);
         const arrived = free;
@@ -358,7 +433,7 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
 
     let mi = 0;
     let cur = initial;
-    const paths = moves.map(m => pathFor(m.from, m.to));
+    const paths = moves.map(m => pathFor(m.from, m.to, m.rho));
     let si = 0;
     for (let i = 0; i < frames; i++) {
         const t = i / hz;
@@ -373,6 +448,9 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
             const at = p.at(minimumJerk((t - m.t0) / m.d) * p.length);
             f = framing(at.x, at.y, Math.max(1, 1 / at.w));
         }
+        // Keep the window inside the recording before smoothing, so the
+        // smoothing pass rounds off any kink the constraint introduces.
+        f = fit(f);
         fx[i] = f.x;
         fy[i] = f.y;
         sc[i] = Math.log(f.s);
