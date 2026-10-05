@@ -18,6 +18,10 @@ for (const [name, make] of Object.entries(SCENARIOS)) {
         assert.ok(m.peakMotion <= BUDGET.peakMotion, `peak motion ${m.peakMotion.toFixed(2)} > ${BUDGET.peakMotion}`);
         assert.ok(m.peakAccel <= BUDGET.peakAccel, `peak acceleration ${m.peakAccel.toFixed(2)} > ${BUDGET.peakAccel}`);
         assert.ok(m.cursorOffPct <= BUDGET.cursorOffPct, `cursor off screen ${m.cursorOffPct.toFixed(1)}% while zoomed`);
+        // One rhythm: every move uses one of the three tempos (in, out, swoop).
+        for (const d of m.moveDurations) {
+            assert.ok([1.35, 1.512, 2.2].some(t => Math.abs(d - t) < 0.01), `move of ${d.toFixed(2)} s breaks the tempo`);
+        }
         const [seen, total] = m.clicksFramed.split('/').map(Number);
         assert.ok(seen >= total - Math.floor(total * 0.05), `only ${m.clicksFramed} clicks in frame`);
     });
