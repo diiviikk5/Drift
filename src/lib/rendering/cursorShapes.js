@@ -12,19 +12,64 @@ const SHAPES = new Set(['text', 'hand', 'resize-ew', 'resize-ns', 'resize-nwse',
 
 const timeOf = (s) => s.timeMs ?? s.time ?? s.t ?? 0;
 
-/** Shape showing at `timeSec` ('arrow' when unknown). `shapes` = [{time(ms), shape}] sorted. */
+// Real cursors flip shape constantly for a few ms (arrow <-> I-beam between
+// words and lines, arrow <-> hand at link edges, brief busy blips). Replayed
+// literally that reads as flicker, so a shape must hold for a moment before
+// the synthetic pointer adopts it.
+const MIN_HOLD_MS = 150;
+const MIN_HOLD_BUSY_MS = 400;
+const FADE_MS = 90;
+
+const stableCache = new WeakMap();
+
+/** The recorded shape track with micro-flips removed: [{time, shape}] sorted. */
+export function stableCursorShapes(shapes) {
+    if (!shapes || !shapes.length) return [];
+    const hit = stableCache.get(shapes);
+    if (hit) return hit;
+    const sorted = shapes
+        .map(s => ({ time: timeOf(s), shape: SHAPES.has(s.shape) ? s.shape : 'arrow' }))
+        .sort((a, b) => a.time - b.time);
+    const out = [];
+    for (let i = 0; i < sorted.length; i++) {
+        const cur = sorted[i];
+        const next = sorted[i + 1];
+        const held = next ? next.time - cur.time : Infinity;
+        const need = cur.shape === 'wait' || cur.shape === 'progress' ? MIN_HOLD_BUSY_MS : MIN_HOLD_MS;
+        if (held < need) continue; // a flip: keep showing the previous shape
+        if (out.length && out[out.length - 1].shape === cur.shape) continue;
+        out.push(cur);
+    }
+    stableCache.set(shapes, out);
+    return out;
+}
+
+/** Shape showing at `timeSec` ('arrow' when unknown). */
 export function cursorShapeAt(timeSec, shapes) {
-    if (!shapes || !shapes.length) return 'arrow';
+    return cursorShapeState(timeSec, shapes).shape;
+}
+
+/**
+ * Shape at `timeSec` plus the one it is fading from: { shape, prev, mix }
+ * where mix goes 0 -> 1 over FADE_MS after a change.
+ */
+export function cursorShapeState(timeSec, shapes) {
+    const list = stableCursorShapes(shapes);
+    if (!list.length) return { shape: 'arrow', prev: null, mix: 1 };
     const t = timeSec * 1000;
     let lo = 0;
-    let hi = shapes.length - 1;
+    let hi = list.length - 1;
     let idx = -1;
     while (lo <= hi) {
         const mid = (lo + hi) >> 1;
-        if (timeOf(shapes[mid]) <= t) { idx = mid; lo = mid + 1; } else { hi = mid - 1; }
+        if (list[mid].time <= t) { idx = mid; lo = mid + 1; } else { hi = mid - 1; }
     }
-    const shape = idx >= 0 ? shapes[idx].shape : 'arrow';
-    return SHAPES.has(shape) ? shape : 'arrow';
+    if (idx < 0) return { shape: 'arrow', prev: null, mix: 1 };
+    const shape = list[idx].shape;
+    const since = t - list[idx].time;
+    const prev = idx > 0 ? list[idx - 1].shape : 'arrow';
+    if (since >= FADE_MS || prev === shape) return { shape, prev: null, mix: 1 };
+    return { shape, prev, mix: since / FADE_MS };
 }
 
 /** Does this theme draw shapes (rather than one stylized pointer)? */
