@@ -17,7 +17,7 @@ const STEP_MS = 1000 / HZ;
 const MIN_HOLD_GAP_MS = 60;
 const MOVE_IN_MS = 16;
 const CLICK_PIN_MS = 90;
-const BASE_TAU_MS = 9; // strength 1 -> effective sigma ~18 ms
+const BASE_TAU_MS = 16; // strength 1 -> effective sigma ~32 ms (silky, still lag-free)
 
 function sampleTime(s) {
     return s.timeMs ?? s.time ?? s.t ?? 0;
