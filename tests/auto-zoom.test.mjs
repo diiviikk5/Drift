@@ -50,11 +50,13 @@ test('rapid nearby clicks form one calm zoom instead of many', () => {
     assert.ok(segs[0].endTime - segs[0].startTime > 3);
 });
 
-test('zoom depth adapts to how spread out the work is', () => {
+test('zoom depth: preset for ordinary work, deeper for sustained detail, shallower when spread', () => {
+    const single = new InteractionAnalyzer().analyze([{ time: 1000, x: 0.5, y: 0.5 }], [], 10);
+    assert.equal(single[0].zoomScale, 1.55, 'a lone click uses the preset depth');
     const tight = new InteractionAnalyzer().analyze(
-        [{ time: 1000, x: 0.5, y: 0.5 }, { time: 1800, x: 0.52, y: 0.51 }], [], 10);
+        [{ time: 1000, x: 0.5, y: 0.5 }, { time: 1800, x: 0.52, y: 0.51 }, { time: 2500, x: 0.51, y: 0.5 }], [], 10);
     const wide = new InteractionAnalyzer().analyze(
-        [{ time: 1000, x: 0.3, y: 0.5 }, { time: 1800, x: 0.65, y: 0.6 }], [], 10);
+        [{ time: 1000, x: 0.25, y: 0.5 }, { time: 1800, x: 0.7, y: 0.6 }], [], 10);
     assert.equal(tight.length, 1);
     assert.equal(wide.length, 1);
     assert.ok(tight[0].zoomScale > wide[0].zoomScale, `${tight[0].zoomScale} should exceed ${wide[0].zoomScale}`);
