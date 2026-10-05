@@ -806,6 +806,10 @@ pub async fn stop_native_session(app: AppHandle) -> Result<NativeSessionResult, 
     let telemetry_json = serde_json::to_string_pretty(&telemetry_samples)
         .unwrap_or_else(|_| "[]".to_string());
     let _ = std::fs::write(&telemetry_path, telemetry_json);
+    // Cursor shape track alongside the telemetry (useful when diagnosing playback).
+    if let Ok(json) = serde_json::to_string(&*shapes_out.lock()) {
+        let _ = std::fs::write(session_dir.join("cursor_shapes.json"), json);
+    }
 
     // 4.5 Retrieve synchronized keystrokes and write keystrokes.json
     let keystroke_samples = crate::commands::input::get_session_keystrokes(app.state::<crate::commands::input::InputListenerState>());
