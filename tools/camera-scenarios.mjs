@@ -135,6 +135,31 @@ export const SCENARIOS = {
         return buildScenario(steps, { duration: 60 });
     },
 
+    'one click in a long, quiet video': () => buildScenario([{ wait: 6 }, { click: [0.62, 0.44] }, { wait: 20 }], { duration: 30 }),
+
+    'detail work in a corner for 15 s': () => {
+        const r = rnd(11);
+        const steps = [{ wait: 1 }];
+        for (let i = 0; i < 18; i++) {
+            if (i % 4 === 3) steps.push({ type: 1.2 });
+            else steps.push({ click: [0.78 + r() * 0.12, 0.8 + r() * 0.1], speed: 0.9 });
+            steps.push({ wait: 0.3 + r() * 0.5 });
+        }
+        return buildScenario(steps);
+    },
+
+    'deliberate tour of four areas': () => buildScenario([
+        { wait: 1 },
+        { click: [0.2, 0.2] }, { wait: 1.6 }, { click: [0.24, 0.26] }, { wait: 2 },
+        { click: [0.8, 0.25] }, { wait: 1.5 }, { click: [0.76, 0.3] }, { wait: 2 },
+        { click: [0.75, 0.8] }, { wait: 1.8 }, { click: [0.7, 0.78] }, { wait: 2 },
+        { click: [0.25, 0.75] }, { wait: 2.5 },
+    ]),
+
+    'quick two-step: click, then a far button': () => buildScenario([
+        { wait: 1 }, { click: [0.2, 0.3] }, { wait: 0.4 }, { click: [0.85, 0.75] }, { wait: 2.5 },
+    ]),
+
     'cursor wandering, no clicks': () => {
         const r = rnd(3);
         const steps = [];
