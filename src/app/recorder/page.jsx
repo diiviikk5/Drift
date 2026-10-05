@@ -20,6 +20,7 @@ import InspectorPanel from '@/components/desktop/InspectorPanel';
 import ExportDialog from '@/components/desktop/ExportDialog';
 import HotkeyModal from '@/components/desktop/HotkeyModal';
 import { normalizeHotkeys, formatAccelerator, matchesAccelerator } from '@/lib/hotkeys';
+import { getAppTheme } from '@/lib/ui/themes';
 import AISettings from '@/app/components/settings/AISettings';
 import NotesTeleprompter from '@/components/desktop/NotesTeleprompter';
 
@@ -1770,10 +1771,10 @@ export default function RecorderPage() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [viewMode, activeCountdown]);
 
-    const isDark = theme !== 'light';
+    const isDark = getAppTheme(theme).scheme === 'dark';
 
     return (
-        <div className={`h-screen font-sans select-none flex flex-col overflow-hidden theme-${theme} ${isDark ? 'dark' : ''} bg-[var(--bg-app)] text-[var(--text-app)] transition-colors duration-200`}>
+        <div className={`drift-app h-screen select-none flex flex-col overflow-hidden theme-${getAppTheme(theme).id} ${isDark ? 'dark' : ''} bg-[var(--bg-app)] text-[var(--text-app)]`}>
             {/* Offscreen media elements for Canvas pipeline - MUST NOT use display:none so Chromium decodes frames */}
             <video
                 ref={recorderVideoRef}
@@ -1816,7 +1817,7 @@ export default function RecorderPage() {
             <div className="flex-1 min-h-0 flex flex-col relative overflow-hidden">
                 {viewMode === 'recorder' ? (
                     /* ═══ CAPTURE COCKPIT ═══ */
-                    <div className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-4xl mx-auto overflow-y-auto">
+                    <div className="flex-1 flex flex-col w-full overflow-y-auto px-8 py-8">
                         {/* Centered Cockpit Card */}
                         <CaptureCockpit
                             sources={sources}
