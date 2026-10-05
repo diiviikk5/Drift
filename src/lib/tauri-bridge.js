@@ -475,74 +475,87 @@ function dispatchHotkey(action, source) {
     window.dispatchEvent(new CustomEvent('drift-hotkey', { detail: { action, source } }));
 }
 
+// Shortcut changes run one at a time: a page remount can unregister and
+// re-register at the same moment, and overlapping calls race each other.
+let _shortcutQueue = Promise.resolve();
+function queueShortcuts(task) {
+    const run = _shortcutQueue.then(task, task);
+    _shortcutQueue = run.catch(() => {});
+    return run;
+}
+
 /**
  * Register the system-wide recording shortcuts (they keep working while Drift
  * is in the background or the tray) and forward tray menu actions.
  * Every action arrives as a 'drift-hotkey' window event.
+ *
+ * Drift's own earlier registrations are always cleared first (they survive a
+ * page reload on the native side), so a failure really means another app
+ * owns the key.
  * @param {object} hotkeyConfig - { toggle_recording, stop_recording, ... }
  * @returns {Promise<{registered: string[], failed: {action: string, accelerator: string}[]}>}
  */
-export async function registerGlobalShortcuts(hotkeyConfig) {
-    const result = { registered: [], failed: [] };
-    if (!isTauri()) return result;
-    const api = await getShortcutApi();
-    if (!api) return result;
+export function registerGlobalShortcuts(hotkeyConfig) {
+    return queueShortcuts(async () => {
+        const result = { registered: [], failed: [] };
+        if (!isTauri()) return result;
+        const api = await getShortcutApi();
+        if (!api) return result;
 
-    await unregisterAllShortcuts();
+        try { await api.unregisterAll(); } catch { /* nothing registered */ }
+        _registeredShortcuts = [];
 
-    if (!_trayHotkeyUnlisten) {
-        const events = await getEventApi();
-        _trayHotkeyUnlisten = await events.listen('drift-hotkey', (event) => {
-            const { action, source } = event.payload || {};
-            if (action) dispatchHotkey(action, source || 'tray');
-        });
-    }
-
-    // One registration per accelerator; if start/stop share a key, toggle wins.
-    const byAccel = new Map();
-    for (const action of GLOBAL_HOTKEY_ACTIONS) {
-        const accel = String(hotkeyConfig?.[action] || '').trim();
-        if (!accel) continue;
-        if (!byAccel.has(accel)) byAccel.set(accel, action);
-    }
-
-    let last = 0;
-    for (const [accel, action] of byAccel.entries()) {
-        try {
-            await api.register(accel, (event) => {
-                if (event && event.state === 'Released') return;
-                const now = Date.now();
-                if (now - last < 350) return; // key repeat
-                last = now;
-                dispatchHotkey(action, 'global');
+        if (!_trayHotkeyUnlisten) {
+            const events = await getEventApi();
+            _trayHotkeyUnlisten = await events.listen('drift-hotkey', (event) => {
+                const { action, source } = event.payload || {};
+                if (action) dispatchHotkey(action, source || 'tray');
             });
-            _registeredShortcuts.push(accel);
-            result.registered.push(accel);
-        } catch (err) {
-            console.warn(`[drift] Could not register ${accel} for ${action}:`, err);
-            result.failed.push({ action, accelerator: accel });
         }
-    }
-    console.log('[drift] Registered global shortcuts:', _registeredShortcuts);
-    return result;
+
+        // One registration per accelerator; if start/stop share a key, toggle wins.
+        const byAccel = new Map();
+        for (const action of GLOBAL_HOTKEY_ACTIONS) {
+            const accel = String(hotkeyConfig?.[action] || '').trim();
+            if (!accel) continue;
+            if (!byAccel.has(accel)) byAccel.set(accel, action);
+        }
+
+        let last = 0;
+        const handler = (action) => (event) => {
+            if (event && event.state === 'Released') return;
+            const now = Date.now();
+            if (now - last < 350) return; // key repeat
+            last = now;
+            dispatchHotkey(action, 'global');
+        };
+        for (const [accel, action] of byAccel.entries()) {
+            try {
+                if (await api.isRegistered(accel)) await api.unregister(accel);
+                await api.register(accel, handler(action));
+                _registeredShortcuts.push(accel);
+                result.registered.push(accel);
+            } catch (err) {
+                console.warn(`[drift] Could not register ${accel} for ${action}:`, err);
+                result.failed.push({ action, accelerator: accel });
+            }
+        }
+        console.log('[drift] Registered global shortcuts:', _registeredShortcuts);
+        return result;
+    });
 }
 
 /**
- * Unregister all previously registered global shortcuts.
+ * Unregister all of Drift's global shortcuts.
  */
-export async function unregisterAllShortcuts() {
-    if (!isTauri()) return;
-    const api = await getShortcutApi();
-    if (!api) return;
-
-    for (const accel of _registeredShortcuts) {
-        try {
-            await api.unregister(accel);
-        } catch (err) {
-            // Ignore — may already be unregistered
-        }
-    }
-    _registeredShortcuts = [];
+export function unregisterAllShortcuts() {
+    return queueShortcuts(async () => {
+        if (!isTauri()) return;
+        const api = await getShortcutApi();
+        if (!api) return;
+        try { await api.unregisterAll(); } catch { /* already clear */ }
+        _registeredShortcuts = [];
+    });
 }
 
 /**
