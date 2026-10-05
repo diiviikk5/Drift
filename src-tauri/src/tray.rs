@@ -69,11 +69,8 @@ pub fn setup(app: &App) -> tauri::Result<()> {
     let quit = MenuItem::with_id(handle, "quit", "Quit Drift", true, None::<&str>)?;
     let menu = Menu::with_items(handle, &[&toggle, &open, &sep, &quit])?;
 
-    let idle_icon = app
-        .default_window_icon()
-        .cloned()
-        .map(|i| Image::new_owned(i.rgba().to_vec(), i.width(), i.height()))
-        .ok_or_else(|| tauri::Error::AssetNotFound("default window icon".into()))?;
+    // The compact Drift mark (the full logo's wordmark is illegible at tray size).
+    let idle_icon = Image::from_bytes(include_bytes!("../icons/tray.png"))?.to_owned();
     let recording_icon = with_record_dot(&idle_icon);
 
     let tray = TrayIconBuilder::with_id("drift")
