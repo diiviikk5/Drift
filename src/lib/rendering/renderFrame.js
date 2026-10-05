@@ -8,7 +8,7 @@
 
 import { computeCursorSwayRotation } from '../zoom/cursorTilt.js';
 import { typingPointerOpacity } from '../zoom/typingFocus.js';
-import { cursorShapeAt, drawCursorShape, themeHasShapes } from './cursorShapes.js';
+import { cursorShapeState, drawCursorShape, themeHasShapes } from './cursorShapes.js';
 import { getSmoothedCursorPath } from '../zoom/cursorPathSmoothing.js';
 import { getCameraTrack, sampleCameraTrack } from '../zoom/cameraTrack.js';
 import { WALLPAPERS, computeStageLayout, drawMeshBackground, getGrainPattern } from './stage.js';
@@ -522,9 +522,20 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
             }
             ctx.globalAlpha = idleOpacity;
             // Same shape as the real pointer had (I-beam over text, hand over links...).
-            const shape = themeHasShapes(cursorTheme) ? cursorShapeAt(timeSec, cursorShapes) : 'arrow';
-            if (!drawCursorShape(ctx, curScreenX, curScreenY, size, shape, cursorTheme, timeSec)) {
-                _drawThemedCursor(ctx, curScreenX, curScreenY, size, cursorTheme, swayAngle);
+            // Shape changes crossfade briefly instead of swapping on one frame.
+            const drawShape = (shape, alpha) => {
+                if (alpha <= 0.01) return;
+                ctx.globalAlpha = idleOpacity * alpha;
+                if (!drawCursorShape(ctx, curScreenX, curScreenY, size, shape, cursorTheme, timeSec)) {
+                    _drawThemedCursor(ctx, curScreenX, curScreenY, size, cursorTheme, swayAngle);
+                }
+            };
+            if (themeHasShapes(cursorTheme)) {
+                const st = cursorShapeState(timeSec, cursorShapes);
+                if (st.prev) drawShape(st.prev, 1 - st.mix);
+                drawShape(st.shape, st.prev ? st.mix : 1);
+            } else {
+                drawShape('arrow', 1);
             }
             ctx.restore();
         }
@@ -1197,6 +1208,17 @@ function _drawSyntheticCursor(ctx, x, y, scale = 1.0, swayAngle = 0) {
 /**
  * Draw animated floating keystroke badges
  */
+/**
+ * Is this logged key worth a badge? Only real shortcuts (with Ctrl, Alt or
+ * Win). Bare Space/Enter/Backspace/arrows and Shift+letter are just typing.
+ */
+export function isShortcutKeystroke(text) {
+    if (!text) return false;
+    const parts = String(text).split('+').map(p => p.trim());
+    if (parts.length < 2) return false;
+    return parts.slice(0, -1).some(p => /^(ctrl|alt|win|⌘|cmd|meta)$/i.test(p));
+}
+
 function _drawKeystrokeOverlay(ctx, keystrokes, timeSec, bounds) {
     if (!keystrokes || keystrokes.length === 0) return;
     const curSec = timeSec;
@@ -1205,7 +1227,7 @@ function _drawKeystrokeOverlay(ctx, keystrokes, timeSec, bounds) {
     let active = null;
     for (let i = keystrokes.length - 1; i >= 0; i--) {
         const k = keystrokes[i];
-        if (k.typed) continue; // anonymous typing activity, not a shortcut to show
+        if (k.typed || !isShortcutKeystroke(k.text)) continue; // only real shortcuts get a badge
         const t = (k.time > 1000 || k.t > 1000) ? (k.time || k.t) / 1000 : (k.time || k.t || 0);
         const dt = curSec - t;
         if (dt >= 0 && dt <= 1.6) {
