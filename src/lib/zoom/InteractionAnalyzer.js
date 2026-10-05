@@ -33,6 +33,7 @@ export const AUTO_ZOOM_DEFAULTS = Object.freeze({
     maxZoomBoost: 1.12,     // tight work may zoom up to preset * boost
     hopGap: 1.4,            // actions closer than this in time belong to one burst
     minRunZoom: 1.15,       // a burst that doesn't fit at this zoom stays on the full frame
+    minShotHold: 1.0,       // a shot must be watchable this long before the next action elsewhere
     fitMargin: 0.14,        // breathing room (normalized) around the session's activity box
     maxSessionSpan: 0.45,   // activity spread (normalized) above which a session is split (fits at ~1.5x)
     minActionTime: 0.35,    // ignore the click that starts the recording
@@ -373,7 +374,13 @@ export class InteractionAnalyzer {
             }
             i = j + 1;
         }
-        return out;
+
+        // 3. A shot that can't be held for a moment before the next one takes
+        // over isn't worth the trip: go straight to the next shot.
+        return out.filter((shot, k) => {
+            const next = out[k + 1];
+            return !next || next.actionTime - shot.lastAction >= o.minShotHold;
+        });
     }
 
     _finalize(planned, duration) {
