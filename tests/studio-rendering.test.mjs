@@ -322,3 +322,30 @@ test('pointer hides while outside the recorded area', async () => {
     assert.equal(cursorAreaOpacity(0.2, samples), 0);
     assert.equal(cursorAreaOpacity(0.35, samples), 1);
 });
+
+test('camera motion blur: several video draws while the camera moves, one when still', () => {
+    const draws = { n: 0 };
+    const noop = () => {};
+    const ctx = new Proxy({ canvas: { width: 1920, height: 1080 } }, {
+        get(target, key) {
+            if (key in target) return target[key];
+            if (key === 'drawImage') return (img) => { if (img && img.__video) draws.n++; };
+            if (key === 'createLinearGradient' || key === 'createRadialGradient') return () => ({ addColorStop: noop });
+            if (key === 'createPattern') return () => null;
+            return noop;
+        },
+        set(target, key, value) { target[key] = value; return true; },
+    });
+    const video = { __video: true, width: 1920, height: 1080, videoWidth: 1920, videoHeight: 1080 };
+    const segs = [{ startTime: 1, endTime: 6, targetX: 0.3, targetY: 0.3, zoomScale: 1.6 }];
+    renderFrame(ctx, 0.2, video, { focusSegments: segs }, { duration: 8 });
+    const still = draws.n;
+    draws.n = 0;
+    renderFrame(ctx, 1.6, video, { focusSegments: segs }, { duration: 8 });
+    const moving = draws.n;
+    draws.n = 0;
+    renderFrame(ctx, 1.6, video, { focusSegments: segs }, { duration: 8, cameraMotionBlur: false });
+    assert.equal(still, 1);
+    assert.ok(moving > 1, `expected blur draws while moving, got ${moving}`);
+    assert.equal(draws.n, 1, 'blur can be turned off');
+});
