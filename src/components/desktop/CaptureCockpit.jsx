@@ -1,9 +1,62 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Monitor, Mic, MicOff, Timer, Camera, ExternalLink, Sparkles, Check, Play, Square, AppWindow, RefreshCw } from 'lucide-react';
-import AudioLevelMeter from './AudioLevelMeter';
+import { Monitor, Mic, Camera, Timer, Play, Square, AppWindow, RefreshCw, ExternalLink } from 'lucide-react';
 import { createAudioLevelMeter } from '@/lib/audio/audioMix';
+
+/** Accessible on/off switch. */
+function Switch({ checked, onChange, label }) {
+    return (
+        <button
+            type="button"
+            role="switch"
+            aria-checked={checked}
+            aria-label={label}
+            onClick={() => onChange?.(!checked)}
+            className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${checked ? 'bg-[var(--accent-app)]' : 'bg-[var(--border-app-hover)]'}`}
+        >
+            <span
+                className={`absolute top-0.5 w-4 h-4 rounded-full shadow transition-[left] duration-150 ${checked ? 'left-[18px]' : 'left-0.5'}`}
+                style={{ background: checked ? 'var(--accent-app-fg)' : '#ffffff' }}
+            />
+        </button>
+    );
+}
+
+/** Option tile: icon, title, state, and optional detail below. */
+function Tile({ icon: Icon, title, status, control, children }) {
+    return (
+        <div className="p-3.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-app)] flex flex-col gap-2.5 min-w-0">
+            <div className="flex items-center gap-2.5">
+                <span className="w-8 h-8 rounded-lg bg-[var(--bg-card-subtle)] flex items-center justify-center text-[var(--text-app-muted)] flex-shrink-0">
+                    <Icon className="w-4 h-4" />
+                </span>
+                <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-medium text-[var(--text-app)] leading-tight">{title}</div>
+                    <div className="text-xs text-[var(--text-app-muted)] truncate">{status}</div>
+                </div>
+                {control}
+            </div>
+            {children}
+        </div>
+    );
+}
+
+function DeviceSelect({ value, onChange, devices, fallback }) {
+    return (
+        <select
+            value={value}
+            onChange={(e) => onChange?.(e.target.value)}
+            className="w-full h-8 text-xs bg-[var(--bg-card-subtle)] text-[var(--text-app)] border border-[var(--border-app)] rounded-lg px-2 truncate focus:outline-none cursor-pointer"
+        >
+            {devices.map((d) => (
+                <option key={d.deviceId} value={d.deviceId}>
+                    {d.label || `${fallback} (${d.deviceId.slice(0, 6)})`}
+                </option>
+            ))}
+        </select>
+    );
+}
 
 export default function CaptureCockpit({
     sources = [],
@@ -14,7 +67,6 @@ export default function CaptureCockpit({
     onSelectWindowMode = null,
     onRefreshWindows = null,
     sourceThumbnails = {},
-    loadingSources = false,
     isRecording,
     onToggleRecord,
     timer,
@@ -38,26 +90,16 @@ export default function CaptureCockpit({
     autoMinimize = true,
     onToggleAutoMinimize = null,
     isNativeSupported = false,
-    webcamStream = null,
 }) {
     const [audioLevel, setAudioLevel] = useState(0);
 
+    // Real input level only; no meter without a live microphone stream.
     useEffect(() => {
-        if (!micEnabled) {
+        if (!micEnabled || !micStream) {
             setAudioLevel(0);
             return;
         }
-        if (micStream) {
-            const cleanup = createAudioLevelMeter(micStream, (lvl) => setAudioLevel(lvl));
-            return cleanup;
-        }
-        let frame;
-        const tick = () => {
-            setAudioLevel(0.25 + Math.sin(Date.now() / 220) * 0.15);
-            frame = requestAnimationFrame(tick);
-        };
-        frame = requestAnimationFrame(tick);
-        return () => cancelAnimationFrame(frame);
+        return createAudioLevelMeter(micStream, (lvl) => setAudioLevel(lvl));
     }, [micEnabled, micStream]);
 
     const isNativeWindowMode = String(selectedSource || '').startsWith('window:');
@@ -66,430 +108,241 @@ export default function CaptureCockpit({
     const useNativeWindows = isNativeSupported && Boolean(onSelectWindowMode);
 
     const activeSource = nativeWindow
-        ? { name: nativeWindow.title, width: nativeWindow.width, height: nativeWindow.height, is_window: true }
+        ? { name: nativeWindow.title, width: nativeWindow.width, height: nativeWindow.height }
         : !isWindowMode
-        ? (sources.find(s => s.id === selectedSource) || sources[0] || {
-            name: 'Primary Display',
-            width: 1920,
-            height: 1080,
-            is_primary: true
-        })
-        : {
-            name: 'Application Window',
-            is_window: true,
-        };
+        ? (sources.find(s => s.id === selectedSource) || sources[0] || { name: 'Primary display', width: 1920, height: 1080, is_primary: true })
+        : { name: 'Window' };
+    const resolution = activeSource.width ? `${activeSource.width} × ${activeSource.height}` : null;
+    const thumb = !isWindowMode ? (sourceThumbnails[activeSource.id] || activeSource.thumbnailDataUrl) : null;
 
-    const thumb = (!isWindowMode && activeSource) ? (sourceThumbnails[activeSource.id] || activeSource.thumbnailDataUrl) : null;
+    const selectScreen = () => {
+        const primary = sources.find(s => s.is_primary) || sources[0];
+        onSelectSource(primary ? primary.id : 'screen:0');
+    };
+
+    const sourceButton = (active, onClick, Icon, label) => (
+        <button
+            type="button"
+            onClick={onClick}
+            className={`flex items-center justify-center gap-2 h-8 rounded-md text-[13px] font-medium transition-colors ${
+                active ? 'bg-[var(--pill-active-bg)] text-[var(--pill-active-fg)] shadow-sm' : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
+            }`}
+        >
+            <Icon className="w-4 h-4" />
+            <span>{label}</span>
+        </button>
+    );
+
+    const previewStatus = hasActiveStream ? (isRecording ? 'Recording' : 'Live preview') : 'Ready';
 
     return (
-        <div className="max-w-2xl w-full mx-auto my-auto p-6 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-app)] shadow-2xl space-y-6 transition-all duration-200">
-            {/* Display Selector & Live Preview */}
-            <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-[var(--text-app)] uppercase tracking-wider font-mono">
-                            Capture Target
-                        </span>
-                    </div>
-
-                    {isWindowMode && hasActiveStream && (
-                        <button
-                            onClick={onSelectBrowserSource}
-                            className="flex items-center gap-1.5 text-xs text-[var(--accent-app)] hover:underline transition-colors cursor-pointer"
-                        >
-                            <span>Switch Window</span>
-                            <ExternalLink className="w-3 h-3" />
-                        </button>
-                    )}
+        <div className="w-full max-w-3xl mx-auto my-auto flex flex-col gap-5">
+            {/* Title */}
+            <div className="flex items-end justify-between gap-4">
+                <div>
+                    <h1 className="text-xl font-semibold tracking-tight text-[var(--text-app)]">New recording</h1>
+                    <p className="text-[13px] text-[var(--text-app-muted)] mt-0.5">
+                        Clicks, typing and scrolling are tracked so Drift can zoom and edit for you.
+                    </p>
                 </div>
-
-                {/* Target Type Selector: Display vs Specific Window */}
-                <div className="grid grid-cols-2 p-1 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] gap-1">
-                    <button
-                        type="button"
-                        onClick={() => {
-                            if (sources.length > 0) {
-                                const primary = sources.find(s => s.is_primary) || sources[0];
-                                onSelectSource(primary.id);
-                            } else {
-                                onSelectSource('screen:0');
-                            }
-                        }}
-                        className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                            !isWindowMode
-                                ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] shadow-xs'
-                                : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
-                        }`}
-                    >
-                        <Monitor className="w-4 h-4" />
-                        <span>Entire Display</span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={useNativeWindows ? onSelectWindowMode : onSelectBrowserSource}
-                        className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                            isWindowMode
-                                ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] shadow-xs'
-                                : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
-                        }`}
-                    >
-                        <AppWindow className="w-4 h-4" />
-                        <span>Window / Application</span>
-                    </button>
-                </div>
-
-                {/* Display Selector Pills (if multiple displays and in display mode) */}
-                {!isWindowMode && sources.length > 1 && (
-                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                        {sources.map((src, i) => {
-                            const isSelected = (selectedSource === src.id) || (!selectedSource && i === 0);
-                            return (
-                                <button
-                                    key={src.id}
-                                    onClick={() => onSelectSource(src.id)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all flex items-center gap-2 flex-shrink-0 cursor-pointer ${
-                                        isSelected
-                                            ? 'bg-[var(--bg-card-subtle)] border-[var(--border-app-hover)] text-[var(--text-app)] font-semibold'
-                                            : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
-                                    }`}
-                                >
-                                    <Monitor className="w-3 h-3" />
-                                    <span>{src.name || `Display ${i + 1}`}</span>
-                                    {src.is_primary && (
-                                        <span className="text-[9px] px-1 py-0.2 rounded bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold">
-                                            Primary
-                                        </span>
-                                    )}
-                                </button>
-                            );
-                        })}
-                    </div>
-                )}
-
-                {/* Native window list */}
-                {isNativeWindowMode && (
-                    <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-app-muted)]">Open windows</span>
-                            {onRefreshWindows && (
-                                <button type="button" onClick={onRefreshWindows} className="flex items-center gap-1 text-[11px] text-[var(--accent-app)] hover:underline cursor-pointer">
-                                    <RefreshCw className="w-3 h-3" />
-                                    <span>Refresh</span>
-                                </button>
-                            )}
-                        </div>
-                        <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
-                            {captureWindows.length === 0 && (
-                                <div className="text-[11px] text-[var(--text-app-muted)] px-2 py-3 text-center">No windows found - open the app you want to record, then Refresh.</div>
-                            )}
-                            {captureWindows.map((w) => (
-                                <button
-                                    key={w.id}
-                                    type="button"
-                                    onClick={() => onSelectSource(w.id)}
-                                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-left transition-all cursor-pointer ${
-                                        selectedSource === w.id
-                                            ? 'bg-[var(--bg-card-subtle)] border-[var(--accent-app)] text-[var(--text-app)]'
-                                            : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
-                                    }`}
-                                >
-                                    <AppWindow className="w-3.5 h-3.5 flex-shrink-0 text-[var(--accent-app)]" />
-                                    <span className="text-xs truncate flex-1">{w.title}</span>
-                                    <span className="text-[10px] font-mono opacity-70 flex-shrink-0">{w.process} · {w.width}×{w.height}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* Active Window Status Banner when in window mode */}
-                {isWindowMode && !isNativeWindowMode && (
-                    <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400">
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                            <span className="font-medium">
-                                {hasActiveStream ? 'Selected Window Ready to Record' : 'Click below to pick a specific window'}
-                            </span>
-                        </div>
-                        <span className="text-[11px] text-emerald-500/80">Only the chosen window is recorded</span>
-                    </div>
-                )}
-
-                {/* Preview Card */}
-                <div className="relative aspect-video w-full rounded-xl overflow-hidden border border-[var(--border-app)] bg-black/60 shadow-inner group flex items-center justify-center">
-                    {/* Permanently mounted preview canvas so recorderCanvasRef is never null */}
-                    <div className={`w-full h-full flex items-center justify-center bg-black ${hasActiveStream ? 'block' : 'hidden'}`}>
-                        {previewCanvas}
-                    </div>
-
-                    {!hasActiveStream && (thumb ? (
-                        <div className="relative w-full h-full group">
-                            <img
-                                src={thumb}
-                                alt="Display Preview"
-                                className="w-full h-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-xs">
-                                <button
-                                    type="button"
-                                    onClick={onStartPreview || onSelectBrowserSource}
-                                    className="px-3.5 py-1.5 rounded-lg bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-semibold text-xs flex items-center gap-1.5 shadow-lg hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-                                >
-                                    <Play className="w-3.5 h-3.5 fill-current" />
-                                    <span>Preview Screen</span>
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-[var(--text-app-muted)] gap-3 p-6 text-center">
-                            <div className="w-12 h-12 rounded-2xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] flex items-center justify-center text-[var(--accent-app)] shadow-md">
-                                {isWindowMode ? <AppWindow className="w-6 h-6" /> : <Monitor className="w-6 h-6" />}
-                            </div>
-                            <div>
-                                <p className="text-xs font-semibold text-[var(--text-app)]">
-                                    {isNativeWindowMode ? (nativeWindow ? nativeWindow.title : 'Pick a window above') : isWindowMode ? (hasActiveStream ? 'Application Window Selected' : 'No Window Selected') : (activeSource.name || 'Primary Display')}
-                                </p>
-                                <p className="text-[11px] text-[var(--text-app-muted)] font-mono mt-0.5">
-                                    {isNativeWindowMode ? 'Only this window is recorded - no system cursor' : isWindowMode ? 'Capture only the chosen app or tab' : `${activeSource.width ? `${activeSource.width} × ${activeSource.height}` : '1920 × 1080'} • 60 FPS`}
-                                </p>
-                            </div>
-                            {!isNativeWindowMode && <button
-                                type="button"
-                                onClick={onSelectBrowserSource || onStartPreview}
-                                className="px-3.5 py-1.5 rounded-lg bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-semibold text-xs flex items-center gap-1.5 shadow-lg hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-                            >
-                                {isWindowMode ? <AppWindow className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                                <span>{isWindowMode ? 'Choose Window to Record' : 'Preview Screen'}</span>
-                            </button>}
-                        </div>
-                    ))}
-
-                    {/* Overlay Badges */}
-                    <div className="absolute top-3 left-3 flex items-center gap-2 pointer-events-none">
-                        <span className="px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-white text-[10px] font-mono border border-white/10 font-semibold">
-                            {activeSource.width ? `${activeSource.width} × ${activeSource.height}` : '1920 × 1080'}
-                        </span>
-                        <span className={`px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-[10px] font-mono border border-white/10 flex items-center gap-1 ${
-                            hasActiveStream ? 'text-[#22c55e]' : 'text-zinc-400'
-                        }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${
-                                hasActiveStream ? 'bg-[#22c55e] animate-pulse' : 'bg-zinc-400'
-                            }`} />
-                            {hasActiveStream ? (isRecording ? 'LIVE RECORDING' : 'LIVE PREVIEW') : 'READY'}
-                        </span>
-                    </div>
-
-                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between bg-black/75 backdrop-blur-md px-3 py-2 rounded-lg border border-white/10 text-xs text-white pointer-events-none">
-                        <span className="truncate max-w-[300px] font-medium">{activeSource.name}</span>
-                        <span className="text-[11px] text-gray-300 font-mono">
-                            {isNativeSupported ? 'DirectX WGC • 60 FPS H.264' : 'Hardware Accelerated'}
-                        </span>
-                    </div>
+                <div className="grid grid-cols-2 gap-0.5 p-0.5 rounded-lg bg-[var(--pill-bg)] border border-[var(--border-app)] w-56 flex-shrink-0">
+                    {sourceButton(!isWindowMode, selectScreen, Monitor, 'Screen')}
+                    {sourceButton(isWindowMode, useNativeWindows ? onSelectWindowMode : onSelectBrowserSource, AppWindow, 'Window')}
                 </div>
             </div>
 
-            {/* Quick Settings Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* Microphone Card */}
-                <div className="p-3.5 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] space-y-2">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
+            {/* Displays */}
+            {!isWindowMode && sources.length > 1 && (
+                <div className="flex items-center gap-2 overflow-x-auto">
+                    {sources.map((src, i) => {
+                        const selected = selectedSource === src.id || (!selectedSource && i === 0);
+                        return (
                             <button
-                                onClick={onToggleMic}
-                                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
-                                    micEnabled
-                                        ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)]'
-                                        : 'bg-black/20 text-[var(--text-app-muted)]'
+                                key={src.id}
+                                onClick={() => onSelectSource(src.id)}
+                                className={`h-8 px-3 rounded-lg text-[13px] border flex items-center gap-2 flex-shrink-0 transition-colors ${
+                                    selected
+                                        ? 'bg-[var(--accent-soft)] border-[var(--accent-app)] text-[var(--text-app)]'
+                                        : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:border-[var(--border-app-hover)]'
                                 }`}
                             >
-                                {micEnabled ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
+                                <Monitor className="w-3.5 h-3.5" />
+                                <span>{src.name || `Display ${i + 1}`}</span>
+                                {src.is_primary && <span className="text-xs text-[var(--text-app-faint)]">Main</span>}
                             </button>
-                            <span className="text-xs font-semibold text-[var(--text-app)]">
-                                Mic
-                            </span>
-                        </div>
-                        <span className={`text-[10px] font-mono ${micEnabled ? 'text-green-500 font-bold' : 'text-[var(--text-app-muted)]'}`}>
-                            {micEnabled ? 'On' : 'Muted'}
-                        </span>
-                    </div>
-
-                    {/* Audio Level Indicator */}
-                    <div className="h-1.5 bg-black/25 rounded-full overflow-hidden flex gap-0.5 p-0.5 border border-white/5">
-                        {[...Array(12)].map((_, i) => {
-                            const threshold = (i + 1) / 12;
-                            const isLit = micEnabled && audioLevel >= threshold;
-                            let barColor = 'bg-emerald-400';
-                            if (i >= 10) barColor = 'bg-rose-500';
-                            else if (i >= 8) barColor = 'bg-amber-400';
-
-                            return (
-                                <div
-                                    key={i}
-                                    className={`flex-1 h-full rounded-xs transition-all duration-75 ${
-                                        isLit ? `${barColor} opacity-100 shadow-[0_0_4px_currentColor]` : 'bg-white/10 opacity-30'
-                                    }`}
-                                />
-                            );
-                        })}
-                    </div>
-
-                    {/* Microphone Device Dropdown */}
-                    {micEnabled && audioDevices.length > 1 && (
-                        <select
-                            value={selectedMicId}
-                            onChange={(e) => onSelectMic && onSelectMic(e.target.value)}
-                            className="w-full text-[10px] bg-black/40 text-[var(--text-app)] border border-white/10 rounded-md px-1.5 py-1 truncate focus:outline-none cursor-pointer"
-                        >
-                            {audioDevices.map((d) => (
-                                <option key={d.deviceId} value={d.deviceId} className="bg-[#121420] text-white">
-                                    {d.label || `Microphone (${d.deviceId.slice(0, 6)})`}
-                                </option>
-                            ))}
-                        </select>
-                    )}
+                        );
+                    })}
                 </div>
+            )}
 
-                {/* Webcam PiP Card */}
-                <div className="p-3.5 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] space-y-2">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={onToggleWebcam}
-                                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
-                                    webcamEnabled
-                                        ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)]'
-                                        : 'bg-black/20 text-[var(--text-app-muted)]'
-                                }`}
-                            >
-                                <Camera className="w-3.5 h-3.5" />
+            {/* Windows */}
+            {isNativeWindowMode && (
+                <div className="rounded-xl border border-[var(--border-app)] bg-[var(--bg-card)] overflow-hidden">
+                    <div className="flex items-center justify-between px-3.5 h-10 border-b border-[var(--border-app)]">
+                        <span className="text-[13px] font-medium text-[var(--text-app)]">Choose a window</span>
+                        {onRefreshWindows && (
+                            <button type="button" onClick={onRefreshWindows} className="flex items-center gap-1.5 text-xs text-[var(--text-app-muted)] hover:text-[var(--text-app)]">
+                                <RefreshCw className="w-3.5 h-3.5" />
+                                <span>Refresh</span>
                             </button>
-                            <span className="text-xs font-semibold text-[var(--text-app)]">
-                                Webcam
-                            </span>
-                        </div>
-                        <span className={`text-[10px] font-mono ${webcamEnabled ? 'text-green-500 font-bold' : 'text-[var(--text-app-muted)]'}`}>
-                            {webcamEnabled ? 'PiP Active' : 'Off'}
-                        </span>
+                        )}
                     </div>
-
-
-                    {/* Camera Device Dropdown */}
-                    {webcamEnabled && videoDevices.length > 1 ? (
-                        <select
-                            value={selectedWebcamId}
-                            onChange={(e) => onSelectWebcam && onSelectWebcam(e.target.value)}
-                            className="w-full text-[10px] bg-black/40 text-[var(--text-app)] border border-white/10 rounded-md px-1.5 py-1 truncate focus:outline-none cursor-pointer"
-                        >
-                            {videoDevices.map((d) => (
-                                <option key={d.deviceId} value={d.deviceId} className="bg-[#121420] text-white">
-                                    {d.label || `Camera (${d.deviceId.slice(0, 6)})`}
-                                </option>
-                            ))}
-                        </select>
-                    ) : (
-                        <div className="text-[10px] font-mono text-[var(--text-app-muted)] truncate">
-                            {webcamEnabled ? 'Picture-in-Picture active' : 'Click to enable camera'}
-                        </div>
-                    )}
-                </div>
-
-                {/* Countdown Timer Card */}
-                <div className="p-3.5 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] space-y-2">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Timer className="w-4 h-4 text-[var(--text-app-muted)]" />
-                            <span className="text-xs font-semibold text-[var(--text-app)]">
-                                Delay
-                            </span>
-                        </div>
-                        <span className="text-[10px] font-mono text-[var(--text-app-muted)]">
-                            {countdownSeconds === 0 ? 'Instant' : `${countdownSeconds}s`}
-                        </span>
-                    </div>
-
-                    {/* Segmented Pills */}
-                    <div className="grid grid-cols-3 gap-1 bg-black/20 p-1 rounded-lg">
-                        {[0, 3, 5].map((sec) => (
+                    <div className="max-h-44 overflow-y-auto p-1">
+                        {captureWindows.length === 0 && (
+                            <div className="text-[13px] text-[var(--text-app-muted)] px-3 py-5 text-center">
+                                No windows found. Open the app you want to record, then refresh.
+                            </div>
+                        )}
+                        {captureWindows.map((w) => (
                             <button
-                                key={sec}
-                                onClick={() => onChangeCountdown(sec)}
-                                className={`py-1 rounded-md text-[11px] font-mono font-medium transition-all ${
-                                    countdownSeconds === sec
-                                        ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold shadow-xs'
-                                        : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
+                                key={w.id}
+                                type="button"
+                                onClick={() => onSelectSource(w.id)}
+                                className={`w-full flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-left transition-colors ${
+                                    selectedSource === w.id ? 'bg-[var(--accent-soft)] text-[var(--text-app)]' : 'text-[var(--text-app-muted)] hover:bg-[var(--bg-card-subtle)] hover:text-[var(--text-app)]'
                                 }`}
                             >
-                                {sec === 0 ? '0s' : `${sec}s`}
+                                <AppWindow className="w-4 h-4 flex-shrink-0" />
+                                <span className="text-[13px] truncate flex-1">{w.title}</span>
+                                <span className="text-xs text-[var(--text-app-faint)] flex-shrink-0">{w.process}</span>
                             </button>
                         ))}
                     </div>
                 </div>
-            </div>
+            )}
 
-            {/* Studio Recording Spec & Options Bar */}
-            <div className="flex items-center justify-between text-xs text-[var(--text-app-muted)] px-1">
-                <label className="flex items-center gap-2 cursor-pointer hover:text-[var(--text-app)] transition-colors select-none">
-                    <input
-                        type="checkbox"
-                        checked={autoMinimize}
-                        onChange={(e) => onToggleAutoMinimize && onToggleAutoMinimize(e.target.checked)}
-                        className="rounded border-[var(--border-app)] text-[var(--accent-app)] accent-[var(--accent-app)] cursor-pointer"
-                    />
-                    <span className="text-[11px] font-medium">Auto-minimize during recording</span>
-                </label>
-                <div className="flex items-center gap-2 font-mono text-[10px] text-[var(--text-app-muted)]">
-                    {isNativeSupported ? (
-                        <>
-                            <span className="text-emerald-400 font-semibold">WASAPI Multi-Track</span>
-                            <span>•</span>
-                            <span>DirectX H.264</span>
-                            <span>•</span>
-                            <span className="text-[var(--accent-app)] font-semibold">Zero Dialogs</span>
-                        </>
-                    ) : (
-                        <>
-                            <span>48 kHz Voice Boost</span>
-                            <span>•</span>
-                            <span>VP9 60 FPS</span>
-                            <span>•</span>
-                            <span className="text-[var(--accent-app)] font-semibold">25 Mbps Lossless</span>
-                        </>
-                    )}
+            {isWindowMode && !isNativeWindowMode && (
+                <div className="flex items-center justify-between px-3.5 h-10 rounded-xl bg-[var(--bg-card)] border border-[var(--border-app)] text-[13px]">
+                    <span className="text-[var(--text-app)]">{hasActiveStream ? 'Window selected' : 'Pick the window to record'}</span>
+                    <button onClick={onSelectBrowserSource} className="flex items-center gap-1.5 text-[var(--text-app-muted)] hover:text-[var(--text-app)]">
+                        <span>{hasActiveStream ? 'Change' : 'Choose'}</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+            )}
+
+            {/* Preview */}
+            <div className="relative aspect-video w-full rounded-xl overflow-hidden border border-[var(--border-app)] bg-black group">
+                {/* Always mounted so the recorder canvas ref is never null */}
+                <div className={`w-full h-full flex items-center justify-center ${hasActiveStream ? 'block' : 'hidden'}`}>
+                    {previewCanvas}
+                </div>
+
+                {!hasActiveStream && (thumb ? (
+                    <div className="relative w-full h-full">
+                        <img src={thumb} alt="" className="w-full h-full object-cover opacity-90" />
+                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button
+                                type="button"
+                                onClick={onStartPreview || onSelectBrowserSource}
+                                className="h-9 px-4 rounded-lg bg-white/95 text-black text-[13px] font-medium flex items-center gap-2 shadow-lg"
+                            >
+                                <Play className="w-3.5 h-3.5 fill-current" />
+                                <span>Show live preview</span>
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-center p-6 bg-[var(--bg-card)]">
+                        <span className="w-12 h-12 rounded-xl bg-[var(--bg-card-subtle)] flex items-center justify-center text-[var(--text-app-muted)]">
+                            {isWindowMode ? <AppWindow className="w-6 h-6" /> : <Monitor className="w-6 h-6" />}
+                        </span>
+                        <div>
+                            <p className="text-[14px] font-medium text-[var(--text-app)]">
+                                {isNativeWindowMode ? (nativeWindow ? nativeWindow.title : 'No window chosen yet') : isWindowMode ? 'No window chosen yet' : activeSource.name || 'Primary display'}
+                            </p>
+                            <p className="text-[13px] text-[var(--text-app-muted)] mt-0.5">
+                                {isNativeWindowMode ? 'Only this window is recorded' : isWindowMode ? 'Only the chosen app or tab is recorded' : resolution ? `${resolution} · 60 fps` : '60 fps'}
+                            </p>
+                        </div>
+                        {!isNativeWindowMode && (
+                            <button
+                                type="button"
+                                onClick={isWindowMode ? onSelectBrowserSource : (onStartPreview || onSelectBrowserSource)}
+                                className="h-8 px-3.5 rounded-lg bg-[var(--bg-card-subtle)] border border-[var(--border-app)] hover:border-[var(--border-app-hover)] text-[var(--text-app)] text-[13px] font-medium flex items-center gap-2 transition-colors"
+                            >
+                                {isWindowMode ? <AppWindow className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                                <span>{isWindowMode ? 'Choose window' : 'Show live preview'}</span>
+                            </button>
+                        )}
+                    </div>
+                ))}
+
+                <div className="absolute top-3 left-3 flex items-center gap-1.5 h-6 px-2 rounded-md bg-black/60 text-white text-xs pointer-events-none">
+                    <span className={`w-1.5 h-1.5 rounded-full ${hasActiveStream ? (isRecording ? 'bg-red-500 animate-pulse' : 'bg-emerald-400') : 'bg-white/50'}`} />
+                    <span>{previewStatus}</span>
+                    {resolution && <span className="text-white/60 font-mono">{resolution}</span>}
                 </div>
             </div>
 
-            {/* Hero Record Button (Clean, robust, NEVER goes out of bounds!) */}
-            <div>
+            {/* Options */}
+            <div className="grid grid-cols-3 gap-3">
+                <Tile
+                    icon={Mic}
+                    title="Microphone"
+                    status={micEnabled ? (audioDevices.find(d => d.deviceId === selectedMicId)?.label || 'On') : 'Off'}
+                    control={<Switch checked={micEnabled} onChange={() => onToggleMic()} label="Microphone" />}
+                >
+                    {micEnabled && (
+                        <div className="h-1.5 rounded-full bg-[var(--bg-card-subtle)] overflow-hidden" title="Input level">
+                            <div className="h-full rounded-full bg-emerald-400 transition-[width] duration-75" style={{ width: `${Math.round(Math.min(1, audioLevel) * 100)}%` }} />
+                        </div>
+                    )}
+                    {micEnabled && audioDevices.length > 1 && (
+                        <DeviceSelect value={selectedMicId} onChange={onSelectMic} devices={audioDevices} fallback="Microphone" />
+                    )}
+                </Tile>
+
+                <Tile
+                    icon={Camera}
+                    title="Camera"
+                    status={webcamEnabled ? (videoDevices.find(d => d.deviceId === selectedWebcamId)?.label || 'On, shown in a bubble') : 'Off'}
+                    control={<Switch checked={webcamEnabled} onChange={() => onToggleWebcam()} label="Camera" />}
+                >
+                    {webcamEnabled && videoDevices.length > 1 && (
+                        <DeviceSelect value={selectedWebcamId} onChange={onSelectWebcam} devices={videoDevices} fallback="Camera" />
+                    )}
+                </Tile>
+
+                <Tile icon={Timer} title="Countdown" status={countdownSeconds === 0 ? 'Starts immediately' : `${countdownSeconds} seconds before recording`}>
+                    <div className="grid grid-cols-3 gap-0.5 p-0.5 rounded-lg bg-[var(--pill-bg)] border border-[var(--border-app)]">
+                        {[0, 3, 5].map((sec) => (
+                            <button
+                                key={sec}
+                                onClick={() => onChangeCountdown(sec)}
+                                className={`h-7 rounded-md text-xs font-medium transition-colors ${
+                                    countdownSeconds === sec ? 'bg-[var(--pill-active-bg)] text-[var(--pill-active-fg)] shadow-sm' : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
+                                }`}
+                            >
+                                {sec === 0 ? 'Off' : `${sec}s`}
+                            </button>
+                        ))}
+                    </div>
+                </Tile>
+            </div>
+
+            {/* Record */}
+            <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2.5 text-[13px] text-[var(--text-app-muted)] cursor-pointer select-none flex-shrink-0">
+                    <Switch checked={autoMinimize} onChange={(v) => onToggleAutoMinimize?.(v)} label="Hide Drift while recording" />
+                    <span>Hide Drift while recording</span>
+                </label>
                 <button
                     onClick={onToggleRecord}
-                    className={`w-full py-4 px-6 rounded-xl flex items-center justify-between transition-all duration-200 shadow-lg active:scale-[0.99] ${
-                        isRecording
-                            ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/20'
-                            : 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] hover:opacity-90 shadow-black/10'
+                    className={`flex-1 h-12 px-5 rounded-xl flex items-center justify-between transition-[filter,transform] active:scale-[0.99] ${
+                        isRecording ? 'bg-red-500 text-white hover:brightness-110' : 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] hover:brightness-105'
                     }`}
+                    style={{ boxShadow: 'var(--shadow-app)' }}
                 >
-                    <div className="flex items-center gap-3">
-                        {isRecording ? (
-                            <Square className="w-5 h-5 fill-current" />
-                        ) : (
-                            <div className="w-4 h-4 rounded-full bg-red-500 animate-pulse" />
-                        )}
-                        <span className="text-sm font-bold tracking-tight uppercase">
-                            {isRecording ? 'Stop Recording' : 'Start Recording'}
-                        </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        {isRecording ? (
-                            <span className="font-mono text-xs font-black tracking-wider bg-black/20 px-2.5 py-1 rounded-md">
-                                {timer || '00:00'}
-                            </span>
-                        ) : (
-                            <kbd className="font-mono text-[11px] px-2 py-0.5 rounded-md bg-black/15 text-current border border-current/20 font-semibold">
-                                {hotkey || 'Ctrl+Shift+R'}
-                            </kbd>
-                        )}
-                    </div>
+                    <span className="flex items-center gap-3">
+                        {isRecording ? <Square className="w-4 h-4 fill-current" /> : <span className="w-3.5 h-3.5 rounded-full bg-red-500 ring-2 ring-white/40" />}
+                        <span className="text-[15px] font-semibold">{isRecording ? 'Stop recording' : 'Start recording'}</span>
+                    </span>
+                    {isRecording ? (
+                        <span className="font-mono text-sm">{timer || '00:00'}</span>
+                    ) : (
+                        <kbd className="font-mono text-xs px-2 py-0.5 rounded-md bg-black/10 border border-current/20 opacity-80">{hotkey || 'Alt+Shift+R'}</kbd>
+                    )}
                 </button>
             </div>
         </div>
