@@ -38,11 +38,12 @@ const NON_ZOOM_SCENES = new Set(['overview', 'spotlight', 'full-camera']);
  */
 export const CAMERA_MOTION = Object.freeze({
     rho: 1.25,              // willingness to pull back while panning
-    minMove: 0.95,          // shortest camera move
-    maxMove: 2.6,           // longest camera move
-    baseMove: 0.75,
-    perUnit: 1.15,
-    zoomOutFactor: 1.2,     // returning to the full frame is a touch slower
+    tempo: 1.35,            // every camera move takes this long: one consistent rhythm
+    maxMove: 2.6,           // upper bound used when sizing candidate searches
+    zoomOutFactor: 1.12,    // returning to the full frame is a touch slower (~1.5 s)
+    revealTempo: 2.2,       // a region change: one swoop out towards the full frame and in
+    swoopPeak: 0.8,         // ...pulling back to this much of the full frame
+    breatheAfter: 14,       // after this long zoomed in, pull back at the next chance
     minOverviewRest: 0.9,   // only zoom out if we can rest at overview this long
     minHold: 0.8,           // a reframe holds at least this long before the next
     safeZone: 0.68,         // fraction of the half-window the cursor may roam freely
@@ -205,10 +206,29 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
         { x: b.x, y: b.y, w: 1 / b.s },
         rho,
     );
-    const moveDuration = (a, b, slower = 1) => {
-        const len = pathFor(a, b).length;
-        return clamp(M.baseMove + M.perUnit * len, M.minMove, M.maxMove) * slower * pace;
+
+    // The rho at which the smooth path between a and b pulls back to about
+    // `peakW` of the full frame: a swoop that is smooth by construction.
+    const swoopRho = (a, b, peakW = M.swoopPeak) => {
+        const widest = (rho) => {
+            const p = pathFor(a, b, rho);
+            let w = 0;
+            for (let k = 0; k <= 32; k++) w = Math.max(w, p.at((p.length * k) / 32).w);
+            return w;
+        };
+        let lo = M.rho;
+        let hi = 12;
+        if (widest(hi) < peakW) return hi;
+        for (let i = 0; i < 24; i++) {
+            const mid = (lo + hi) / 2;
+            if (widest(mid) < peakW) lo = mid; else hi = mid;
+        }
+        return lo;
     };
+    // One tempo for every move, whatever its size or how rushed the clicks
+    // were: a consistent rhythm reads as calm and intentional. Big moves are
+    // handled by routing (pulling back through the full frame), not by speed.
+    const moveDuration = (a, b, slower = 1) => M.tempo * slower * pace;
 
     // --- plan ------------------------------------------------------------
     const moves = [];  // { t0, d, from, to }
@@ -247,9 +267,17 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
     // Emit a move. Being offline, try a few variants (start a little earlier,
     // pull back further mid-move, take a little longer) and keep the one that
     // best keeps the cursor in view without moving faster than feels calm.
-    const emit = (t0, to, slower = 1, { flexible = true } = {}) => {
+    const emit = (t0, to, slower = 1, { flexible = true, swoop = false, duration = null } = {}) => {
         const from = state;
         const dest = fit(to);
+        if (swoop) {
+            const start = Math.max(t0, free);
+            const d = duration ?? moveDuration(from, dest, slower);
+            moves.push({ t0: start, d, from, to: dest, rho: swoopRho(from, dest) });
+            state = dest;
+            free = start + d;
+            return free;
+        }
         if (Math.abs(dest.x - from.x) < 1e-4 && Math.abs(dest.y - from.y) < 1e-4 && Math.abs(dest.s - from.s) < 1e-4) {
             return t0;
         }
@@ -257,7 +285,7 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
         const d0 = moveDuration(from, dest, slower);
         const leads = flexible ? [0, 0.2, 0.4] : [0];
         const rhos = flexible && zoomed(from) && zoomed(dest) ? [M.rho, 1.8, 2.6] : [M.rho];
-        const stretches = flexible ? [1, 1.25] : [1];
+        const stretches = [1];
         let best = null;
         for (const lead of leads) {
             const start = Math.max(free, base - lead);
@@ -403,6 +431,8 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
 
     let departEarly = null;
     let holdFloor = 0;
+    let swoopTo = null;
+    let zoomedSince = 0; // when the current continuous zoom-in began
     for (let i = 0; i < sorted.length; i++) {
         const seg = sorted[i];
         const next = sorted[i + 1];
@@ -424,7 +454,9 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
             const limit = Math.min(seg.endTime, next && Number.isFinite(next.actionTime) ? next.actionTime - 0.6 : Infinity);
             target = frameWork(target, start + d * 0.6, Math.min(start + d + 0.6, limit), false);
         }
-        emit(start, target);
+        if (!zoomed(state)) zoomedSince = start;
+        const alreadyThere = zoomed(state) && Math.abs(state.x - target.x) < 0.02 && Math.abs(state.y - target.y) < 0.02 && Math.abs(state.s - target.s) < 0.02;
+        if (!alreadyThere) emit(start, target);
         const arrived = free;
 
         // Leave: straight to the next shot when it is close, else back out.
@@ -432,11 +464,57 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
         const outDur = moveDuration(state, overview(), M.zoomOutFactor);
         const leave = Math.max(seg.endTime, arrived);
         const nextStart = next ? Math.min(next.startTime, Number.isFinite(next.actionTime) ? next.actionTime - 1.2 : Infinity) : Infinity;
-        const canRest = !next || nextStart >= leave + outDur + M.minOverviewRest;
-        const bridge = toNext && !canRest;
+        let canRest = !next || nextStart >= leave + outDur + M.minOverviewRest;
 
         // Never leave before the shot's last action has been seen.
         const minLeave = Number.isFinite(seg.lastActionTime) ? seg.lastActionTime + 0.5 : arrived;
+
+        // Director: pull back to the full frame between shots when the next one
+        // is in a different region (the viewer sees where we're going), or
+        // when we've been zoomed in for a long stretch (a breather), provided
+        // there is time to do it at the normal tempo.
+        if (toNext && !canRest) {
+            const nextTarget = segFraming(next);
+            const overlap = (() => {
+                const w = (f) => [f.x - halfX(f.s), f.x + halfX(f.s), f.y - halfY(f.s), f.y + halfY(f.s)];
+                const [a0, a1, a2, a3] = w(state);
+                const [b0, b1, b2, b3] = w(nextTarget);
+                const ix = Math.max(0, Math.min(a1, b1) - Math.max(a0, b0));
+                const iy = Math.max(0, Math.min(a3, b3) - Math.max(a2, b2));
+                return (ix * iy) / Math.min((a1 - a0) * (a3 - a2), (b1 - b0) * (b3 - b2));
+            })();
+            // A new region: the point of interest moves more than 60% of the frame.
+            const dxFrac = Math.abs((next.targetX ?? 0.5) - (seg.targetX ?? 0.5)) / (2 * halfX(state.s));
+            const dyFrac = Math.abs((next.targetY ?? 0.5) - (seg.targetY ?? 0.5)) / (2 * halfY(state.s));
+            const far = overlap < 0.25 || Math.max(dxFrac, dyFrac) > 0.6;
+            const longZoom = arrived - zoomedSince > M.breatheAfter;
+            const swoop = M.revealTempo * pace;
+            // Feasible if it can land by the action; aim to land when the
+            // cursor settles at the destination.
+            const action = Number.isFinite(next.actionTime) ? next.actionTime : next.startTime + swoop;
+            const land = Number.isFinite(next.actionTime) ? settleTime(next, nextTarget) : action;
+            const out0 = Math.max(arrived, minLeave);
+            if ((far || longZoom) && action - out0 >= swoop * 0.95) {
+                let target = nextTarget;
+                if (next.followCursor !== false && trackCursor && cursor.length) {
+                    // Only where the cursor settles, not its trip over there.
+                    target = frameWork(nextTarget, land, Math.min(Math.max(land, action) + 0.8, next.endTime), false);
+                }
+                swoopTo = { at: Math.max(out0, land - swoop * 0.95), target };
+            }
+        }
+        const bridge = toNext && !canRest;
+        if (bridge && swoopTo) {
+            // Hold, then swoop out through the full frame into the next shot.
+            // ...or as soon as the cursor heads off for it.
+            const early = holdAndReframe(arrived, swoopTo.at, follows);
+            const at = early != null ? Math.max(early, minLeave) : swoopTo.at;
+            emit(at, swoopTo.target, 1, { swoop: true, duration: M.revealTempo * pace });
+            zoomedSince = free;
+            swoopTo = null;
+            continue;
+        }
+        swoopTo = null;
         const holdUntil = bridge ? Math.max(arrived, nextStart, minLeave) : leave;
         const early = holdAndReframe(arrived, holdUntil, follows);
 
