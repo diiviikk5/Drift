@@ -1504,7 +1504,7 @@ export default function RecorderPage() {
         if (!studioRef.current) return;
         setIsExporting(true);
         setExportProgress(0);
-        setExportStage('Rendering frames & camera transforms...');
+        setExportStage('Preparing');
 
         try {
             studioRef.current.trimStart = trimStart;
@@ -1515,21 +1515,22 @@ export default function RecorderPage() {
                 const scaled = Math.round(Math.min(Math.max(pct || 0, 0), 1) * 92);
                 setExportProgress(scaled);
                 if (scaled < 40) {
-                    setExportStage(`Compositing ${resolution.toUpperCase()} @ ${fps}fps...`);
+                    setExportStage('Rendering frames');
                 } else if (scaled < 85) {
-                    setExportStage('Hardware encoding audio & video tracks...');
+                    setExportStage('Encoding video and audio');
                 } else {
-                    setExportStage('Finalizing MP4 container...');
+                    setExportStage('Finishing up');
                 }
             }, { format, resolution, fps, quality });
 
             let finalBlob = videoBlob;
-            let ext = format === 'gif' ? 'gif' : (videoBlob.type === 'video/mp4' ? 'mp4' : 'webm');
+            // Name the file by what was actually encoded.
+            let ext = videoBlob.type === 'video/mp4' ? 'mp4' : 'webm';
 
             // If user requested MP4, but WebCodecs produced WebM, transcode via native FFmpeg
             if (format === 'mp4' && ext !== 'mp4' && drift.isTauri()) {
                 try {
-                    setExportStage('Transcoding to pristine MP4 via hardware-accelerated FFmpeg...');
+                    setExportStage('Converting to MP4');
                     setExportProgress(94);
                     const tempMp4Path = await drift.convertWebmToMp4(videoBlob, {
                         fps,
@@ -1550,7 +1551,7 @@ export default function RecorderPage() {
 
             if (platform === 'tauri') {
                 try {
-                    setExportStage('Selecting save location...');
+                    setExportStage('Choose where to save');
                     const savePath = await drift.showSaveDialog({
                         defaultPath: `drift-cinema-${resolution}-${fps}fps-${Date.now()}.${ext}`,
                         filters: [{ name: `${ext.toUpperCase()} Video`, extensions: [ext] }],
@@ -1559,7 +1560,7 @@ export default function RecorderPage() {
                     if (!savePath) {
                         triggerBlobDownload(finalBlob, ext);
                     } else {
-                        setExportStage('Saving high-speed video to disk...');
+                        setExportStage('Saving');
                         setExportProgress(96);
                         const fileBytes = new Uint8Array(await finalBlob.arrayBuffer());
                         await drift.saveFile(savePath, fileBytes);
