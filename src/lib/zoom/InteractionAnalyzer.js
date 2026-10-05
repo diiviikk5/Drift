@@ -114,13 +114,15 @@ export class InteractionAnalyzer {
                 t: (s.timeMs ?? s.time ?? s.t ?? 0) / 1000,
                 x: this._normalizeX(s.cx ?? s.x ?? 0.5),
                 y: this._normalizeY(s.cy ?? s.y ?? 0.5),
+                hidden: Boolean(s.hidden),
             }))
             .filter(s => Number.isFinite(s.t) && Number.isFinite(s.x) && Number.isFinite(s.y))
             .sort((a, b) => a.t - b.t);
     }
 
     _clickSignals(clicks, duration) {
-        const list = clicks || [];
+        // Clicks outside the recorded screen (another monitor) aren't in the video.
+        const list = (clicks || []).filter(c => !c.hidden);
         if (!list.length) return [];
         // Recorder clicks are in ms; tolerate legacy second-based inputs.
         const maxRaw = list.reduce((m, c) => Math.max(m, c.time ?? c.t ?? 0), 0);
@@ -162,7 +164,7 @@ export class InteractionAnalyzer {
             .map(k => {
                 const time = k.timeSec;
                 const c = this._cursorAt(moves, time);
-                if (!c) return null;
+                if (!c || c.hidden) return null;
                 if (k.typed) {
                     // Typing is the classic "zoom in here" moment; a lone stray key is not.
                     return { time, x: c.x, y: c.y, weight: 0.7, strong: typingBurst(time), kind: 'type' };
@@ -177,6 +179,8 @@ export class InteractionAnalyzer {
 
     _dwellSignals(moves) {
         const o = this.options;
+        if (moves.length < 8) return [];
+        moves = moves.filter(m => !m.hidden);
         if (moves.length < 8) return [];
         const out = [];
         let anchor = 0;
@@ -251,7 +255,7 @@ export class InteractionAnalyzer {
         // session (robust 10-90% range so a stray flick doesn't widen the zoom).
         const xs = sess.signals.map(s => s.x);
         const ys = sess.signals.map(s => s.y);
-        const during = moves.filter(m => m.t >= anchors[0].time && m.t <= lastAction);
+        const during = moves.filter(m => !m.hidden && m.t >= anchors[0].time && m.t <= lastAction);
         if (during.length >= 6) {
             const mx = during.map(m => m.x).sort((a, b) => a - b);
             const my = during.map(m => m.y).sort((a, b) => a - b);
@@ -342,11 +346,12 @@ export class InteractionAnalyzer {
             };
         };
 
-        // 1. Merge quick neighbours that still fit a comfortable zoom.
+        // 1. Merge quick neighbours: there is no time to pan between them, so
+        // a wider shot that holds both reads better than a rushed move.
         const merged = [];
         for (const shot of shots) {
             const prev = merged[merged.length - 1];
-            if (prev && shot.actionTime - prev.lastAction < o.hopGap && fitOf(union(prev.box, shot.box)) >= o.minZoom) {
+            if (prev && shot.actionTime - prev.lastAction < o.hopGap && fitOf(union(prev.box, shot.box)) >= o.minRunZoom) {
                 merged[merged.length - 1] = merge(prev, shot);
             } else {
                 merged.push(shot);
@@ -404,6 +409,7 @@ export class InteractionAnalyzer {
                 return {
                     id: `focus_seg_${i}_${Math.round(seg.startTime * 10)}`,
                     actionTime: Math.round(seg.actionTime * 1000) / 1000,
+                    lastActionTime: Math.round(seg.lastAction * 1000) / 1000,
                     startTime: Math.round(seg.startTime * 1000) / 1000,
                     endTime: Math.round(Math.max(seg.startTime + 0.2, endTime) * 1000) / 1000,
                     targetX: seg.targetX,
