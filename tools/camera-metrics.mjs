@@ -107,6 +107,7 @@ export function measure(scenario) {
     const durs = track.moves.map(m => m.d);
     const overviewReturns = track.moves.filter(m => m.to.s < 1.01 && m.from.s > 1.01).length;
     return {
+        moveDurations: durs,
         moveDurMin: durs.length ? Math.min(...durs) : 0,
         moveDurMax: durs.length ? Math.max(...durs) : 0,
         overviewReturns,
