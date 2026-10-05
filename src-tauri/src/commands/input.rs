@@ -26,6 +26,9 @@ pub struct CursorSample {
     pub x: f64,
     pub y: f64,
     pub click: Option<String>,
+    /// Scroll-wheel activity at this moment (vertical delta in notches).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scroll: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -220,6 +223,8 @@ pub fn start_global_listener(app: AppHandle) {
         let mut last_move_emit: f64 = f64::NEG_INFINITY;
         let mut last_sample_at: f64 = f64::NEG_INFINITY;
         let mut last_typed_at: f64 = f64::NEG_INFINITY;
+        let mut last_scroll_at: f64 = f64::NEG_INFINITY;
+        let mut last_pos: (f64, f64) = (0.0, 0.0);
 
         listen(move |event: Event| {
             if !*is_listening.lock() {
@@ -260,13 +265,29 @@ pub fn start_global_listener(app: AppHandle) {
                                 x: pos.0,
                                 y: pos.1,
                                 click: Some(btn_name.to_string()),
+                                scroll: None,
                             });
                         }
 
                         let _ = app_handle.emit("global-click", &click);
                     }
                 }
+                EventType::Wheel { delta_x, delta_y } => {
+                    // Scrolling: kept so auto-zoom can pull back while the page moves.
+                    if is_rec && now - last_scroll_at >= 50.0 {
+                        last_scroll_at = now;
+                        let delta = if delta_y != 0 { delta_y as f64 } else { delta_x as f64 };
+                        session_samples.lock().push(CursorSample {
+                            t: elapsed,
+                            x: last_pos.0,
+                            y: last_pos.1,
+                            click: None,
+                            scroll: Some(delta),
+                        });
+                    }
+                }
                 EventType::MouseMove { x, y } => {
+                    last_pos = (x, y);
                     if is_rec {
                         // Buffer high-frequency telemetry at up to 240Hz (>= 4ms between samples)
                         if now - last_sample_at >= 4.0 {
@@ -276,6 +297,7 @@ pub fn start_global_listener(app: AppHandle) {
                                 x,
                                 y,
                                 click: None,
+                                scroll: None,
                             });
                         }
                     }
