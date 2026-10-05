@@ -349,9 +349,10 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
     };
 
     // While a framing is held, glide only when the cursor is about to leave
-    // the comfortable middle of the frame.
+    // the comfortable middle of the frame. Returns the time the shot should
+    // be left early (the cursor left and there is no time to reframe), or null.
     const holdAndReframe = (from, until, follows) => {
-        if (!follows || !trackCursor || !cursor.length) return;
+        if (!follows || !trackCursor || !cursor.length) return null;
         const step = 1 / 30;
         let t = Math.max(from, free);
         let calmUntil = t; // after a reframe, hold unless the cursor is leaving the frame
@@ -378,13 +379,15 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
             if (moved < M.minReframeShift && Math.abs(target.s - s) < 0.02) { t += step; continue; }
 
             const d = moveDuration(state, target);
-            if (t + d > until - 0.2) break; // leave room for the next shot's move
+            if (t + d > until - 0.2) return urgent ? t : null; // no time: leave the shot instead
             emit(t, target);
             t = free;
             calmUntil = free + M.minHold;
         }
+        return null;
     };
 
+    let departEarly = null;
     for (let i = 0; i < sorted.length; i++) {
         const seg = sorted[i];
         const next = sorted[i + 1];
@@ -393,7 +396,9 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
 
         // Arrive at this shot just as its first action happens, framed on
         // where the cursor will be by then (not where it was).
-        const start = Math.max(arrivalStart(seg, target), free);
+        const planned = arrivalStart(seg, target);
+        const start = Math.max(departEarly != null ? Math.min(planned, departEarly) : planned, free);
+        departEarly = null;
         if (follows && trackCursor && cursor.length) {
             // Only this shot's own work, never the next shot's.
             const d = moveDuration(state, target);
@@ -412,12 +417,17 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
         const bridge = toNext && !canRest;
 
         const holdUntil = bridge ? Math.max(arrived, nextStart) : leave;
-        holdAndReframe(arrived, holdUntil, follows);
+        const early = holdAndReframe(arrived, holdUntil, follows);
 
-        if (bridge) continue;
+        if (bridge) {
+            // The next shot's move may start as soon as the cursor heads off.
+            departEarly = early;
+            continue;
+        }
         if (zoomed(state) || cropped) {
-            const near = cropped ? look.at(leave) : null;
-            emit(leave, overview(near), M.zoomOutFactor);
+            const at = early != null ? Math.max(free, Math.min(leave, early)) : leave;
+            const near = cropped ? look.at(at) : null;
+            emit(at, overview(near), M.zoomOutFactor);
         }
         if (cropped) holdAndReframe(free, next ? next.startTime : end, true);
     }
