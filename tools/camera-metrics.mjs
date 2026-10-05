@@ -13,6 +13,7 @@ import path from 'path';
 import { SCENARIOS } from './camera-scenarios.mjs';
 import { InteractionAnalyzer } from '../src/lib/zoom/InteractionAnalyzer.js';
 import { evaluateCameraAtTime } from '../src/lib/rendering/renderFrame.js';
+import { getCameraTrack } from '../src/lib/zoom/cameraTrack.js';
 
 const FPS = 60;
 
@@ -102,7 +103,13 @@ export function measure(scenario) {
         return Math.abs(c.x - f.x) <= half * 0.92 && Math.abs(c.y - f.y) <= half * 0.92;
     }).length;
     ms.sort((p, q) => p - q);
+    const track = getCameraTrack(segments, moves, { duration });
+    const durs = track.moves.map(m => m.d);
+    const overviewReturns = track.moves.filter(m => m.to.s < 1.01 && m.from.s > 1.01).length;
     return {
+        moveDurMin: durs.length ? Math.min(...durs) : 0,
+        moveDurMax: durs.length ? Math.max(...durs) : 0,
+        overviewReturns,
         segments: segments.length,
         peakMotion: peak,
         p95Motion: ms[Math.floor(ms.length * 0.95)] || 0,
@@ -129,9 +136,9 @@ if (import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}` || proc
         console.log(JSON.stringify(rows, null, 2));
     } else {
         const f = (v, d = 2) => (typeof v === 'number' ? v.toFixed(d) : v);
-        console.log('scenario'.padEnd(40), 'segs peak  p95   pan   zoom  accel  move% moves/min rev zoom% maxS  curOff% clicks');
+        console.log('scenario'.padEnd(40), 'segs peak  p95   pan   zoom  accel  move% moves/min rev zoom% maxS  curOff% clicks  dur(min-max) outs');
         for (const r of rows) {
-            console.log(r.name.padEnd(40), String(r.segments).padStart(4), f(r.peakMotion).padStart(5), f(r.p95Motion).padStart(5), f(r.peakPan).padStart(5), f(r.peakZoom).padStart(5), f(r.peakAccel, 1).padStart(6), f(r.movingPct, 0).padStart(5), f(r.movesPerMin, 1).padStart(8), String(r.reversals).padStart(4), f(r.zoomedPct, 0).padStart(5), f(r.peakScale).padStart(5), f(r.cursorOffPct, 1).padStart(7), r.clicksFramed.padStart(7));
+            console.log(r.name.padEnd(40), String(r.segments).padStart(4), f(r.peakMotion).padStart(5), f(r.p95Motion).padStart(5), f(r.peakPan).padStart(5), f(r.peakZoom).padStart(5), f(r.peakAccel, 1).padStart(6), f(r.movingPct, 0).padStart(5), f(r.movesPerMin, 1).padStart(8), String(r.reversals).padStart(4), f(r.zoomedPct, 0).padStart(5), f(r.peakScale).padStart(5), f(r.cursorOffPct, 1).padStart(7), r.clicksFramed.padStart(7), `${f(r.moveDurMin)}-${f(r.moveDurMax)}`.padStart(12), String(r.overviewReturns).padStart(4));
         }
     }
 }
