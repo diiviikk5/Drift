@@ -1065,7 +1065,7 @@ export default function InspectorPanel({
                     className="w-full py-3 rounded-xl bg-[var(--accent-app)] text-[var(--accent-app-fg)] hover:opacity-90 text-xs shadow-sm transition-all flex items-center justify-center gap-2 font-medium"
                 >
                     <Download className="w-3.5 h-3.5" />
-                    <span>{isExporting ? 'Exporting...' : 'Export Video'}</span>
+                    <span>{isExporting ? 'Exporting…' : 'Export'}</span>
                 </button>
             </div>
         </aside>

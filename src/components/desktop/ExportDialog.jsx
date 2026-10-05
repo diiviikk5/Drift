@@ -1,7 +1,35 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Download, Film, CheckCircle2, X, Zap, Cpu, Sliders } from 'lucide-react';
+import { Download, X } from 'lucide-react';
+
+/** A row of mutually exclusive options. */
+function Choice({ label, value, onChange, options, columns }) {
+    return (
+        <div className="space-y-1.5">
+            <div className="text-xs font-medium text-[var(--text-app-muted)]">{label}</div>
+            <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${columns || options.length}, minmax(0, 1fr))` }}>
+                {options.map((o) => {
+                    const selected = value === o.id;
+                    return (
+                        <button
+                            key={o.id}
+                            onClick={() => onChange(o.id)}
+                            className={`px-2.5 py-2 rounded-lg border text-left transition-colors ${
+                                selected
+                                    ? 'border-[var(--accent-app)] bg-[var(--accent-soft)] text-[var(--text-app)]'
+                                    : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:border-[var(--border-app-hover)]'
+                            }`}
+                        >
+                            <div className="text-[13px] font-medium">{o.label}</div>
+                            {o.desc && <div className="text-xs opacity-75 truncate">{o.desc}</div>}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
 
 export default function ExportDialog({
     isOpen,
@@ -9,7 +37,7 @@ export default function ExportDialog({
     onStartExport,
     isExporting,
     exportProgress,
-    exportStage = 'Rendering & Encoding',
+    exportStage = 'Rendering',
 }) {
     const [format, setFormat] = useState('mp4');
     const [resolution, setResolution] = useState('1080p');
@@ -19,167 +47,86 @@ export default function ExportDialog({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-md p-4 select-none animate-in fade-in duration-150">
-            <div className="max-w-lg w-full rounded-2xl bg-[var(--bg-card)] border border-[var(--border-app)] shadow-2xl p-6 space-y-5 text-[var(--text-app)]">
-                <div className="flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 select-none">
+            <div className="max-w-lg w-full rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-app)] p-5 space-y-5 text-[var(--text-app)]" style={{ boxShadow: 'var(--shadow-pop)' }}>
+                <div className="flex items-start justify-between">
                     <div>
-                        <div className="flex items-center gap-2">
-                            <h3 className="text-base font-bold tracking-tight">Export Cinema Studio Video</h3>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-[#DCFE50]/15 text-[#DCFE50] border border-[#DCFE50]/30">
-                                <Zap className="w-2.5 h-2.5" />
-                                GPU Accelerated
-                            </span>
-                        </div>
-                        <p className="text-xs text-[var(--text-app-muted)] mt-0.5">Hardware H.264 & WebCodecs multi-track encoder</p>
+                        <h3 className="text-base font-semibold tracking-tight">Export video</h3>
+                        <p className="text-[13px] text-[var(--text-app-muted)] mt-0.5">Rendered on this computer. Nothing is uploaded.</p>
                     </div>
                     {!isExporting && (
-                        <button onClick={onClose} className="p-1 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-app-muted)] hover:text-[var(--text-app)] transition-colors">
+                        <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:bg-[var(--bg-card-subtle)] transition-colors">
                             <X className="w-4 h-4" />
                         </button>
                     )}
                 </div>
 
                 {isExporting ? (
-                    <div className="space-y-5 py-6 text-center">
-                        <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
-                            <div className="absolute inset-0 rounded-full border-3 border-[var(--border-app)] border-t-[#DCFE50] animate-spin" />
-                            <Film className="w-6 h-6 text-[#DCFE50]" />
+                    <div className="space-y-3 py-4">
+                        <div className="flex items-baseline justify-between">
+                            <span className="text-[13px] text-[var(--text-app-muted)]">
+                                {exportProgress < 90 ? exportStage : 'Saving the file'}
+                            </span>
+                            <span className="font-mono text-lg">{exportProgress}%</span>
                         </div>
-                        <div className="space-y-2">
-                            <div className="text-2xl font-mono font-bold tracking-tight text-[var(--text-app)]">
-                                {exportProgress}%
-                            </div>
-                            <p className="text-xs font-medium text-[#DCFE50] animate-pulse">
-                                {exportProgress < 90 ? exportStage : 'Finalizing file and writing to disk...'}
-                            </p>
-                            <div className="w-full h-2 rounded-full bg-[var(--bg-surface)] overflow-hidden border border-[var(--border-app)]">
-                                <div
-                                    className="h-full bg-gradient-to-r from-[#DCFE50]/80 to-[#DCFE50] rounded-full transition-all duration-300 shadow-[0_0_12px_rgba(220,254,80,0.5)]"
-                                    style={{ width: `${Math.min(100, Math.max(2, exportProgress))}%` }}
-                                />
-                            </div>
+                        <div className="w-full h-2 rounded-full bg-[var(--bg-card-subtle)] overflow-hidden">
+                            <div
+                                className="h-full bg-[var(--accent-app)] rounded-full transition-[width] duration-300"
+                                style={{ width: `${Math.min(100, Math.max(2, exportProgress))}%` }}
+                            />
                         </div>
+                        <p className="text-xs text-[var(--text-app-faint)]">You can keep using your computer while this runs.</p>
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {/* Format */}
-                        <div className="space-y-1.5">
-                            <label className="text-xs text-[var(--text-app-muted)] font-medium">
-                                Container Format
-                            </label>
-                            <div className="grid grid-cols-3 gap-2">
-                                {[
-                                    { id: 'mp4', label: 'MP4', desc: 'Universal H.264' },
-                                    { id: 'webm', label: 'WebM', desc: 'Lossless VP9' },
-                                    { id: 'gif', label: 'GIF', desc: 'Loop Animation' },
-                                ].map((item) => (
-                                    <button
-                                        key={item.id}
-                                        onClick={() => setFormat(item.id)}
-                                        className={`p-2.5 rounded-xl border text-center transition-all ${
-                                            format === item.id
-                                                ? 'bg-[#DCFE50] text-black font-bold shadow-sm border-[#DCFE50]'
-                                                : 'border-[var(--border-app)] bg-[var(--bg-surface)] text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:border-[var(--border-hover)]'
-                                        }`}
-                                    >
-                                        <div className="text-xs font-semibold">{item.label}</div>
-                                        <div className="text-[11px] opacity-75">{item.desc}</div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Resolution */}
-                        <div className="space-y-1.5">
-                            <label className="text-xs text-[var(--text-app-muted)] font-medium">
-                                Resolution
-                            </label>
-                            <div className="grid grid-cols-4 gap-2">
-                                {[
-                                    { id: '4k', label: '4K UHD', desc: '2160p' },
-                                    { id: '2k', label: '2K QHD', desc: '1440p' },
-                                    { id: '1080p', label: '1080p', desc: 'FHD Pro' },
-                                    { id: '720p', label: '720p', desc: 'HD Fast' },
-                                ].map((item) => (
-                                    <button
-                                        key={item.id}
-                                        onClick={() => setResolution(item.id)}
-                                        className={`p-2 rounded-xl border text-center transition-all ${
-                                            resolution === item.id
-                                                ? 'bg-[#DCFE50] text-black font-bold shadow-sm border-[#DCFE50]'
-                                                : 'border-[var(--border-app)] bg-[var(--bg-surface)] text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:border-[var(--border-hover)]'
-                                        }`}
-                                    >
-                                        <div className="text-xs font-semibold">{item.label}</div>
-                                        <div className="text-[11px] opacity-75">{item.desc}</div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Frame Rate & Quality Grid */}
+                        <Choice
+                            label="Format"
+                            value={format}
+                            onChange={setFormat}
+                            options={[
+                                { id: 'mp4', label: 'MP4', desc: 'Plays everywhere (recommended)' },
+                                { id: 'webm', label: 'WebM', desc: 'For the web' },
+                            ]}
+                        />
+                        <Choice
+                            label="Resolution"
+                            value={resolution}
+                            onChange={setResolution}
+                            options={[
+                                { id: '4k', label: '4K', desc: '2160p' },
+                                { id: '2k', label: '1440p', desc: 'QHD' },
+                                { id: '1080p', label: '1080p', desc: 'Full HD' },
+                                { id: '720p', label: '720p', desc: 'Smaller file' },
+                            ]}
+                        />
                         <div className="grid grid-cols-2 gap-3">
-                            {/* Frame Rate */}
-                            <div className="space-y-1.5">
-                                <label className="text-xs text-[var(--text-app-muted)] font-medium">
-                                    Frame Rate
-                                </label>
-                                <div className="grid grid-cols-2 gap-1.5">
-                                    {[
-                                        { id: '60', label: '60 FPS', desc: 'Cinema Fluid' },
-                                        { id: '30', label: '30 FPS', desc: 'Standard' },
-                                    ].map((item) => (
-                                        <button
-                                            key={item.id}
-                                            onClick={() => setFps(item.id)}
-                                            className={`p-2 rounded-xl border text-center transition-all ${
-                                                fps === item.id
-                                                    ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold shadow-xs border-[var(--accent-app)]'
-                                                    : 'border-[var(--border-app)] bg-[var(--bg-surface)] text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
-                                            }`}
-                                        >
-                                            <div className="text-xs font-semibold">{item.label}</div>
-                                            <div className="text-[11px] opacity-75">{item.desc}</div>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Bitrate / Quality */}
-                            <div className="space-y-1.5">
-                                <label className="text-xs text-[var(--text-app-muted)] font-medium">
-                                    Quality Preset
-                                </label>
-                                <div className="grid grid-cols-3 gap-1">
-                                    {[
-                                        { id: 'master', label: 'Master', desc: '60M' },
-                                        { id: 'pro', label: 'Pro', desc: '30M' },
-                                        { id: 'standard', label: 'Fast', desc: '16M' },
-                                    ].map((item) => (
-                                        <button
-                                            key={item.id}
-                                            onClick={() => setQuality(item.id)}
-                                            className={`p-2 rounded-xl border text-center transition-all ${
-                                                quality === item.id
-                                                    ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold shadow-xs border-[var(--accent-app)]'
-                                                    : 'border-[var(--border-app)] bg-[var(--bg-surface)] text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
-                                            }`}
-                                        >
-                                            <div className="text-xs font-semibold">{item.label}</div>
-                                            <div className="text-[11px] opacity-75">{item.desc}</div>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+                            <Choice
+                                label="Frame rate"
+                                value={fps}
+                                onChange={setFps}
+                                options={[
+                                    { id: '60', label: '60 fps', desc: 'Smoothest' },
+                                    { id: '30', label: '30 fps', desc: 'Smaller' },
+                                ]}
+                            />
+                            <Choice
+                                label="Quality"
+                                value={quality}
+                                onChange={setQuality}
+                                options={[
+                                    { id: 'master', label: 'Best' },
+                                    { id: 'pro', label: 'High' },
+                                    { id: 'standard', label: 'Small' },
+                                ]}
+                            />
                         </div>
 
-                        {/* Start Button */}
                         <button
                             onClick={() => onStartExport(format, resolution, parseInt(fps, 10), quality)}
-                            className="w-full mt-2 py-3.5 rounded-xl bg-[#DCFE50] text-black hover:bg-[#c8e840] text-xs shadow-sm transition-all flex items-center justify-center gap-2 font-medium"
+                            className="w-full h-11 rounded-xl bg-[var(--accent-app)] text-[var(--accent-app-fg)] hover:brightness-105 text-[14px] font-semibold flex items-center justify-center gap-2"
                         >
                             <Download className="w-4 h-4" />
-                            <span>Export Video Now</span>
+                            <span>Export</span>
                         </button>
                     </div>
                 )}
