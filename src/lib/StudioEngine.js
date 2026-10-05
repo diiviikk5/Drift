@@ -759,6 +759,7 @@ export class StudioEngine {
             {
                 background: this.background,
                 customBackgroundImage: this.customBackgroundImage,
+                frameRate: this._renderFps || 60,
                 insetPadding: this.insetPadding ?? 0.08,
                 borderRadius: this.borderRadius ?? 18,
                 windowChrome: this.windowChrome !== false,
@@ -1056,6 +1057,7 @@ export class StudioEngine {
         const totalOutputDuration = exportDuration / baseSpeed;
         const fps = options.fps ? Number(options.fps) : 60;
         const quality = options.quality || 'pro';
+        this._renderFps = fps; // motion blur shutter follows the export frame rate
 
         let width = 1920;
         let height = 1080;
@@ -1525,6 +1527,7 @@ export class StudioEngine {
                 } finally {
                     screenFrames?.dispose();
                     camFrames?.dispose();
+                    this._renderFps = null;
                     this.canvas.width = origW;
                     this.canvas.height = origH;
                     this.drawFrame();
