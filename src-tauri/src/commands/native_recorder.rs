@@ -176,6 +176,8 @@ pub struct NativeSessionResult {
     pub telemetry_offset_ms: f64,
     /// Text caret positions over time (video timeline, target pixels).
     pub caret: Vec<crate::commands::caret::CaretSample>,
+    /// System cursor shape changes (video timeline).
+    pub cursor_shapes: Vec<crate::commands::cursor_shape::CursorShapeSample>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -291,6 +293,7 @@ pub struct NativeSessionManager {
     /// Window capture: the window's desktop origin over time, for cursor mapping.
     pub origin_track: Arc<Mutex<Vec<(std::time::Instant, i32, i32)>>>,
     pub caret_track: Arc<Mutex<Vec<(std::time::Instant, i32, i32, i32)>>>,
+    pub shape_track: Arc<Mutex<Vec<(std::time::Instant, &'static str)>>>,
     pub first_frame_at: Arc<Mutex<Option<std::time::Instant>>>,
     #[cfg(windows)]
     capture_control: Arc<Mutex<Option<CaptureControl<ScreenRecorderHandler, Box<dyn std::error::Error + Send + Sync>>>>>,
@@ -316,6 +319,7 @@ impl Default for NativeSessionManager {
             monitor_origin: Arc::new(Mutex::new((0, 0))),
             origin_track: Arc::new(Mutex::new(Vec::new())),
             caret_track: Arc::new(Mutex::new(Vec::new())),
+            shape_track: Arc::new(Mutex::new(Vec::new())),
             first_frame_at: Arc::new(Mutex::new(None)),
             #[cfg(windows)]
             capture_control: Arc::new(Mutex::new(None)),
@@ -592,6 +596,8 @@ pub async fn start_native_session(
         crate::commands::input::start_session_telemetry(app.clone());
         state.caret_track.lock().clear();
         crate::commands::caret::spawn_caret_sampler(state.is_recording.clone(), state.caret_track.clone());
+        state.shape_track.lock().clear();
+        crate::commands::cursor_shape::spawn_shape_sampler(state.is_recording.clone(), state.shape_track.clone());
 
         // 5. Configure and launch windows-capture free-threaded
         let cursor_setting = if without_cursor {
@@ -725,6 +731,7 @@ pub async fn stop_native_session(app: AppHandle) -> Result<NativeSessionResult, 
     // coordinates are local to the recorded monitor or window.
     let (monitor_x, monitor_y) = *state.monitor_origin.lock();
     let caret_out: Mutex<Vec<crate::commands::caret::CaretSample>> = Mutex::new(Vec::new());
+    let shapes_out: Mutex<Vec<crate::commands::cursor_shape::CursorShapeSample>> = Mutex::new(Vec::new());
     let telemetry_offset_ms = {
         let input_state = app.state::<crate::commands::input::InputListenerState>();
         let tele_start = crate::commands::input::session_start_instant(&input_state);
@@ -770,6 +777,18 @@ pub async fn stop_native_session(app: AppHandle) -> Result<NativeSessionResult, 
             })
             .collect();
         *caret_out.lock() = samples;
+
+        // Cursor shape changes onto the video timeline.
+        let shapes: Vec<crate::commands::cursor_shape::CursorShapeSample> = std::mem::take(&mut *state.shape_track.lock())
+            .into_iter()
+            .map(|(at, shape)| {
+                let tele_ms = tele_start
+                    .map(|t0| if at > t0 { at.duration_since(t0).as_secs_f64() * 1000.0 } else { 0.0 })
+                    .unwrap_or(0.0);
+                crate::commands::cursor_shape::CursorShapeSample { t: tele_ms - offset, shape: shape.to_string() }
+            })
+            .collect();
+        *shapes_out.lock() = shapes;
         offset
     };
 
@@ -835,6 +854,7 @@ pub async fn stop_native_session(app: AppHandle) -> Result<NativeSessionResult, 
         monitor_y,
         telemetry_offset_ms,
         caret: caret_out.into_inner(),
+        cursor_shapes: shapes_out.into_inner(),
     };
 
     let _ = app.emit("native-recording-stopped", &res);
