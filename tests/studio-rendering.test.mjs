@@ -119,17 +119,13 @@ test('compositor renders all vector cursor themes without throwing', () => {
     }
 });
 
-test('springProfile controls camera ramp speed between snappy and cinematic', () => {
-    const focusSeg = [{ startTime: 1.0, endTime: 4.0, targetX: 0.8, targetY: 0.2, zoomScale: 2.0 }];
-    // At t = 1.45s (0.45s after start):
-    // snappy (0.42s ramp) is already fully zoomed (scale = 2.0)
-    const snappyCam = evaluateCameraAtTime(1.45, focusSeg, [], { springProfile: 'snappy' });
-    // cinematic (0.85s ramp) is still easing in (scale < 2.0)
-    const cinemaCam = evaluateCameraAtTime(1.45, focusSeg, [], { springProfile: 'cinematic' });
-
-    assert.ok(snappyCam.scale > 1.95, 'Snappy should have reached zoom target');
-    assert.ok(cinemaCam.scale < 1.90, 'Cinematic should still be smoothly easing');
-    assert.ok(snappyCam.scale > cinemaCam.scale, 'Snappy camera should be further along ramp than cinematic');
+test('camera pace: snappy moves sooner than cinematic, both ease in without a punch', () => {
+    const focusSeg = [{ startTime: 1.0, endTime: 5.0, targetX: 0.8, targetY: 0.2, zoomScale: 2.0 }];
+    const snappy = evaluateCameraAtTime(1.6, focusSeg, [], { springProfile: 'snappy' });
+    const cinema = evaluateCameraAtTime(1.6, focusSeg, [], { springProfile: 'cinematic' });
+    assert.ok(snappy.scale > cinema.scale, 'snappy should be further along');
+    assert.ok(evaluateCameraAtTime(1.1, focusSeg, [], { springProfile: 'cinematic' }).scale < 1.05, 'no punch-in at the start');
+    assert.ok(evaluateCameraAtTime(3.5, focusSeg, [], { springProfile: 'cinematic' }).scale > 1.99, 'arrives and holds');
 });
 
 test('renderFrame renders Cinema Spotlight scene mode with radial vignette', () => {
@@ -260,23 +256,25 @@ test('StudioEngine plays back in real time by default and supports pacing change
     assert.equal(engine.playbackSpeed, 1.25);
 });
 
-test('InteractionAnalyzer guarantees strict non-overlapping segment bounds across all click configurations', () => {
+test('InteractionAnalyzer: segments never overlap, and corner-hopping stays on the full frame', () => {
     const analyzer = new InteractionAnalyzer();
-    // Rapid clicks in alternating corners of screen (stress test for overlap avoidance)
-    const clicks = [
+    const hopping = [
         { time: 1000, x: 0.1, y: 0.1 },
         { time: 1800, x: 0.9, y: 0.9 },
         { time: 2600, x: 0.1, y: 0.9 },
         { time: 3400, x: 0.9, y: 0.1 },
         { time: 7000, x: 0.5, y: 0.5 },
     ];
-    const track = analyzer.analyze(clicks, [], 12);
-    assert.ok(track.length >= 2);
-    for (let i = 0; i < track.length - 1; i++) {
-        assert.ok(
-            track[i].endTime <= track[i + 1].startTime + 0.001,
-            `Segment ${i} end (${track[i].endTime}) must not exceed segment ${i + 1} start (${track[i + 1].startTime})`
-        );
+    const track = analyzer.analyze(hopping, [], 12);
+    assert.equal(track.length, 1, 'only the deliberate click at 7s zooms');
+    assert.ok(track[0].startTime > 4);
+
+    const spread = [1000, 4500, 8000, 11500, 15000].map((time, i) => ({ time, x: 0.15 + (i % 3) * 0.35, y: 0.2 + (i % 2) * 0.55 }));
+    const segs = analyzer.analyze(spread, [], 18);
+    assert.ok(segs.length >= 2);
+    for (let i = 0; i < segs.length - 1; i++) {
+        assert.ok(segs[i].endTime <= segs[i + 1].startTime + 0.001,
+            `Segment ${i} end (${segs[i].endTime}) must not exceed segment ${i + 1} start (${segs[i + 1].startTime})`);
     }
 });
 
