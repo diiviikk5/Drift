@@ -103,7 +103,7 @@ export default function NotesTeleprompter({
                 className="flex items-center justify-between px-3 py-2.5 bg-white/5 border-b border-white/10 cursor-move"
             >
                 <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-[#DCFE50]" />
+                    <FileText className="w-4 h-4 text-[var(--accent-app)]" />
                     <span className="text-xs font-semibold text-white tracking-wide font-mono">
                         Presenter Script
                     </span>
@@ -142,7 +142,7 @@ export default function NotesTeleprompter({
                                 onClick={() => setIsScrolling(!isScrolling)}
                                 className={`px-2 py-1 rounded flex items-center gap-1 font-medium transition-all ${
                                     isScrolling 
-                                        ? 'bg-[#DCFE50] text-black font-bold' 
+                                        ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold' 
                                         : 'bg-white/10 hover:bg-white/20 text-white'
                                 }`}
                             >
@@ -170,7 +170,7 @@ export default function NotesTeleprompter({
                                     max="5"
                                     value={scrollSpeed}
                                     onChange={(e) => setScrollSpeed(Number(e.target.value))}
-                                    className="w-14 accent-[#DCFE50] cursor-pointer"
+                                    className="w-14 accent-[var(--accent-app)] cursor-pointer"
                                 />
                             </div>
                             <div className="flex items-center gap-1">
