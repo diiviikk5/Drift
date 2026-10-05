@@ -40,7 +40,7 @@ export default function AudioLevelMeter({ enabled, onToggle }) {
             </button>
 
             <div className="flex-1">
-                <div className="flex items-center justify-between text-[10px] text-gray-400 mb-1 font-mono">
+                <div className="flex items-center justify-between text-[11px] text-gray-400 mb-1 font-mono">
                     <span>Microphone Input</span>
                     <span className={enabled ? 'text-[#DCFE50] font-bold' : 'text-gray-600'}>
                         {enabled ? 'Active (Gain Auto)' : 'Off'}

@@ -163,7 +163,7 @@ export default function NotesTeleprompter({
                         {/* Font Size & Speed */}
                         <div className="flex items-center gap-3">
                             <div className="flex items-center gap-1">
-                                <span className="text-[10px] text-zinc-400 font-mono">Speed</span>
+                                <span className="text-[11px] text-zinc-400 font-mono">Speed</span>
                                 <input
                                     type="range"
                                     min="1"

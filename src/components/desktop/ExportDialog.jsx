@@ -25,7 +25,7 @@ export default function ExportDialog({
                     <div>
                         <div className="flex items-center gap-2">
                             <h3 className="text-base font-bold tracking-tight">Export Cinema Studio Video</h3>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-[#DCFE50]/15 text-[#DCFE50] border border-[#DCFE50]/30">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-[#DCFE50]/15 text-[#DCFE50] border border-[#DCFE50]/30">
                                 <Zap className="w-2.5 h-2.5" />
                                 GPU Accelerated
                             </span>
@@ -64,7 +64,7 @@ export default function ExportDialog({
                     <div className="space-y-4">
                         {/* Format */}
                         <div className="space-y-1.5">
-                            <label className="text-[11px] font-semibold text-[var(--text-app-muted)] font-mono uppercase tracking-wider">
+                            <label className="text-xs text-[var(--text-app-muted)] font-medium">
                                 Container Format
                             </label>
                             <div className="grid grid-cols-3 gap-2">
@@ -83,7 +83,7 @@ export default function ExportDialog({
                                         }`}
                                     >
                                         <div className="text-xs font-semibold">{item.label}</div>
-                                        <div className="text-[10px] opacity-75">{item.desc}</div>
+                                        <div className="text-[11px] opacity-75">{item.desc}</div>
                                     </button>
                                 ))}
                             </div>
@@ -91,7 +91,7 @@ export default function ExportDialog({
 
                         {/* Resolution */}
                         <div className="space-y-1.5">
-                            <label className="text-[11px] font-semibold text-[var(--text-app-muted)] font-mono uppercase tracking-wider">
+                            <label className="text-xs text-[var(--text-app-muted)] font-medium">
                                 Resolution
                             </label>
                             <div className="grid grid-cols-4 gap-2">
@@ -111,7 +111,7 @@ export default function ExportDialog({
                                         }`}
                                     >
                                         <div className="text-xs font-semibold">{item.label}</div>
-                                        <div className="text-[10px] opacity-75">{item.desc}</div>
+                                        <div className="text-[11px] opacity-75">{item.desc}</div>
                                     </button>
                                 ))}
                             </div>
@@ -121,7 +121,7 @@ export default function ExportDialog({
                         <div className="grid grid-cols-2 gap-3">
                             {/* Frame Rate */}
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-semibold text-[var(--text-app-muted)] font-mono uppercase tracking-wider">
+                                <label className="text-xs text-[var(--text-app-muted)] font-medium">
                                     Frame Rate
                                 </label>
                                 <div className="grid grid-cols-2 gap-1.5">
@@ -139,7 +139,7 @@ export default function ExportDialog({
                                             }`}
                                         >
                                             <div className="text-xs font-semibold">{item.label}</div>
-                                            <div className="text-[9px] opacity-75">{item.desc}</div>
+                                            <div className="text-[11px] opacity-75">{item.desc}</div>
                                         </button>
                                     ))}
                                 </div>
@@ -147,7 +147,7 @@ export default function ExportDialog({
 
                             {/* Bitrate / Quality */}
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-semibold text-[var(--text-app-muted)] font-mono uppercase tracking-wider">
+                                <label className="text-xs text-[var(--text-app-muted)] font-medium">
                                     Quality Preset
                                 </label>
                                 <div className="grid grid-cols-3 gap-1">
@@ -166,7 +166,7 @@ export default function ExportDialog({
                                             }`}
                                         >
                                             <div className="text-xs font-semibold">{item.label}</div>
-                                            <div className="text-[9px] opacity-75">{item.desc}</div>
+                                            <div className="text-[11px] opacity-75">{item.desc}</div>
                                         </button>
                                     ))}
                                 </div>
@@ -176,7 +176,7 @@ export default function ExportDialog({
                         {/* Start Button */}
                         <button
                             onClick={() => onStartExport(format, resolution, parseInt(fps, 10), quality)}
-                            className="w-full mt-2 py-3.5 rounded-xl bg-[#DCFE50] text-black hover:bg-[#c8e840] font-bold text-xs uppercase tracking-wider shadow-sm transition-all flex items-center justify-center gap-2"
+                            className="w-full mt-2 py-3.5 rounded-xl bg-[#DCFE50] text-black hover:bg-[#c8e840] text-xs shadow-sm transition-all flex items-center justify-center gap-2 font-medium"
                         >
                             <Download className="w-4 h-4" />
                             <span>Export Video Now</span>

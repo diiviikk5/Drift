@@ -122,7 +122,7 @@ export default function HotkeyModal({
 
                 {/* Configurable Shortcuts */}
                 <div className="space-y-2">
-                    <label className="text-[10px] font-mono uppercase font-semibold text-[var(--text-app-muted)] tracking-wider">
+                    <label className="text-xs text-[var(--text-app-muted)] font-medium">
                         Configurable Hotkeys
                     </label>
                     {entries.map((item) => {
@@ -161,7 +161,7 @@ export default function HotkeyModal({
                                 </kbd>
                             </button>
                             {bare && !isBinding && (
-                                <p className="text-[10px] text-amber-400 px-1 -mt-1">
+                                <p className="text-[11px] text-amber-400 px-1 -mt-1">
                                     Without Ctrl, Alt or Shift, {formatted} is taken in every app while Drift runs (you can't type it elsewhere).
                                 </p>
                             )}
@@ -172,7 +172,7 @@ export default function HotkeyModal({
 
                 {/* Workspace Shortcuts */}
                 <div className="space-y-2 pt-2 border-t border-[var(--border-app)]">
-                    <label className="text-[10px] font-mono uppercase font-semibold text-[var(--text-app-muted)] tracking-wider">
+                    <label className="text-xs text-[var(--text-app-muted)] font-medium">
                         Workspace Hotkeys
                     </label>
                     <div className="space-y-1">
@@ -182,7 +182,7 @@ export default function HotkeyModal({
                                 className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs"
                             >
                                 <span className="text-[var(--text-app-muted)] text-[11px]">{s.label}</span>
-                                <kbd className="px-2 py-0.5 rounded bg-[var(--bg-card-subtle)] text-[var(--text-app)] font-mono text-[10px] border border-[var(--border-app)]">
+                                <kbd className="px-2 py-0.5 rounded bg-[var(--bg-card-subtle)] text-[var(--text-app)] font-mono text-[11px] border border-[var(--border-app)]">
                                     {s.key}
                                 </kbd>
                             </div>
@@ -192,7 +192,7 @@ export default function HotkeyModal({
 
                 {isDesktopApp && (
                     <div className="pt-2 border-t border-[var(--border-app)] space-y-1.5">
-                        <p className="text-[10px] text-[var(--text-app-muted)] flex items-center gap-1.5">
+                        <p className="text-[11px] text-[var(--text-app-muted)] flex items-center gap-1.5">
                             <Globe className="w-3 h-3 text-[var(--accent-app)]" />
                             Works anywhere, even when Drift is minimized or in the tray. Stopping opens the studio with your recording.
                         </p>
@@ -203,7 +203,7 @@ export default function HotkeyModal({
                         >
                             <span>
                                 <span className="block text-xs text-[var(--text-app)]">Keep running in the tray when closed</span>
-                                <span className="block text-[10px] text-[var(--text-app-muted)]">Quit from the tray icon menu</span>
+                                <span className="block text-[11px] text-[var(--text-app-muted)]">Quit from the tray icon menu</span>
                             </span>
                             <span className={`w-9 h-5 rounded-full relative transition-all flex-shrink-0 ${closeToTray ? 'bg-[var(--accent-app)]' : 'bg-gray-600'}`}>
                                 <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${closeToTray ? 'left-[18px]' : 'left-0.5'}`} />
@@ -222,7 +222,7 @@ export default function HotkeyModal({
                     </button>
                     <button
                         onClick={handleSave}
-                        className="flex-1 py-2.5 rounded-xl bg-[var(--accent-app)] text-[var(--accent-app-fg)] hover:opacity-90 text-xs font-bold uppercase tracking-wider shadow-sm transition-all flex items-center justify-center gap-1.5"
+                        className="flex-1 py-2.5 rounded-xl bg-[var(--accent-app)] text-[var(--accent-app-fg)] hover:opacity-90 text-xs shadow-sm transition-all flex items-center justify-center gap-1.5 font-medium"
                     >
                         <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                         <span>Save Shortcuts</span>

@@ -21,7 +21,7 @@ export default function CountdownOverlay({ count, onCancel }) {
                 </span>
             </motion.div>
 
-            <p className="mt-8 font-mono text-sm uppercase tracking-widest text-gray-300">
+            <p className="mt-8 text-sm text-gray-300 font-medium">
                 Recording starts in...
             </p>
 
