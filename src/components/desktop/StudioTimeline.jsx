@@ -389,13 +389,13 @@ export default function StudioTimeline({
                 {/* Trim Out-of-bounds Shading */}
                 {duration > 0 && trimStart > 0 && (
                     <div
-                        className="absolute top-0 bottom-0 left-0 bg-black/60 backdrop-blur-[1px] border-r-2 border-red-500/70 z-15 pointer-events-none"
+                        className="absolute top-0 bottom-0 left-0 bg-black/60 border-r-2 border-red-500/70 z-15 pointer-events-none"
                         style={{ width: `${(trimStart / duration) * 100}%` }}
                     />
                 )}
                 {duration > 0 && effectiveTrimEnd < duration && (
                     <div
-                        className="absolute top-0 bottom-0 right-0 bg-black/60 backdrop-blur-[1px] border-l-2 border-red-500/70 z-15 pointer-events-none"
+                        className="absolute top-0 bottom-0 right-0 bg-black/60 border-l-2 border-red-500/70 z-15 pointer-events-none"
                         style={{ width: `${((duration - effectiveTrimEnd) / duration) * 100}%` }}
                     />
                 )}

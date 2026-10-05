@@ -95,7 +95,7 @@ export default function NotesTeleprompter({
     return (
         <div 
             style={{ left: `${position.x}px`, top: `${position.y}px` }}
-            className="fixed z-50 w-80 bg-zinc-900/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col transition-shadow duration-200 select-none"
+            className="fixed z-50 w-80 bg-zinc-900/95 border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col transition-shadow duration-200 select-none"
         >
             {/* Window Header */}
             <div 

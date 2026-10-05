@@ -1918,7 +1918,7 @@ export default function RecorderPage() {
                                         )}
 
                                         {/* Canvas Hint */}
-                                        <div className="absolute top-3 left-3 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity bg-black/75 backdrop-blur-md px-2.5 py-1 rounded-md text-[11px] font-mono text-white border border-white/10">
+                                        <div className="absolute top-3 left-3 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity bg-black/75 px-2.5 py-1 rounded-md text-[11px] font-mono text-white border border-white/10">
                                             ✦ Drag a box or click to add a zoom focal point
                                         </div>
                                     </div>

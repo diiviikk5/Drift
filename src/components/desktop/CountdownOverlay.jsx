@@ -7,7 +7,7 @@ export default function CountdownOverlay({ count, onCancel }) {
     if (!count || count <= 0) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md select-none">
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 select-none">
             <motion.div
                 key={count}
                 initial={{ scale: 0.5, opacity: 0 }}
