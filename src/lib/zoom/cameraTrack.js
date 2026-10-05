@@ -175,7 +175,7 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
 
     const lastSegEnd = sorted.length ? sorted[sorted.length - 1].endTime : 0;
     const lastSample = cursor.length ? sampleTimeMs(cursor[cursor.length - 1]) / 1000 : 0;
-    const end = Math.max(options.duration ?? 0, lastSegEnd + 3, lastSample + 0.5, 1);
+    let end = Math.max(options.duration ?? 0, lastSegEnd + 3, lastSample + 0.5, 1);
 
     // --- framing helpers --------------------------------------------------
     const halfX = (s) => 0.5 / (s * kx);
@@ -424,6 +424,8 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
     if (!sorted.length && cropped) holdAndReframe(0, end, true);
 
     // --- render the plan into a 120 Hz track -------------------------------
+    // Cover every planned move, plus time for the smoothing tail to settle.
+    for (const m of moves) end = Math.max(end, m.t0 + m.d + 0.5);
     const hz = TRACK_HZ;
     const frames = Math.ceil(end * hz) + 2;
     const fx = new Float32Array(frames);
