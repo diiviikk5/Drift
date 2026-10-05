@@ -52,6 +52,8 @@ export const CAMERA_MOTION = Object.freeze({
     minReframeShift: 0.04,  // ignore reframes smaller than this (normalized)
     minWidenScale: 1.18,    // a reframe may widen the shot down to this zoom
     smoothTau: 0.06,        // final rounding of joins (seconds)
+    establishing: 0.5,      // show the full frame at least this long before the first zoom
+    endOnOverview: 0.25,    // finish the final zoom-out this long before the video ends
     calmSpeed: 0.9,         // perceived speed (widths/s) above which moves are penalized
 });
 
@@ -409,7 +411,10 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
 
         // Arrive at this shot just as its first action happens, framed on
         // where the cursor will be by then (not where it was).
-        const planned = Math.max(arrivalStart(seg, target), holdFloor);
+        // Auto zooms open on the full frame for a moment (an establishing shot);
+        // a zoom placed by hand at the start is honoured.
+        const establishing = i === 0 && seg.auto && !cropped ? M.establishing : 0;
+        const planned = Math.max(arrivalStart(seg, target), holdFloor, establishing);
         const start = Math.max(departEarly != null ? Math.min(planned, departEarly) : planned, free);
         departEarly = null;
         holdFloor = 0;
@@ -442,7 +447,13 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
             continue;
         }
         if (zoomed(state) || cropped) {
-            const at = early != null ? Math.max(free, minLeave, Math.min(leave, early)) : leave;
+            let at = early != null ? Math.max(free, minLeave, Math.min(leave, early)) : leave;
+            // The last shot: end the video on the full frame when there is time.
+            const videoEnd = options.duration;
+            if (!next && Number.isFinite(videoEnd)) {
+                const finish = videoEnd - M.endOnOverview - moveDuration(state, overview(), M.zoomOutFactor);
+                if (finish < at && finish >= Math.max(free, minLeave)) at = finish;
+            }
             const near = cropped ? look.at(at) : null;
             emit(at, overview(near), M.zoomOutFactor);
         }
