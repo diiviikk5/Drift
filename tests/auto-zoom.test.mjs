@@ -227,3 +227,14 @@ test('a zoom placed by hand at the very start is honoured', () => {
     const segs = [{ startTime: 0, endTime: 3, targetX: 0.4, targetY: 0.5, zoomScale: 1.6 }];
     assert.ok(evaluateCameraAtTime(0.45, segs).scale > 1.05);
 });
+
+test('scrolling ends the shot: the camera pulls back while the page moves', () => {
+    const moves = path([[0, 0.3, 0.4], [9000, 0.3, 0.4]]);
+    for (let t = 3000; t <= 4500; t += 100) moves.push({ time: t, x: 0.3, y: 0.4, scroll: -1 });
+    moves.sort((a, b) => a.time - b.time);
+    const clicks = [{ time: 1500, x: 0.3, y: 0.4 }, { time: 7000, x: 0.32, y: 0.42 }];
+    const segs = new InteractionAnalyzer().analyze(clicks, moves, 10);
+    assert.equal(segs.length, 2, 'the click after scrolling is a new shot');
+    assert.ok(segs[0].endTime <= 3.45, `first shot should end as scrolling starts, ended ${segs[0].endTime}`);
+    assert.ok(evaluateCameraAtTime(4.6, segs, moves, { duration: 10 }).scale < 1.1, 'pulled back during the scroll');
+});
