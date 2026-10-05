@@ -8,6 +8,7 @@
 
 import { computeCursorSwayRotation } from '../zoom/cursorTilt.js';
 import { typingPointerOpacity } from '../zoom/typingFocus.js';
+import { cursorShapeAt, drawCursorShape, themeHasShapes } from './cursorShapes.js';
 import { getSmoothedCursorPath } from '../zoom/cursorPathSmoothing.js';
 import { getCameraTrack, sampleCameraTrack } from '../zoom/cameraTrack.js';
 import { WALLPAPERS, computeStageLayout, drawMeshBackground, getGrainPattern } from './stage.js';
@@ -250,6 +251,7 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         cameraSamples = null,
         clicks = [],
         keystrokes = [],
+        cursorShapes = [],
     } = sessionData;
 
     // 2. Stage layout (resolution independent: 1 unit = 1px at 1080p)
@@ -519,7 +521,11 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
                 }
             }
             ctx.globalAlpha = idleOpacity;
-            _drawThemedCursor(ctx, curScreenX, curScreenY, size, cursorTheme, swayAngle);
+            // Same shape as the real pointer had (I-beam over text, hand over links...).
+            const shape = themeHasShapes(cursorTheme) ? cursorShapeAt(timeSec, cursorShapes) : 'arrow';
+            if (!drawCursorShape(ctx, curScreenX, curScreenY, size, shape, cursorTheme, timeSec)) {
+                _drawThemedCursor(ctx, curScreenX, curScreenY, size, cursorTheme, swayAngle);
+            }
             ctx.restore();
         }
     }
