@@ -1014,6 +1014,7 @@ export default function RecorderPage() {
                         x: normalizeX(s.x),
                         y: normalizeY(s.y),
                         click: s.click,
+                        ...(s.scroll ? { scroll: s.scroll } : {}),
                         ...(outside(s) ? { hidden: true } : {}),
                     }));
 
