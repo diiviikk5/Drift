@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tauri::command;
-use xcap::Monitor;
+
+use crate::commands::display;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScreenSource {
@@ -14,47 +15,33 @@ pub struct ScreenSource {
 /// Get available screen sources for recording
 #[command]
 pub async fn get_sources() -> Result<Vec<ScreenSource>, String> {
-    let monitors = Monitor::all().map_err(|e| format!("Failed to enumerate monitors: {}", e))?;
-
-    let sources: Vec<ScreenSource> = monitors
+    let displays = display::displays();
+    if displays.is_empty() {
+        return Err("No displays found".into());
+    }
+    Ok(displays
         .into_iter()
         .enumerate()
-        .map(|(i, monitor)| ScreenSource {
+        .map(|(i, d)| ScreenSource {
             id: format!("screen:{}", i),
-            name: monitor.name().to_string(),
-            width: monitor.width(),
-            height: monitor.height(),
-            is_primary: monitor.is_primary(),
+            name: if d.primary { "Main display".to_string() } else { format!("Display {}", i + 1) },
+            width: d.width,
+            height: d.height,
+            is_primary: d.primary,
         })
-        .collect();
-
-    Ok(sources)
+        .collect())
 }
 
-/// Capture a screenshot of a specific monitor (for thumbnails)
+/// Thumbnail of a display as PNG bytes (for the source picker preview).
 #[command]
 pub async fn capture_screenshot(monitor_id: usize) -> Result<Vec<u8>, String> {
-    let monitors = Monitor::all().map_err(|e| format!("Failed to get monitors: {}", e))?;
+    let displays = display::displays();
+    let d = displays.get(monitor_id).ok_or_else(|| "Display not found".to_string())?;
+    let (w, h, rgba) = display::thumbnail(d, 1280)?;
 
-    let monitor = monitors
-        .get(monitor_id)
-        .ok_or_else(|| "Monitor not found".to_string())?;
-
-    let image = monitor
-        .capture_image()
-        .map_err(|e| format!("Failed to capture: {}", e))?;
-
-    // Encode as PNG bytes
     let mut buf = Vec::new();
     let encoder = image::codecs::png::PngEncoder::new(&mut buf);
-    image::ImageEncoder::write_image(
-        encoder,
-        image.as_raw(),
-        image.width(),
-        image.height(),
-        image::ExtendedColorType::Rgba8,
-    )
-    .map_err(|e| format!("Failed to encode: {}", e))?;
-
+    image::ImageEncoder::write_image(encoder, &rgba, w, h, image::ExtendedColorType::Rgba8)
+        .map_err(|e| format!("Failed to encode: {}", e))?;
     Ok(buf)
 }

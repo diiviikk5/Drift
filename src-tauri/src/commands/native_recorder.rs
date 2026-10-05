@@ -416,10 +416,10 @@ pub async fn start_native_session(
                 Monitor::primary().map_err(|e| format!("Failed to acquire primary monitor: {:?}", e))?
             };
             let (w, h) = (monitor.width().unwrap_or(1920), monitor.height().unwrap_or(1080));
-            // Same index the source picker used (xcap enumerates monitors in the same order).
-            let origin = xcap::Monitor::all()
-                .ok()
-                .and_then(|all| all.get(config.monitor_index).map(|m| (m.x(), m.y())))
+            // Same index the source picker used (both enumerate with EnumDisplayMonitors).
+            let origin = crate::commands::display::displays()
+                .get(config.monitor_index)
+                .map(|d| (d.x, d.y))
                 .unwrap_or((0, 0));
             (Target::Monitor(monitor), w, h, origin)
         };
