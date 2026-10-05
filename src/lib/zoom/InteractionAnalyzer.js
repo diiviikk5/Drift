@@ -271,15 +271,14 @@ export class InteractionAnalyzer {
         const targetY = clamp(cy * 0.5 + (minY + maxY) * 0.25, 0, 1);
 
         const span = Math.max(maxX - minX, maxY - minY) + o.fitMargin * 2;
-        // The preset is the typical depth; tight work (a field, a button) may go a bit deeper.
-        const maxZoom = Math.max(o.minZoom, o.defaultZoomScale * (o.maxZoomBoost ?? 1.3));
-        const fitZoom = span > 0 ? 1 / span : maxZoom;
-        const zoomScale = Math.round(clamp(fitZoom, o.minZoom, maxZoom) * 100) / 100;
+        const fitZoom = span > 0 ? 1 / span : Infinity;
+        const zoomScale = this._depth(fitZoom, sess.signals.length);
 
         return {
             startTime,
             endTime,
             actionTime: anchors[0].time,
+            actions: sess.signals.length,
             lastAction,
             box: { minX, maxX, minY, maxY },
             weightedX: cx,
@@ -290,6 +289,17 @@ export class InteractionAnalyzer {
             reason: anchors[0].kind === 'click' ? 'click' : (anchors[0].kind === 'type' ? 'key' : anchors[0].kind),
             clickCount: sess.signals.filter(s => s.kind === 'click').length,
         };
+    }
+
+    /**
+     * Zoom depth: the preset for ordinary work, a little deeper only for
+     * sustained detail work (3+ actions in a tight spot), shallower when the
+     * work is spread out.
+     */
+    _depth(fitZoom, actions) {
+        const o = this.options;
+        const cap = actions >= 3 ? o.defaultZoomScale * (o.maxZoomBoost ?? 1) : o.defaultZoomScale;
+        return Math.round(clamp(fitZoom, o.minZoom, Math.max(o.minZoom, cap)) * 100) / 100;
     }
 
     /**
@@ -313,7 +323,6 @@ export class InteractionAnalyzer {
         const merge = (a, b) => {
             const box = union(a.box, b.box);
             const fitZoom = fitOf(box);
-            const maxZoom = Math.max(o.minZoom, o.defaultZoomScale * (o.maxZoomBoost ?? 1));
             const wa = a.clickCount + 1;
             const wb = b.clickCount + 1;
             const cx = (a.weightedX * wa + b.weightedX * wb) / (wa + wb);
@@ -327,8 +336,9 @@ export class InteractionAnalyzer {
                 weightedY: cy,
                 targetX: clamp(cx * 0.5 + (box.minX + box.maxX) * 0.25, 0, 1),
                 targetY: clamp(cy * 0.5 + (box.minY + box.maxY) * 0.25, 0, 1),
-                zoomScale: Math.round(clamp(fitZoom, 1, maxZoom) * 100) / 100,
+                zoomScale: Math.min(this._depth(fitZoom, a.actions + b.actions), Math.round(fitZoom * 100) / 100),
                 clickCount: a.clickCount + b.clickCount,
+                actions: a.actions + b.actions,
             };
         };
 
