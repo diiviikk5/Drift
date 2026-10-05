@@ -17,6 +17,7 @@ const KEEP = new Set([
     '_next',        // scripts, styles, fonts
     'recorder',     // the app
     'backgrounds',  // studio backgrounds
+    'brand',        // app logo
     'index.html',
     '404.html',
     'icon.ico',
