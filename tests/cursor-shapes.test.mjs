@@ -50,3 +50,20 @@ test('the renderer draws the I-beam while the real cursor was a text cursor', ()
     // The I-beam's serifs are the only extra curves compared with the arrow.
     assert.ok(curves(1.5) - curves(0.5) >= 4, 'I-beam drawn while the real cursor was a text cursor');
 });
+
+test('micro-flips are ignored and real changes crossfade', async () => {
+    const { cursorShapeState } = await import('../src/lib/rendering/cursorShapes.js');
+    const flicky = [
+        { time: 0, shape: 'arrow' },
+        { time: 1000, shape: 'text' }, { time: 1030, shape: 'arrow' }, { time: 1060, shape: 'text' }, // flips
+        { time: 1100, shape: 'text' },
+        { time: 2000, shape: 'hand' }, { time: 2020, shape: 'arrow' },  // 20 ms hand blip
+        { time: 3000, shape: 'wait' }, { time: 3100, shape: 'text' },   // 100 ms busy blip
+    ];
+    // Between 1060 and 2000 the pointer is steadily an I-beam.
+    for (let t = 1.2; t < 2; t += 0.05) assert.equal(cursorShapeState(t, flicky).shape, 'text');
+    assert.equal(cursorShapeState(2.01, flicky).shape, 'text', 'hand blip ignored');
+    assert.equal(cursorShapeState(3.05, flicky).shape, 'arrow', 'busy blip ignored (it was an arrow before)');
+    const fade = cursorShapeState(1.13, flicky);
+    assert.ok(fade.prev === 'arrow' && fade.mix > 0 && fade.mix < 1, JSON.stringify(fade));
+});

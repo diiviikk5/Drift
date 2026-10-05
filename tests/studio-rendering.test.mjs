@@ -374,3 +374,9 @@ test('changing the zoom preset re-plans auto zooms and keeps their variety', asy
     assert.ok(tight.zoomScale > 1.35, `detail work should go deeper than the preset, got ${tight.zoomScale}`);
     assert.ok(spread.zoomScale <= 1.35);
 });
+
+test('keystroke badges only for real shortcuts, never plain typing keys', async () => {
+    const { isShortcutKeystroke } = await import('../src/lib/rendering/renderFrame.js');
+    for (const k of ['Ctrl+S', 'Alt+Tab', 'Ctrl+Shift+P', 'Win+D']) assert.ok(isShortcutKeystroke(k), k);
+    for (const k of ['Space', 'Enter', 'Backspace', '↑', 'Shift+H', '', undefined]) assert.ok(!isShortcutKeystroke(k), String(k));
+});
