@@ -108,6 +108,7 @@ export default function RecorderPage() {
     const [frameFit, setFrameFit] = useState('contain');
     const [captureWindows, setCaptureWindows] = useState([]);
     const [recordedCaret, setRecordedCaret] = useState([]);
+    const [recordedCursorShapes, setRecordedCursorShapes] = useState([]);
     // Screen-capture fallback recordings have the real OS cursor baked into the
     // video; a synthetic cursor on top of those shows two pointers.
     const [cursorBakedIn, setCursorBakedIn] = useState(false);
@@ -412,6 +413,7 @@ export default function RecorderPage() {
                         showKeystrokes,
                         keystrokes: recordedKeystrokes,
                         caret: recordedCaret,
+                        cursorShapes: recordedCursorShapes,
                         focusSegments: savedSegmentsRef.current,
                         showCursor: showCursor,
                         systemAudioUrl: nativeAudioTracks.systemAudioUrl,
@@ -1043,6 +1045,7 @@ export default function RecorderPage() {
                     }
                     setRecordedKeystrokes(keystrokeList || []);
                     // Text caret track (target pixels -> normalized; y is the caret top).
+                    setRecordedCursorShapes((result.cursor_shapes || []).map(c => ({ time: c.t, shape: c.shape })));
                     setRecordedCaret((result.caret || []).map(c => ({
                         time: c.t,
                         x: Math.max(0, Math.min(1, c.x / srcW)),
@@ -1422,6 +1425,7 @@ export default function RecorderPage() {
         studioRef.current.setFocusSegments([]);
         setRecordedClicks([]);
         setRecordedCaret([]);
+        setRecordedCursorShapes([]);
         setFocusSegments([]);
     };
 
@@ -1622,6 +1626,7 @@ export default function RecorderPage() {
         setNativeAudioTracks({ systemAudioUrl: null, micAudioUrl: null });
         setRecordedClicks([]);
         setRecordedCaret([]);
+        setRecordedCursorShapes([]);
         setRecordedMoves([]);
         setDuration(0);
         setCurrentTime(0);
@@ -1642,7 +1647,7 @@ export default function RecorderPage() {
             }
             const project = await encodeProject({
                 recording: blobToSave, webcam: webcamToSave, duration,
-                clicks: recordedClicks, moves: recordedMoves, keystrokes: recordedKeystrokes, caret: recordedCaret,
+                clicks: recordedClicks, moves: recordedMoves, keystrokes: recordedKeystrokes, caret: recordedCaret, cursorShapes: recordedCursorShapes,
                 focusSegments: studioRef.current?.getFocusSegments() ?? focusSegments,
                 annotations, captions, captionsEnabled, background,
                 customBackground: customImage?.src ?? null,
@@ -1708,6 +1713,7 @@ export default function RecorderPage() {
             setRecordedMoves(project.moves ?? []);
             setRecordedKeystrokes(project.keystrokes ?? []);
             setRecordedCaret(project.caret ?? []);
+            setRecordedCursorShapes(project.cursorShapes ?? []);
             savedSegmentsRef.current = project.focusSegments ?? [];
             setFocusSegments(savedSegmentsRef.current);
             recDurationRef.current = project.duration;

@@ -31,6 +31,7 @@ export class StudioEngine {
         this.mouseMoves = mouseMoves;
         this.keystrokes = options.keystrokes || [];
         this.caret = options.caret || [];
+        this.cursorShapes = options.cursorShapes || [];
         this.showKeystrokes = options.showKeystrokes !== false;
 
         // Webcam PiP Video & Settings
@@ -754,6 +755,7 @@ export class StudioEngine {
                 focusSegments: this.focusSegments || [],
                 mouseSamples: this.mouseMoves || [],
                 cameraSamples: this.getFocusSamples(),
+                cursorShapes: this.cursorShapes || [],
                 clicks: this.clicks || [],
                 keystrokes: this.keystrokes || [],
             },
