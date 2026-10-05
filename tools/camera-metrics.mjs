@@ -8,11 +8,28 @@
  * log-scale per second. Their combination is the "motion" a viewer feels.
  */
 
+import fs from 'fs';
+import path from 'path';
 import { SCENARIOS } from './camera-scenarios.mjs';
 import { InteractionAnalyzer } from '../src/lib/zoom/InteractionAnalyzer.js';
 import { evaluateCameraAtTime } from '../src/lib/rendering/renderFrame.js';
 
 const FPS = 60;
+
+/** Load a recorder session folder (telemetry.json, keystrokes.json, session.json). */
+function loadSession(dir) {
+    const read = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); } catch { return null; } };
+    const meta = read('session.json') || {};
+    const w = meta.width || 1920;
+    const h = meta.height || 1080;
+    const moves = (read('telemetry.json') || []).map(s => ({ time: s.t, x: Math.max(0, Math.min(1, s.x / w)), y: Math.max(0, Math.min(1, s.y / h)), click: s.click || undefined }));
+    return {
+        moves,
+        clicks: moves.filter(m => m.click),
+        keys: read('keystrokes.json') || [],
+        duration: (meta.duration_ms || 10000) / 1000,
+    };
+}
 
 export function measure(scenario) {
     const { moves, clicks, keys, duration } = scenario;
@@ -72,7 +89,7 @@ export function measure(scenario) {
     const zoomed = frames.filter(f => f.s > 1.05).length / frames.length;
     const peakScale = Math.max(...frames.map(f => f.s));
     const clickSeen = clicks.filter(c => {
-        const f = frames[Math.min(frames.length - 1, Math.round((c.time / 1000) * FPS))];
+        const f = frames[Math.max(0, Math.min(frames.length - 1, Math.round((c.time / 1000) * FPS)))];
         const half = 0.5 / f.s;
         return Math.abs(c.x - f.x) <= half * 0.92 && Math.abs(c.y - f.y) <= half * 0.92;
     }).length;
@@ -95,7 +112,11 @@ export function measure(scenario) {
 }
 
 if (import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}` || process.argv[1].endsWith('camera-metrics.mjs')) {
-    const rows = Object.entries(SCENARIOS).map(([name, make]) => ({ name, ...measure(make()) }));
+    const sessionDirs = process.argv.slice(2).filter(a => !a.startsWith('--'));
+    const sources = sessionDirs.length
+        ? sessionDirs.map(dir => [dir.split(/[\/]/).filter(Boolean).pop().slice(0, 40), () => loadSession(dir)])
+        : Object.entries(SCENARIOS);
+    const rows = sources.map(([name, make]) => ({ name, ...measure(make()) }));
     if (process.argv.includes('--json')) {
         console.log(JSON.stringify(rows, null, 2));
     } else {
