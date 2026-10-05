@@ -1,16 +1,42 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Monitor, Film, Keyboard, Sun, Moon, Sparkles, Palette, Check, Laptop, FileText, FolderOpen, Save, Settings } from 'lucide-react';
+import { Monitor, Film, Keyboard, Check, FileText, FolderOpen, Save, Settings, ChevronDown } from 'lucide-react';
+import { APP_THEMES, getAppTheme } from '@/lib/ui/themes';
+
+/** Small ghost button used across the header. */
+function HeaderButton({ active = false, children, className = '', ...props }) {
+    return (
+        <button
+            {...props}
+            className={`flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[13px] font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none ${
+                active
+                    ? 'bg-[var(--accent-soft)] text-[var(--text-app)]'
+                    : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:bg-[var(--bg-card-subtle)]'
+            } ${className}`}
+        >
+            {children}
+        </button>
+    );
+}
+
+/** Miniature of a theme: window, card and accent. */
+function ThemePreview({ swatch }) {
+    const [bg, card, accent] = swatch;
+    return (
+        <span className="relative block w-11 h-8 rounded-md overflow-hidden border border-black/10 flex-shrink-0" style={{ background: bg }}>
+            <span className="absolute left-1.5 top-1.5 right-1.5 h-2 rounded-sm" style={{ background: card }} />
+            <span className="absolute left-1.5 bottom-1.5 w-4 h-2 rounded-sm" style={{ background: accent }} />
+            <span className="absolute right-1.5 bottom-1.5 w-3 h-2 rounded-sm" style={{ background: card }} />
+        </span>
+    );
+}
 
 export default function DesktopHeader({
     viewMode,
     setViewMode,
-    platform,
-    hookStatus,
     onOpenHotkeys,
     onOpenSettings,
-    onNewRecording,
     onOpenProject,
     onSaveProject,
     hasRecording,
@@ -20,127 +46,94 @@ export default function DesktopHeader({
     theme = 'dark',
     onSelectTheme,
     isTeleprompterOpen = false,
-    onToggleTeleprompter
+    onToggleTeleprompter,
 }) {
     const [showThemeMenu, setShowThemeMenu] = useState(false);
+    const current = getAppTheme(theme);
 
-    const themes = [
-        { id: 'dark', label: 'Zinc Dark', icon: Moon, desc: 'Classic Shadcn' },
-        { id: 'light', label: 'Clean Light', icon: Sun, desc: 'High Contrast' },
-        { id: 'midnight', label: 'Midnight', icon: Sparkles, desc: 'Deep Navy' },
-        { id: 'drift', label: 'Drift Lime', icon: Palette, desc: 'Electric Accent' },
-    ];
+    const tab = (id, label, Icon, enabled = true) => (
+        <button
+            onClick={() => enabled && setViewMode(id)}
+            disabled={!enabled}
+            className={`flex items-center gap-1.5 h-7 px-3 rounded-md text-[13px] font-medium transition-colors ${
+                viewMode === id
+                    ? 'bg-[var(--pill-active-bg)] text-[var(--pill-active-fg)] shadow-sm'
+                    : enabled
+                    ? 'text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
+                    : 'text-[var(--text-app-faint)] cursor-not-allowed'
+            }`}
+        >
+            <Icon className="w-3.5 h-3.5" />
+            <span>{label}</span>
+            {id === 'recorder' && isRecording && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
+        </button>
+    );
 
     return (
-        <header className="flex items-center justify-between px-5 py-2.5 border-b border-[var(--border-app)] bg-[var(--bg-app)]/90 backdrop-blur-xl flex-shrink-0 z-40 select-none transition-colors duration-200">
-            {/* Left: Brand + App Tabs */}
-            <div className="flex items-center gap-5">
-                {/* Brand */}
-                <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-[var(--accent-app)] text-[var(--accent-app-fg)] flex items-center justify-center font-black text-xs shadow-sm transition-colors">
-                        D
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm tracking-tight text-[var(--text-app)]">
-                            Drift
-                        </span>
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-[var(--bg-card-subtle)] text-[var(--text-app-muted)] border border-[var(--border-app)] font-medium">
-                            v2.0
-                        </span>
-                    </div>
+        <header className="flex items-center justify-between h-12 px-4 border-b border-[var(--border-app)] bg-[var(--bg-app)] flex-shrink-0 z-40 select-none">
+            {/* Brand + views */}
+            <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                    <img src="/brand/drift-mark.png" alt="" width={24} height={24} className="w-6 h-6 rounded-md" draggable={false} />
+                    <span className="font-semibold text-[15px] tracking-tight text-[var(--text-app)]">Drift</span>
                 </div>
-
-                {/* Shadcn Segmented Control Tabs */}
-                <div className="flex items-center bg-[var(--pill-bg)] p-1 rounded-lg border border-[var(--border-app)]">
-                    <button
-                        onClick={() => setViewMode('recorder')}
-                        className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                            viewMode === 'recorder'
-                                ? 'bg-[var(--pill-active-bg)] text-[var(--pill-active-fg)] shadow-xs font-semibold'
-                                : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
-                        }`}
-                    >
-                        <Monitor className="w-3.5 h-3.5" />
-                        <span>Capture</span>
-                        {isRecording && (
-                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse ml-0.5" />
-                        )}
-                    </button>
-                    <button
-                        onClick={() => {
-                            if (hasRecording) setViewMode('studio');
-                        }}
-                        disabled={!hasRecording || isRecording}
-                        className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                            viewMode === 'studio'
-                                ? 'bg-[var(--pill-active-bg)] text-[var(--pill-active-fg)] shadow-xs font-semibold'
-                                : hasRecording
-                                ? 'text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
-                                : 'text-[var(--text-app-muted)] opacity-40 cursor-not-allowed'
-                        }`}
-                    >
-                        <Film className="w-3.5 h-3.5" />
-                        <span>Studio</span>
-                    </button>
+                <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--pill-bg)] border border-[var(--border-app)]">
+                    {tab('recorder', 'Record', Monitor)}
+                    {tab('studio', 'Edit', Film, hasRecording && !isRecording)}
                 </div>
             </div>
 
-            {/* Center: Live Recording Pill (when recording) */}
+            {/* Recording status */}
             {isRecording && (
-                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-mono font-bold animate-pulse">
-                    <span className="w-2 h-2 rounded-full bg-red-500" />
-                    <span>REC {recordingTime}</span>
-                    <span className="text-[10px] text-red-400">({clickCount} clicks)</span>
+                <div className="flex items-center gap-2 h-7 px-3 rounded-full bg-red-500/10 text-red-500 text-[13px] font-medium">
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                    <span>Recording</span>
+                    <span className="font-mono">{recordingTime}</span>
+                    {clickCount > 0 && <span className="text-red-500/70">· {clickCount} {clickCount === 1 ? 'click' : 'clicks'}</span>}
                 </div>
             )}
 
-            {/* Right: Theme Picker & Hotkeys */}
-            <div className="flex items-center gap-2">
-                <button onClick={onOpenProject} disabled={isRecording} title="Open recording or Drift project" aria-label="Open recording or Drift project" className="p-2 disabled:opacity-40">
+            {/* Actions */}
+            <div className="flex items-center gap-0.5">
+                <HeaderButton onClick={onOpenProject} disabled={isRecording} title="Open a recording or Drift project" aria-label="Open">
                     <FolderOpen className="w-4 h-4" />
-                </button>
-                <button onClick={onSaveProject} disabled={!hasRecording || isRecording} title="Save Drift project" aria-label="Save Drift project" className="p-2 disabled:opacity-40">
+                </HeaderButton>
+                <HeaderButton onClick={onSaveProject} disabled={!hasRecording || isRecording} title="Save as a Drift project" aria-label="Save">
                     <Save className="w-4 h-4" />
-                </button>
-                {/* Theme Switcher Dropdown */}
-                <div className="relative">
-                    <button
-                        onClick={() => setShowThemeMenu(!showThemeMenu)}
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-[var(--text-app-muted)] hover:text-[var(--text-app)] bg-[var(--bg-card)] border border-[var(--border-app)] hover:border-[var(--border-app-hover)] transition-all"
-                        title="Change Theme"
-                    >
-                        {theme === 'light' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-                        <span className="capitalize">{theme}</span>
-                    </button>
+                </HeaderButton>
 
+                <span className="w-px h-5 bg-[var(--border-app)] mx-1.5" />
+
+                <div className="relative">
+                    <HeaderButton onClick={() => setShowThemeMenu(v => !v)} active={showThemeMenu} title="Theme">
+                        <span className="w-3 h-3 rounded-full border border-black/10" style={{ background: current.swatch[2] }} />
+                        <span>{current.label}</span>
+                        <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+                    </HeaderButton>
                     {showThemeMenu && (
                         <>
-                            <div
-                                className="fixed inset-0 z-40"
-                                onClick={() => setShowThemeMenu(false)}
-                            />
-                            <div className="absolute right-0 mt-1.5 w-44 rounded-xl bg-[var(--bg-card)] border border-[var(--border-app)] p-1.5 shadow-xl z-50 space-y-0.5">
-                                {themes.map((t) => {
-                                    const Icon = t.icon;
-                                    const isSelected = theme === t.id;
+                            <div className="fixed inset-0 z-40" onClick={() => setShowThemeMenu(false)} />
+                            <div className="absolute right-0 mt-2 w-72 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-app)] p-1.5 z-50" style={{ boxShadow: 'var(--shadow-pop)' }}>
+                                <div className="px-2.5 pt-1.5 pb-2 text-xs font-medium text-[var(--text-app-faint)]">Theme</div>
+                                {APP_THEMES.map((t) => {
+                                    const selected = current.id === t.id;
                                     return (
                                         <button
                                             key={t.id}
                                             onClick={() => {
-                                                if (onSelectTheme) onSelectTheme(t.id);
+                                                onSelectTheme?.(t.id);
                                                 setShowThemeMenu(false);
                                             }}
-                                            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-all ${
-                                                isSelected
-                                                    ? 'bg-[var(--bg-card-subtle)] text-[var(--text-app)] font-semibold'
-                                                    : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:bg-[var(--bg-card-subtle)]/50'
+                                            className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left transition-colors ${
+                                                selected ? 'bg-[var(--bg-card-subtle)]' : 'hover:bg-[var(--bg-card-subtle)]'
                                             }`}
                                         >
-                                            <div className="flex items-center gap-2">
-                                                <Icon className="w-3.5 h-3.5" />
-                                                <span>{t.label}</span>
-                                            </div>
-                                            {isSelected && <Check className="w-3.5 h-3.5" />}
+                                            <ThemePreview swatch={t.swatch} />
+                                            <span className="flex-1 min-w-0">
+                                                <span className="block text-[13px] font-medium text-[var(--text-app)]">{t.label}</span>
+                                                <span className="block text-xs text-[var(--text-app-muted)] truncate">{t.desc}</span>
+                                            </span>
+                                            {selected && <Check className="w-4 h-4 text-[var(--accent-app)]" />}
                                         </button>
                                     );
                                 })}
@@ -149,38 +142,17 @@ export default function DesktopHeader({
                     )}
                 </div>
 
-                {/* Presenter Teleprompter Button */}
-                <button
-                    onClick={onToggleTeleprompter}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                        isTeleprompterOpen
-                            ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold shadow-xs'
-                            : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)] bg-[var(--bg-card)] border border-[var(--border-app)] hover:border-[var(--border-app-hover)]'
-                    }`}
-                    title="Toggle Presenter Script Teleprompter"
-                >
-                    <FileText className="w-3.5 h-3.5" />
+                <HeaderButton onClick={onToggleTeleprompter} active={isTeleprompterOpen} title="Presenter script">
+                    <FileText className="w-4 h-4" />
                     <span>Script</span>
-                </button>
-
-                {/* Hotkeys Button */}
-                <button
-                    onClick={onOpenHotkeys}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-[var(--text-app-muted)] hover:text-[var(--text-app)] bg-[var(--bg-card)] border border-[var(--border-app)] hover:border-[var(--border-app-hover)] transition-all"
-                >
-                    <Keyboard className="w-3.5 h-3.5" />
+                </HeaderButton>
+                <HeaderButton onClick={onOpenHotkeys} title="Keyboard shortcuts">
+                    <Keyboard className="w-4 h-4" />
                     <span>Shortcuts</span>
-                </button>
-
-                {/* AI / App Settings Button */}
-                <button
-                    onClick={onOpenSettings}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-[var(--text-app-muted)] hover:text-[var(--text-app)] bg-[var(--bg-card)] border border-[var(--border-app)] hover:border-[var(--border-app-hover)] transition-all"
-                    title="AI & App Settings (Cerebras, Hotkeys, Preferences)"
-                >
-                    <Settings className="w-3.5 h-3.5" />
-                    <span>Settings</span>
-                </button>
+                </HeaderButton>
+                <HeaderButton onClick={onOpenSettings} title="Settings">
+                    <Settings className="w-4 h-4" />
+                </HeaderButton>
             </div>
         </header>
     );
