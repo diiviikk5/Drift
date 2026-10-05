@@ -29,5 +29,6 @@ src/
 ## 🧈 Core Engines
 
 - **`InteractionAnalyzer`**: plans zooms from clicks, typing and dwell, grouped into work sessions.
-- **`cameraTrack`**: simulates the whole camera path once with critically damped springs; preview and export sample the same track.
+- **`cameraTrack`**: plans the camera like an edit: held shots joined by smooth zoom-and-pan moves (van Wijk & Nuij) whose duration grows with how big the move feels, reframing only when the cursor is about to leave the frame. Preview and export sample the same precomputed track.
+- **`tools/camera-metrics.mjs`**: measures how the camera feels (perceived speed, acceleration, cursor visibility) on synthetic scenarios or real sessions; `tests/camera-feel.test.mjs` enforces the budget.
 - **`StudioEngine`**: Real-time canvas compositor supporting multi-aspect framing (`16:9`, `9:16`, `1:1`, `4:3`, `4:5`, `21:9`), 66 procedural wallpapers, dynamic video blur backdrops, and WebCodecs 4K/60fps hardware MP4 export.
