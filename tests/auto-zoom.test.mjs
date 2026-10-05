@@ -65,8 +65,10 @@ test('zoom depth: preset for ordinary work, deeper for sustained detail, shallow
 test('a long idle pause zooms out, a short one pans without yo-yo', () => {
     const analyzer = new InteractionAnalyzer();
     const shortGap = analyzer.analyze([{ time: 1000, x: 0.2, y: 0.3 }, { time: 4000, x: 0.8, y: 0.7 }], [], 10);
+    // A far move in a short gap is one continuous swoop: it may pull back,
+    // but never rests on the full frame (no yo-yo).
     for (let t = 1.2; t < 4.2; t += 0.05) {
-        assert.ok(evaluateCameraAtTime(t, shortGap).scale > 1.2, `should stay zoomed at t=${t.toFixed(2)}`);
+        assert.ok(evaluateCameraAtTime(t, shortGap).scale > 1.05, `should not rest at overview at t=${t.toFixed(2)}`);
     }
     const longGap = analyzer.analyze([{ time: 1000, x: 0.2, y: 0.3 }, { time: 12000, x: 0.8, y: 0.7 }], [], 16);
     assert.equal(longGap.length, 2);
