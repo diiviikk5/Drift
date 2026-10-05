@@ -99,8 +99,8 @@ export default function HotkeyModal({
     ];
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 select-none animate-in fade-in duration-150">
-            <div className="max-w-md w-full rounded-2xl bg-[var(--bg-card)] border border-[var(--border-app)] shadow-2xl p-6 space-y-5 text-[var(--text-app)]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 select-none">
+            <div className="max-w-md w-full rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-app)] p-5 space-y-5 text-[var(--text-app)]" style={{ boxShadow: 'var(--shadow-pop)' }}>
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
@@ -109,7 +109,7 @@ export default function HotkeyModal({
                         </div>
                         <div>
                             <h3 className="text-sm font-bold tracking-tight">Keyboard Shortcuts</h3>
-                            <p className="text-[11px] text-[var(--text-app-muted)]">Click any shortcut to rebind</p>
+                            <p className="text-xs text-[var(--text-app-muted)]">Click a shortcut, then press the new keys</p>
                         </div>
                     </div>
                     <button
@@ -123,7 +123,7 @@ export default function HotkeyModal({
                 {/* Configurable Shortcuts */}
                 <div className="space-y-2">
                     <label className="text-xs text-[var(--text-app-muted)] font-medium">
-                        Configurable Hotkeys
+                        Your shortcuts
                     </label>
                     {entries.map((item) => {
                         const isBinding = capturing === item.key;
@@ -173,7 +173,7 @@ export default function HotkeyModal({
                 {/* Workspace Shortcuts */}
                 <div className="space-y-2 pt-2 border-t border-[var(--border-app)]">
                     <label className="text-xs text-[var(--text-app-muted)] font-medium">
-                        Workspace Hotkeys
+                        Built in
                     </label>
                     <div className="space-y-1">
                         {staticShortcuts.map((s, idx) => (
