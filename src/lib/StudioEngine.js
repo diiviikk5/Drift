@@ -600,7 +600,7 @@ export class StudioEngine {
             if (this.video) {
                 this._applyPlaybackRate(this.video.currentTime);
             }
-            // renderFrame handles camera spring transforms and cursor rendering in pure JS in ~1ms
+            // renderFrame handles camera transforms and cursor rendering in pure JS in ~1ms
             this.drawFrame();
             if (this.isPlaying) this.animationFrame = requestAnimationFrame(loop);
         };

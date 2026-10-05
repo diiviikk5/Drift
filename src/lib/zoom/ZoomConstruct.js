@@ -2,7 +2,7 @@
  * ZoomConstruct — Studio Cinema Zoom Architecture & Global Standard
  * 
  * Semantic zoom presets (Subtle, Cinema, Focus). Timing and motion live in
- * InteractionAnalyzer (when/where/how much) and cameraTrack (spring dynamics).
+ * InteractionAnalyzer (when/where/how much) and cameraTrack (planned shots and moves).
  */
 
 export const ZOOM_PRESETS = Object.freeze({

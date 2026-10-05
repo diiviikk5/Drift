@@ -2,7 +2,7 @@
  * renderFrame — deterministic studio compositor
  * 
  * Shared 1:1 between interactive Studio Preview and offline WebCodecs / MP4 export.
- * Pure stateless rendering of background, framing, camera spring transforms,
+ * Pure stateless rendering of background, framing, camera transforms,
  * click ripple waves, and synthetic sub-pixel cursor.
  */
 
@@ -41,7 +41,7 @@ export function calculate3DTilt(cameraX, cameraY, scale, maxTiltDeg = 3.5) {
 /**
  * Evaluate the camera at a timestamp.
  *
- * Samples the precomputed spring-smoothed camera track (see zoom/cameraTrack.js),
+ * Samples the precomputed, planned camera track (see zoom/cameraTrack.js),
  * so the result is deterministic, continuous across segment boundaries and
  * identical between preview and export.
  *
@@ -94,7 +94,7 @@ export function getInterpolatedCursor(timeSec, mouseSamples = [], options = {}) 
 }
 
 /**
- * Cursor position for rendering: spring-smoothed path when smoothing is on
+ * Cursor position for rendering: smoothed path when smoothing is on
  * (memoized per sample set), otherwise the raw interpolated telemetry.
  */
 export function sampleCursor(timeSec, mouseSamples, smooth = true) {
