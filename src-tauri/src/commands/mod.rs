@@ -5,3 +5,4 @@ pub mod ai;
 pub mod export;
 pub mod native_recorder;
 pub mod caret;
+pub mod cursor_shape;
