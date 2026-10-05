@@ -28,9 +28,11 @@ export const AUTO_ZOOM_DEFAULTS = Object.freeze({
     holdAfter: 1.6,         // keep the zoom this long after the last action so viewers can read the result
     idleGap: 2.6,           // a pause longer than this ends a session
     bridgeGap: 1.6,         // sessions closer than this are joined by a pan instead of a zoom-out
-    minSegmentDuration: 1.4,
+    minSegmentDuration: 2.4, // a shot must be worth the trip: move in plus time to read
     minZoom: 1.25,          // never bother with a zoom shallower than this
-    maxZoomBoost: 1.3,      // tight work may zoom up to preset * boost
+    maxZoomBoost: 1.12,     // tight work may zoom up to preset * boost
+    hopGap: 1.4,            // actions closer than this in time belong to one burst
+    minRunZoom: 1.15,       // a burst that doesn't fit at this zoom stays on the full frame
     fitMargin: 0.14,        // breathing room (normalized) around the session's activity box
     maxSessionSpan: 0.45,   // activity spread (normalized) above which a session is split (fits at ~1.5x)
     minActionTime: 0.35,    // ignore the click that starts the recording
@@ -95,7 +97,7 @@ export class InteractionAnalyzer {
             .filter(sess => sess.signals.some(s => s.strong))
             .map(sess => this._planSession(sess, moves, duration));
 
-        return this._finalize(planned, duration);
+        return this._finalize(this._economize(planned), duration);
     }
 
     _normalizeX(v) {
@@ -277,12 +279,86 @@ export class InteractionAnalyzer {
         return {
             startTime,
             endTime,
+            actionTime: anchors[0].time,
+            lastAction,
+            box: { minX, maxX, minY, maxY },
+            weightedX: cx,
+            weightedY: cy,
             targetX,
             targetY,
             zoomScale,
             reason: anchors[0].kind === 'click' ? 'click' : (anchors[0].kind === 'type' ? 'key' : anchors[0].kind),
             clickCount: sess.signals.filter(s => s.kind === 'click').length,
         };
+    }
+
+    /**
+     * Shot economy. A camera that hops after every quick action is exhausting
+     * to watch, so bursts of actions in quick succession are framed together:
+     * neighbours that fit one comfortable zoom merge into a wider shot, and a
+     * burst of three or more hops that spans too much of the screen stays on
+     * the full frame.
+     */
+    _economize(planned) {
+        const o = this.options;
+        const shots = planned.slice().sort((a, b) => a.actionTime - b.actionTime);
+        const fitOf = (box) => {
+            const span = Math.max(box.maxX - box.minX, box.maxY - box.minY) + o.fitMargin * 2;
+            return span > 0 ? 1 / span : Infinity;
+        };
+        const union = (a, b) => ({
+            minX: Math.min(a.minX, b.minX), maxX: Math.max(a.maxX, b.maxX),
+            minY: Math.min(a.minY, b.minY), maxY: Math.max(a.maxY, b.maxY),
+        });
+        const merge = (a, b) => {
+            const box = union(a.box, b.box);
+            const fitZoom = fitOf(box);
+            const maxZoom = Math.max(o.minZoom, o.defaultZoomScale * (o.maxZoomBoost ?? 1));
+            const wa = a.clickCount + 1;
+            const wb = b.clickCount + 1;
+            const cx = (a.weightedX * wa + b.weightedX * wb) / (wa + wb);
+            const cy = (a.weightedY * wa + b.weightedY * wb) / (wa + wb);
+            return {
+                ...a,
+                endTime: Math.max(a.endTime, b.endTime),
+                lastAction: Math.max(a.lastAction, b.lastAction),
+                box,
+                weightedX: cx,
+                weightedY: cy,
+                targetX: clamp(cx * 0.5 + (box.minX + box.maxX) * 0.25, 0, 1),
+                targetY: clamp(cy * 0.5 + (box.minY + box.maxY) * 0.25, 0, 1),
+                zoomScale: Math.round(clamp(fitZoom, 1, maxZoom) * 100) / 100,
+                clickCount: a.clickCount + b.clickCount,
+            };
+        };
+
+        // 1. Merge quick neighbours that still fit a comfortable zoom.
+        const merged = [];
+        for (const shot of shots) {
+            const prev = merged[merged.length - 1];
+            if (prev && shot.actionTime - prev.lastAction < o.hopGap && fitOf(union(prev.box, shot.box)) >= o.minZoom) {
+                merged[merged.length - 1] = merge(prev, shot);
+            } else {
+                merged.push(shot);
+            }
+        }
+
+        // 2. Runs of quick hops: one wide shot if it fits, otherwise none.
+        const out = [];
+        let i = 0;
+        while (i < merged.length) {
+            let j = i;
+            while (j + 1 < merged.length && merged[j + 1].actionTime - merged[j].lastAction < o.hopGap) j++;
+            const run = merged.slice(i, j + 1);
+            if (run.length >= 3) {
+                const all = run.reduce((acc, r) => merge(acc, r));
+                if (fitOf(all.box) >= o.minRunZoom) out.push(all);
+            } else {
+                out.push(...run);
+            }
+            i = j + 1;
+        }
+        return out;
     }
 
     _finalize(planned, duration) {
@@ -317,6 +393,7 @@ export class InteractionAnalyzer {
                 const endTime = next ? Math.min(seg.endTime, next.startTime) : seg.endTime;
                 return {
                     id: `focus_seg_${i}_${Math.round(seg.startTime * 10)}`,
+                    actionTime: Math.round(seg.actionTime * 1000) / 1000,
                     startTime: Math.round(seg.startTime * 1000) / 1000,
                     endTime: Math.round(Math.max(seg.startTime + 0.2, endTime) * 1000) / 1000,
                     targetX: seg.targetX,
