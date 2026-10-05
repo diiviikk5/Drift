@@ -389,31 +389,67 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
     ctx.fillStyle = '#0a0d14';
     ctx.fillRect(padX, padY + headerH, frameW, videoH);
 
-    ctx.save();
-    // Translate origin to center of video area
-    ctx.translate(padX + frameW * 0.5, padY + headerH + videoH * 0.5);
+    // Camera transform: origin at the centre of the video area, optional
+    // perspective tilt, zoom, then pan.
+    const applyCamera = (cam) => {
+        ctx.translate(padX + frameW * 0.5, padY + headerH + videoH * 0.5);
+        if (cam.rotateX || cam.rotateY) {
+            const radX = (cam.rotateX * Math.PI) / 180;
+            const radY = (cam.rotateY * Math.PI) / 180;
+            ctx.transform(Math.cos(radY), Math.sin(radX) * 0.28, Math.sin(radY) * 0.28, Math.cos(radX), 0, 0);
+        }
+        ctx.scale(cam.scale, cam.scale);
+        ctx.translate(-cam.x * contentW, -cam.y * contentH);
+    };
 
-    // Subtle 3D perspective tilt along camera movement
-    if (camera.rotateX || camera.rotateY) {
-        const radX = (camera.rotateX * Math.PI) / 180;
-        const radY = (camera.rotateY * Math.PI) / 180;
-        ctx.transform(Math.cos(radY), Math.sin(radX) * 0.28, Math.sin(radY) * 0.28, Math.cos(radX), 0, 0);
+    // Camera motion blur: a real camera blurs while it moves. Integrate the
+    // video over a 180-degree shutter (half a frame) by averaging several
+    // draws along the camera's motion; only while the camera actually moves.
+    const blurSamples = [];
+    if (videoSource && renderSettings.cameraMotionBlur !== false) {
+        const shutter = 0.5 / (renderSettings.frameRate || 60);
+        const prev = evaluateCameraAtTime(Math.max(0, timeSec - shutter), focusSegments, cameraSamples || mouseSamples, cameraOptions);
+        const travel = Math.hypot((camera.x - prev.x) * contentW, (camera.y - prev.y) * contentH) * camera.scale
+            + Math.abs(camera.scale - prev.scale) * Math.max(contentW, contentH) * 0.5;
+        if (travel > 1.5) {
+            const n = Math.min(8, Math.ceil(travel / 2));
+            for (let i = 0; i < n; i++) {
+                const k = (i + 1) / n;
+                blurSamples.push({
+                    x: prev.x + (camera.x - prev.x) * k,
+                    y: prev.y + (camera.y - prev.y) * k,
+                    scale: prev.scale + (camera.scale - prev.scale) * k,
+                    rotateX: camera.rotateX,
+                    rotateY: camera.rotateY,
+                });
+            }
+        }
     }
 
-    // Scale by camera zoom
-    ctx.scale(camera.scale, camera.scale);
-    // Translate by negative camera position relative to center
-    ctx.translate(-camera.x * contentW, -camera.y * contentH);
-
-    // Draw source video filling video area
-    if (videoSource) {
+    const drawVideo = () => {
         try {
             ctx.drawImage(videoSource, 0, 0, contentW, contentH);
         } catch (e) {
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(0, 0, contentW, contentH);
         }
+    };
+    if (videoSource && blurSamples.length > 1) {
+        // Running average: draw i gets weight 1 / (i + 1), so all draws end equal.
+        for (let i = 0; i < blurSamples.length - 1; i++) {
+            ctx.save();
+            ctx.globalAlpha = 1 / (i + 1);
+            applyCamera(blurSamples[i]);
+            drawVideo();
+            ctx.restore();
+        }
+        ctx.globalAlpha = 1 / blurSamples.length;
     }
+
+    ctx.save();
+    applyCamera(camera);
+    if (videoSource) drawVideo();
+    ctx.globalAlpha = 1;
 
     // 7. Click ripples (content space, so they zoom with the camera)
     if (clickRipples && clicks && clicks.length > 0) {
