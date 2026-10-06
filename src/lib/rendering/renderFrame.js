@@ -526,8 +526,13 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
             const drawShape = (shape, alpha) => {
                 if (alpha <= 0.01) return;
                 ctx.globalAlpha = idleOpacity * alpha;
-                if (!drawCursorShape(ctx, curScreenX, curScreenY, size, shape, cursorTheme, timeSec)) {
-                    _drawThemedCursor(ctx, curScreenX, curScreenY, size, cursorTheme, swayAngle);
+                // Keep the whole pointer inside the picture: at the edge (over a
+                // scrollbar, say) the real arrow's body would be cut off.
+                const centred = shape !== 'arrow' && shape !== 'hand';
+                const px = Math.min(Math.max(curScreenX, centred ? 9 * size : 0), contentW - (centred ? 9 : 13) * size);
+                const py = Math.min(Math.max(curScreenY, centred ? 10 * size : 0), contentH - (centred ? 10 : 21) * size);
+                if (!drawCursorShape(ctx, px, py, size, shape, cursorTheme, timeSec)) {
+                    _drawThemedCursor(ctx, px, py, size, cursorTheme, swayAngle);
                 }
             };
             if (themeHasShapes(cursorTheme)) {

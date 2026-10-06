@@ -14,32 +14,83 @@ const timeOf = (s) => s.timeMs ?? s.time ?? s.t ?? 0;
 
 // Real cursors flip shape constantly for a few ms (arrow <-> I-beam between
 // words and lines, arrow <-> hand at link edges, brief busy blips). Replayed
-// literally that reads as flicker, so a shape must hold for a moment before
-// the synthetic pointer adopts it.
-const MIN_HOLD_MS = 150;
-const MIN_HOLD_BUSY_MS = 400;
-const FADE_MS = 90;
+// literally that reads as flicker. The track is resampled, each moment takes
+// the shape that dominated a short window around it (so a flickering cluster
+// settles on what the user was really over), then runs that are still too
+// short are absorbed by a neighbour.
+const STEP_MS = 10;
+const WINDOW_MS = 140;
+const MIN_HOLD_MS = 260;
+const MIN_HOLD_BUSY_MS = 600;
+const FADE_MS = 110;
 
 const stableCache = new WeakMap();
+
+function minHold(shape) {
+    return shape === 'wait' || shape === 'progress' ? MIN_HOLD_BUSY_MS : MIN_HOLD_MS;
+}
 
 /** The recorded shape track with micro-flips removed: [{time, shape}] sorted. */
 export function stableCursorShapes(shapes) {
     if (!shapes || !shapes.length) return [];
     const hit = stableCache.get(shapes);
     if (hit) return hit;
-    const sorted = shapes
+    const raw = shapes
         .map(s => ({ time: timeOf(s), shape: SHAPES.has(s.shape) ? s.shape : 'arrow' }))
         .sort((a, b) => a.time - b.time);
-    const out = [];
-    for (let i = 0; i < sorted.length; i++) {
-        const cur = sorted[i];
-        const next = sorted[i + 1];
-        const held = next ? next.time - cur.time : Infinity;
-        const need = cur.shape === 'wait' || cur.shape === 'progress' ? MIN_HOLD_BUSY_MS : MIN_HOLD_MS;
-        if (held < need) continue; // a flip: keep showing the previous shape
-        if (out.length && out[out.length - 1].shape === cur.shape) continue;
-        out.push(cur);
+    const t0 = raw[0].time;
+    const t1 = raw[raw.length - 1].time;
+    const n = Math.max(1, Math.ceil((t1 - t0 + 3 * WINDOW_MS) / STEP_MS) + 1); // tail holds the last shape
+
+    // Raw shape per step.
+    const base = new Array(n);
+    let k = 0;
+    for (let i = 0; i < n; i++) {
+        const t = t0 + i * STEP_MS;
+        while (k + 1 < raw.length && raw[k + 1].time <= t) k++;
+        base[i] = raw[k].shape;
     }
+
+    // Dominant shape in a window around each step (ties keep the current one).
+    const half = Math.round(WINDOW_MS / STEP_MS);
+    const counts = new Map();
+    const add = (sh, d) => counts.set(sh, (counts.get(sh) || 0) + d);
+    for (let i = 0; i <= Math.min(n - 1, half); i++) add(base[i], 1);
+    const stable = new Array(n);
+    let current = base[0];
+    for (let i = 0; i < n; i++) {
+        let best = current;
+        let bestCount = counts.get(current) || 0;
+        for (const [sh, c] of counts) if (c > bestCount) { best = sh; bestCount = c; }
+        current = best;
+        stable[i] = best;
+        if (i + half + 1 < n) add(base[i + half + 1], 1);
+        if (i - half >= 0) add(base[i - half], -1);
+    }
+
+    // Run-length encode, then absorb runs shorter than their minimum hold.
+    let runs = [];
+    for (let i = 0; i < n; i++) {
+        const last = runs[runs.length - 1];
+        if (last && last.shape === stable[i]) last.len += STEP_MS;
+        else runs.push({ time: t0 + i * STEP_MS, shape: stable[i], len: STEP_MS });
+    }
+    for (let pass = 0; pass < 4; pass++) {
+        const next = [];
+        for (let i = 0; i < runs.length; i++) {
+            const r = runs[i];
+            const last = next[next.length - 1];
+            if (last && last.shape === r.shape) { last.len += r.len; continue; }
+            if (r.len < minHold(r.shape) && i < runs.length - 1 && next.length) {
+                last.len += r.len; // keep showing the previous shape
+                continue;
+            }
+            next.push({ ...r });
+        }
+        if (next.length === runs.length) { runs = next; break; }
+        runs = next;
+    }
+    const out = runs.map(r => ({ time: r.time, shape: r.shape }));
     stableCache.set(shapes, out);
     return out;
 }

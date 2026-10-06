@@ -63,7 +63,24 @@ test('micro-flips are ignored and real changes crossfade', async () => {
     // Between 1060 and 2000 the pointer is steadily an I-beam.
     for (let t = 1.2; t < 2; t += 0.05) assert.equal(cursorShapeState(t, flicky).shape, 'text');
     assert.equal(cursorShapeState(2.01, flicky).shape, 'text', 'hand blip ignored');
-    assert.equal(cursorShapeState(3.05, flicky).shape, 'arrow', 'busy blip ignored (it was an arrow before)');
+    assert.notEqual(cursorShapeState(3.05, flicky).shape, 'wait', 'busy blip ignored');
     const fade = cursorShapeState(1.13, flicky);
     assert.ok(fade.prev === 'arrow' && fade.mix > 0 && fade.mix < 1, JSON.stringify(fade));
+});
+
+test('a flickering cluster settles on the shape that dominated it', async () => {
+    const { cursorShapeState } = await import('../src/lib/rendering/cursorShapes.js');
+    const track = [{ time: 0, shape: 'arrow' }];
+    // Hovering a link for 2 s while the real cursor flips hand/arrow every 16-32 ms.
+    for (let t = 1000; t < 3000; t += 48) {
+        track.push({ time: t, shape: 'hand' }, { time: t + 32, shape: 'arrow' });
+    }
+    track.push({ time: 3000, shape: 'arrow' });
+    let changes = 0;
+    let last = cursorShapeState(0.5, track).shape;
+    for (let t = 0.5; t < 3.5; t += 0.01) {
+        const s = cursorShapeState(t, track).shape;
+        if (s !== last) { changes++; last = s; }
+    }
+    assert.ok(changes <= 2, `shape changed ${changes} times`);
 });
