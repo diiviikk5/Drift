@@ -730,10 +730,42 @@ export class StudioEngine {
      * Render one frame. `override` lets export supply decoded frames directly:
      * { time, video, webcam, sourceWidth, sourceHeight }.
      */
+    /**
+     * Preview time. While playing, <video>.currentTime advances in coarse steps
+     * (it repeats for a frame or two, then jumps), which made the pointer and
+     * camera stutter in preview. A clock that runs on wall time, re-anchored to
+     * the video when they disagree (seek, stall, rate change), moves smoothly
+     * and stays in sync. Paused or seeking: the video's own time.
+     */
+    _previewTime() {
+        const v = this.video;
+        if (!v) return 0;
+        const actual = v.currentTime || 0;
+        if (v.paused || v.seeking || v.readyState < 3) {
+            this._clock = null;
+            return actual;
+        }
+        const now = performance.now();
+        const rate = v.playbackRate || 1;
+        const c = this._clock;
+        if (c) {
+            const predicted = c.t + ((now - c.wall) / 1000) * rate;
+            const error = actual - predicted;
+            if (Math.abs(error) < 0.12) {
+                // Ease out drift instead of following the steps; never go backwards.
+                const t = Math.max(c.last, predicted + error * 0.08);
+                this._clock = { t, wall: now, last: t };
+                return t;
+            }
+        }
+        this._clock = { t: actual, wall: now, last: actual };
+        return actual;
+    }
+
     drawFrame(override = null) {
         const ctx = this.ctx;
         const v = this.video;
-        const curTimeSec = override ? override.time : (v?.currentTime || 0);
+        const curTimeSec = override ? override.time : this._previewTime();
 
         // A <video> mid-seek/buffering has no frame (readyState < 2) and draws as
         // nothing, which flashed the dark backdrop. Keep the previous frame on
