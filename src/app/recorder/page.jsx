@@ -979,12 +979,17 @@ export default function RecorderPage() {
                 setTimer('00:00');
                 setHasActiveStream(false);
 
+                // Stop capturing first, then bring Drift back: restoring the
+                // window while still recording put the studio into the last frames.
+                const stopping = drift.stopNativeSession();
+                stopping.catch(() => {});
                 if (drift.isTauri() && typeof drift.restoreWindow === 'function') {
+                    await new Promise(r => setTimeout(r, 150));
                     try { await drift.restoreWindow(); } catch (e) {}
                 }
 
                 try {
-                    const result = await drift.stopNativeSession();
+                    const result = await stopping;
                     const nativeSamples = typeof drift.stopSessionTelemetry === 'function'
                         ? await drift.stopSessionTelemetry()
                         : await drift.getSessionTelemetry();
