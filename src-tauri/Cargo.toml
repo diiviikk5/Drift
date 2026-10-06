@@ -64,3 +64,7 @@ lto = "fat"
 codegen-units = 1
 panic = "abort"
 strip = true
+
+# Capture library with Drift's frame-drop fix (see vendor/windows-capture/src/encoder.rs, "Drift patch").
+[patch.crates-io]
+windows-capture = { path = "vendor/windows-capture" }
