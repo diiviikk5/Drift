@@ -58,7 +58,8 @@ windows-sys = { version = "0.59", features = [
 # Small and fast: whole-program optimization, one codegen unit, no symbols.
 # Size-optimized: the heavy work (capture, encoding, rendering) runs in Windows
 # and WebView2, so smaller code costs nothing noticeable and loads faster.
-opt-level = "s"
+# "z" measured smallest: 7.85 MB app / 4.41 MB installer vs 8.57 / 4.59 with "s".
+opt-level = "z"
 lto = "fat"
 codegen-units = 1
 panic = "abort"
