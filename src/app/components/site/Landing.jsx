@@ -8,7 +8,9 @@ import { ZoomArt, CursorArt, TypingArt, ScrollArt, SizeArt, PrivateArt } from '.
 import { useTheme } from '../ThemeProvider';
 import ProductHuntBadge from '../ProductHuntBadge';
 
-const DOWNLOAD_URL = '/downloads/Drift_2.0.0_x64-setup.exe';
+// Drift Recorder is the current app; the 2.0 installer stays up as Legacy Drift.
+const DOWNLOAD_URL = '/downloads/Drift-Recorder_3.0.0_x64-setup.exe';
+const LEGACY_URL = '/downloads/Drift_2.0.0_x64-setup.exe';
 const REPO_URL = 'https://github.com/diiviikk5/Drift';
 const PH_URL = 'https://www.producthunt.com/products/drift-6?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_campaign=badge-drift-6ef740e8-671a-4130-90b6-140b7784af27';
 const DEMO = { src: '/demo/drift-demo.mp4', poster: '/demo/drift-demo.jpg' };
@@ -191,7 +193,7 @@ export default function Landing() {
                         <div className={s.ctaRow}>
                             <a className={`${s.btn} ${s.btnLg}`} href={DOWNLOAD_URL} download>
                                 <WindowsIcon />
-                                Download for Windows
+                                Download Drift Recorder
                             </a>
                             <a className={`${s.btn} ${s.btnLg} ${s.btnPaper}`} href={REPO_URL} target="_blank" rel="noreferrer">
                                 <GitHubIcon />
@@ -201,7 +203,10 @@ export default function Landing() {
                                 <ProductHuntBadge width={296} height={64} />
                             </a>
                         </div>
-                        <p className={s.ctaNote}>Windows 10 &amp; 11 · No account needed</p>
+                        <p className={s.ctaNote}>
+                            Drift Recorder 3.0 · 4.4 MB · Windows 10 &amp; 11 · No account needed ·{' '}
+                            <a href={LEGACY_URL} download style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}>Legacy Drift 2.0</a>
+                        </p>
                     </Reveal>
 
                     {/* ---------- recording on an isometric slab ---------- */}
@@ -329,7 +334,7 @@ export default function Landing() {
                                     <div className={s.ctaRow}>
                                         <a className={`${s.btn} ${s.finalBtn}`} href={DOWNLOAD_URL} download>
                                             <WindowsIcon />
-                                            Download Drift
+                                            Download Drift Recorder
                                         </a>
                                     </div>
                                 </div>

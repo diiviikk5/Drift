@@ -149,10 +149,10 @@ const structuredData = {
       "operatingSystem": ["Windows", "macOS", "Linux", "Chrome OS"],
       "applicationCategory": "MultimediaApplication",
       "applicationSubCategory": "Screen Recording Software",
-      "downloadUrl": "https://drift.dvkk.dev/downloads/Drift_2.0.0_x64-setup.exe",
+      "downloadUrl": "https://drift.dvkk.dev/downloads/Drift-Recorder_3.0.0_x64-setup.exe",
       "installUrl": "https://drift.dvkk.dev/#install",
       "screenshot": "https://drift.dvkk.dev/og.png",
-      "softwareVersion": "1.0.0",
+      "softwareVersion": "3.0.0",
       "releaseNotes": "Initial release with auto-zoom, privacy-first recording, and built-in editor",
       "offers": {
         "@type": "Offer",
@@ -444,12 +444,12 @@ const structuredData = {
       "@id": "https://drift.dvkk.dev/#desktopapp",
       "name": "Drift Desktop",
       "url": "https://drift.dvkk.dev",
-      "downloadUrl": "https://drift.dvkk.dev/downloads/Drift_2.0.0_x64-setup.exe",
+      "downloadUrl": "https://drift.dvkk.dev/downloads/Drift-Recorder_3.0.0_x64-setup.exe",
       "applicationCategory": "MultimediaApplication",
       "operatingSystem": "Windows, macOS",
       "potentialAction": {
         "@type": "DownloadAction",
-        "target": "https://drift.dvkk.dev/downloads/Drift_2.0.0_x64-setup.exe",
+        "target": "https://drift.dvkk.dev/downloads/Drift-Recorder_3.0.0_x64-setup.exe",
         "name": "Download Drift Desktop",
         "description": "Download the Drift native desktop screen recorder"
       }

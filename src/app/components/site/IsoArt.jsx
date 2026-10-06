@@ -101,7 +101,7 @@ export function SizeArt() {
     return (
         <Frame>
             <Box at={p} x={-18} y={-18} w={36} d={36} h={36} {...LIME} />
-            <text x="110" y="122" textAnchor="middle" fill="#9ba3b4" fontSize="12" fontFamily="var(--font-geist-mono), monospace">Rust + Tauri</text>
+            <text x="110" y="122" textAnchor="middle" fill="#9ba3b4" fontSize="12" fontFamily="var(--font-geist-mono), monospace">4.4 MB installer</text>
         </Frame>
     );
 }
