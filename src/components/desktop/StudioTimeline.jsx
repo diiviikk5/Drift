@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef } from 'react';
-import { Play, Pause, ZoomIn, ArrowUpRight, Square, Type, Gauge, Plus, X, Scissors } from 'lucide-react';
+import { Play, Pause, ZoomIn, ArrowUpRight, Square, Type, Plus, X, Scissors } from 'lucide-react';
 
 export default function StudioTimeline({
     isPlaying,
@@ -200,168 +200,128 @@ export default function StudioTimeline({
                 </div>
             </div>
 
-            {/* Selected Segment Speed & Depth Tuning Bar */}
-            {selectedSeg && (
-                <div className="flex items-center justify-between p-2 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--accent-app)] text-xs animate-fadeIn">
-                    {/* Scene Mode Selector */}
-                    <div className="flex items-center gap-1.5 border-r border-[var(--border-app)] pr-2.5">
-                        <span className="text-[var(--accent-app)] text-xs font-medium">
-                            Scene:
-                        </span>
-                        <div className="flex gap-1">
-                            {[
-                                { id: 'focus', label: '⚡ Focus' },
-                                { id: 'spotlight', label: '🎙️ Spotlight' },
-                                { id: 'full-camera', label: '🎥 Full Camera' },
-                                { id: 'overview', label: '🖥️ Overview' },
-                                { id: 'speed', label: '⏩ Speed Ramp' },
-                            ].map((mode) => (
-                                <button
-                                    key={mode.id}
-                                    onClick={() => onUpdateSegment && onUpdateSegment(selectedSeg.id, { sceneMode: mode.id })}
-                                    className={`px-2 py-0.5 rounded-md font-mono text-[11px] transition-all ${
-                                        (selectedSeg.sceneMode || 'focus') === mode.id
-                                            ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold shadow-xs'
-                                            : 'bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
-                                    }`}
-                                >
-                                    {mode.label}
-                                </button>
-                            ))}
-                        </div>
+            {/* Selected zoom: scene, speed, depth, follow, and timing edits */}
+            {selectedSeg && (() => {
+                const upd = (patch) => onUpdateSegment && onUpdateSegment(selectedSeg.id, patch);
+                const seg = selectedSeg;
+                const canSplit = currentTime > seg.startTime + 0.1 && currentTime < seg.endTime - 0.1;
+                const newId = () => 'seg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+                const Group = ({ label, children }) => (
+                    <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-[11px] text-[var(--text-app-faint)] shrink-0">{label}</span>
+                        {children}
                     </div>
-
-                    <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 text-[var(--accent-app)] text-xs font-medium">
-                            <Gauge className="w-3 h-3" />
-                            <span>Segment Speed:</span>
-                        </div>
-                        <div className="flex gap-1">
-                            {[0.5, 1.0, 1.5, 2.0, 4.0].map((spd) => (
-                                <button
-                                    key={spd}
-                                    onClick={() => onUpdateSegment && onUpdateSegment(selectedSeg.id, { speed: spd })}
-                                    className={`px-2 py-0.5 rounded-md font-mono text-[11px] transition-all ${
-                                        (selectedSeg.speed || 1.0) === spd
-                                            ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold shadow-xs'
-                                            : 'bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
-                                    }`}
-                                >
-                                    {spd}x
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    <button
-                        onClick={() => onUpdateSegment && onUpdateSegment(selectedSeg.id, { followCursor: selectedSeg.followCursor === false })}
-                        title="When on, the camera calmly follows the cursor inside this zoom. When off, it holds the chosen framing."
-                        className={`px-2 py-0.5 rounded-md font-mono text-[11px] transition-all ${
-                            selectedSeg.followCursor !== false
-                                ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold'
-                                : 'bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
-                        }`}
-                    >
-                        {selectedSeg.followCursor !== false ? '🎯 Follow cursor' : '📌 Fixed framing'}
-                    </button>
-
-                    <div className="flex items-center gap-2">
-                        <span className="font-mono text-[11px] text-[var(--text-app-muted)]">
-                            Depth:
-                        </span>
-                        <div className="flex gap-1">
-                            {[
-                                { scale: 1.35, label: '1.35x' },
-                                { scale: 1.55, label: '1.55x' },
-                                { scale: 1.85, label: '1.85x' },
-                                { scale: 2.40, label: '2.40x' },
-                            ].map(({ scale: z, label }) => (
-                                <button
-                                    key={z}
-                                    onClick={() => onUpdateSegment && onUpdateSegment(selectedSeg.id, { zoomScale: z })}
-                                    className={`px-2 py-0.5 rounded-md font-mono text-[11px] transition-all ${
-                                        Math.abs((selectedSeg.zoomScale || 1.55) - z) < 0.05
-                                            ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold'
-                                            : 'bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
-                                    }`}
-                                >
-                                    {label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                        {currentTime > selectedSeg.startTime + 0.1 && currentTime < selectedSeg.endTime - 0.1 && (
+                );
+                const Segmented = ({ value, onPick, options }) => (
+                    <div className="flex rounded-lg bg-[var(--bg-card)] p-0.5 border border-[var(--border-app)]">
+                        {options.map((o) => (
                             <button
-                                onClick={() => {
-                                    if (onSplitSegment) {
-                                        onSplitSegment(selectedSeg.id, currentTime);
-                                    } else if (onUpdateSegment && onAddFocusSegment) {
-                                        const oldEnd = selectedSeg.endTime;
-                                        onUpdateSegment(selectedSeg.id, { endTime: currentTime });
-                                        onAddFocusSegment({
-                                            ...selectedSeg,
-                                            id: 'seg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
-                                            startTime: currentTime,
-                                            endTime: oldEnd,
-                                        });
-                                    }
-                                }}
-                                className="px-2 py-0.5 bg-[var(--accent-app)]/20 text-[var(--accent-app)] hover:bg-[var(--accent-app)] hover:text-[var(--accent-app-fg)] rounded text-[11px] font-mono font-bold transition-all flex items-center gap-1"
-                                title="Split segment into two at current playhead"
+                                key={String(o.value)}
+                                onClick={() => onPick(o.value)}
+                                className={`px-2 h-6 rounded-md text-[11px] tabular-nums transition-colors ${
+                                    o.active(value)
+                                        ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-semibold'
+                                        : 'text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
+                                }`}
                             >
-                                <span>✂ Split</span>
+                                {o.label}
                             </button>
-                        )}
-                        <button
-                            onClick={() => {
-                                const segDuration = selectedSeg.endTime - selectedSeg.startTime;
-                                const newStart = Math.min(duration - 0.2, currentTime);
-                                const newEnd = Math.min(duration, newStart + segDuration);
-                                if (onAddFocusSegment) {
-                                    onAddFocusSegment({
-                                        ...selectedSeg,
-                                        id: 'seg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
-                                        startTime: newStart,
-                                        endTime: newEnd,
-                                    });
-                                }
-                            }}
-                            className="px-1.5 py-0.5 bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)] rounded text-[11px] font-mono"
-                            title="Duplicate this segment at playhead"
-                        >
-                            + Copy
-                        </button>
-                        <button
-                            onClick={() => {
-                                const newStart = Math.max(0, selectedSeg.startTime - 0.5);
-                                onUpdateSegment && onUpdateSegment(selectedSeg.id, { startTime: newStart });
-                            }}
-                            className="px-1.5 py-0.5 bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)] rounded text-[11px] font-mono"
-                            title="Expand start by 0.5s"
-                        >
-                            -0.5s
-                        </button>
-                        <button
-                            onClick={() => {
-                                const newEnd = Math.min(duration, selectedSeg.endTime + 0.5);
-                                onUpdateSegment && onUpdateSegment(selectedSeg.id, { endTime: newEnd });
-                            }}
-                            className="px-1.5 py-0.5 bg-black/20 text-[var(--text-app-muted)] hover:text-[var(--text-app)] rounded text-[11px] font-mono"
-                            title="Extend end by 0.5s"
-                        >
-                            +0.5s
-                        </button>
-                        <button
-                            onClick={() => onDeleteSegment && onDeleteSegment(selectedSeg.id)}
-                            className="text-[11px] text-red-400 hover:text-red-300 font-mono ml-1 font-semibold"
-                        >
-                            Delete
-                        </button>
+                        ))}
                     </div>
-                </div>
-            )}
+                );
+                const ghost = 'px-2 h-6 rounded-md text-[11px] text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:bg-[var(--bg-card)] transition-colors';
+                return (
+                    <div className="rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] px-3 py-2 space-y-2 animate-fadeIn">
+                        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                            <div className="flex items-baseline gap-2 text-xs">
+                                <span className="font-medium text-[var(--text-app)]">Selected zoom</span>
+                                <span className="text-[var(--text-app-faint)] tabular-nums">
+                                    {seg.startTime.toFixed(1)}s – {seg.endTime.toFixed(1)}s
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-0.5">
+                                {canSplit && (
+                                    <button
+                                        className={ghost}
+                                        title="Split into two zooms at the playhead"
+                                        onClick={() => {
+                                            if (onSplitSegment) {
+                                                onSplitSegment(seg.id, currentTime);
+                                            } else if (onUpdateSegment && onAddFocusSegment) {
+                                                const oldEnd = seg.endTime;
+                                                onUpdateSegment(seg.id, { endTime: currentTime });
+                                                onAddFocusSegment({ ...seg, id: newId(), startTime: currentTime, endTime: oldEnd });
+                                            }
+                                        }}
+                                    >
+                                        Split
+                                    </button>
+                                )}
+                                <button
+                                    className={ghost}
+                                    title="Duplicate this zoom at the playhead"
+                                    onClick={() => {
+                                        if (!onAddFocusSegment) return;
+                                        const len = seg.endTime - seg.startTime;
+                                        const s = Math.min(duration - 0.2, currentTime);
+                                        onAddFocusSegment({ ...seg, id: newId(), startTime: s, endTime: Math.min(duration, s + len) });
+                                    }}
+                                >
+                                    Duplicate
+                                </button>
+                                <button className={ghost} title="Start 0.5s earlier" onClick={() => upd({ startTime: Math.max(0, seg.startTime - 0.5) })}>−0.5s</button>
+                                <button className={ghost} title="End 0.5s later" onClick={() => upd({ endTime: Math.min(duration, seg.endTime + 0.5) })}>+0.5s</button>
+                                <button
+                                    className="px-2 h-6 rounded-md text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+                                    onClick={() => onDeleteSegment && onDeleteSegment(seg.id)}
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                            <Group label="Scene">
+                                <select
+                                    value={seg.sceneMode || 'focus'}
+                                    onChange={(e) => upd({ sceneMode: e.target.value })}
+                                    className="h-7 rounded-lg bg-[var(--bg-card)] border border-[var(--border-app)] text-[12px] text-[var(--text-app)] px-2 outline-none"
+                                >
+                                    <option value="focus">Focus</option>
+                                    <option value="spotlight">Spotlight</option>
+                                    <option value="full-camera">Full camera</option>
+                                    <option value="overview">Overview</option>
+                                    <option value="speed">Speed ramp</option>
+                                </select>
+                            </Group>
+                            <Group label="Speed">
+                                <Segmented
+                                    value={seg.speed || 1}
+                                    onPick={(v) => upd({ speed: v })}
+                                    options={[0.5, 1, 1.5, 2, 4].map((v) => ({ value: v, label: `${v}×`, active: (cur) => cur === v }))}
+                                />
+                            </Group>
+                            <Group label="Depth">
+                                <Segmented
+                                    value={seg.zoomScale || 1.55}
+                                    onPick={(v) => upd({ zoomScale: v })}
+                                    options={[1.35, 1.55, 1.85, 2.4].map((v) => ({ value: v, label: `${v}×`, active: (cur) => Math.abs(cur - v) < 0.05 }))}
+                                />
+                            </Group>
+                            <Group label="Camera">
+                                <Segmented
+                                    value={seg.followCursor !== false}
+                                    onPick={(v) => upd({ followCursor: v })}
+                                    options={[
+                                        { value: true, label: 'Follows cursor', active: (cur) => cur === true },
+                                        { value: false, label: 'Fixed', active: (cur) => cur === false },
+                                    ]}
+                                />
+                            </Group>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* Scrubber Track with Zoom Markers */}
             <div
