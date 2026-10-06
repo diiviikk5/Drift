@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { motion, useMotionValueEvent, useReducedMotion, useScroll, useSpring, useTransform } from 'framer-motion';
+import { useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import s from './site.module.css';
 
 const LAYERS = [
@@ -51,54 +51,29 @@ function Arrow() {
 }
 
 export default function LayersSection() {
-    const track = useRef(null);
     const reduce = useReducedMotion();
-    const [narrow, setNarrow] = useState(false);
-    const [active, setActive] = useState(-1);
+    const [open, setOpen] = useState(false);
 
-    useEffect(() => {
-        const mq = window.matchMedia('(max-width: 900px)');
-        const on = () => setNarrow(mq.matches);
-        on();
-        mq.addEventListener('change', on);
-        return () => mq.removeEventListener('change', on);
-    }, []);
+    // Click (or tap) pulls the frame apart; click again to put it back together.
+    const spring = reduce ? { duration: 0 } : { type: 'spring', stiffness: 90, damping: 15, mass: 0.9 };
+    const lift = (n, i) => ({ z: open ? n : i * 2, transition: { ...spring, delay: reduce ? 0 : (open ? i * 0.09 : (3 - i) * 0.05) } });
+    const cam = open
+        ? { left: '40%', top: '32%', width: '52%', height: '40%' }
+        : { left: '0%', top: '0%', width: '100%', height: '100%' };
+    const toggle = () => setOpen(o => !o);
 
-    const { scrollYProgress } = useScroll({
-        target: track,
-        offset: narrow ? ['start 0.85', 'end 0.4'] : ['start start', 'end end'],
-    });
-    const p = useSpring(scrollYProgress, { stiffness: 120, damping: 26, mass: 0.4 });
-
-    // Layers lift one after another.
-    const zRec = useTransform(p, [0.05, 0.3], [2, 58]);
-    const zCam = useTransform(p, [0.25, 0.5], [4, 122]);
-    const zCur = useTransform(p, [0.45, 0.7], [6, 190]);
-    // The camera then pulls in onto the text field.
-    const camL = useTransform(p, [0.6, 0.85], ['0%', '40%']);
-    const camT = useTransform(p, [0.6, 0.85], ['0%', '32%']);
-    const camW = useTransform(p, [0.6, 0.85], ['100%', '52%']);
-    const camH = useTransform(p, [0.6, 0.85], ['100%', '40%']);
-    const labels = useTransform(p, [0.08, 0.2], [0, 1]);
-
-    useMotionValueEvent(p, 'change', (v) => {
-        const i = v < 0.08 ? -1 : v < 0.3 ? 0 : v < 0.5 ? 1 : v < 0.7 ? 2 : 3;
-        setActive(i);
-    });
-
-    const still = reduce;
     return (
-        <section id="layers" ref={track} className={s.layersTrack}>
-            <div className={`${s.container} ${s.layersSticky}`}>
+        <section id="layers" className={s.section}>
+            <div className={`${s.container} ${s.layersGrid}`}>
                 <div>
                     <span className={s.kicker}>How it looks</span>
                     <h2 className={s.h2}>Every frame is four layers.</h2>
                     <p className={s.sub}>
-                        Drift keeps them apart until export, so each one gets done properly. Keep scrolling.
+                        Drift keeps them apart until export, so each one gets done properly. Click the frame to pull it apart.
                     </p>
                     <div className={s.layerList}>
                         {LAYERS.map((l, i) => (
-                            <div key={l.n} className={`${s.layerItem} ${(still || i <= active) ? s.layerOn : ''}`}>
+                            <div key={l.n} className={`${s.layerItem} ${s.layerOn}`}>
                                 <div className={`${s.layerNum} ${s.mono}`}>{l.n}</div>
                                 <div>
                                     <div className={s.layerTitle}>{l.title}</div>
@@ -107,29 +82,28 @@ export default function LayersSection() {
                             </div>
                         ))}
                     </div>
+                    <button type="button" className={`${s.btn} ${s.btnPaper}`} style={{ marginTop: 26 }} onClick={toggle} aria-pressed={open}>
+                        {open ? 'Put it back together' : 'Explode the frame'}
+                    </button>
                 </div>
 
-                <div className={s.stage} aria-hidden="true">
+                <div className={s.stage} onClick={toggle} role="button" tabIndex={0} aria-label={open ? 'Put the frame back together' : 'Pull the frame apart into its layers'}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}>
                     <div className={s.iso}>
                         <div className={s.isoShadow} />
                         <div className={`${s.isoLayer} ${s.isoWall}`} style={{ backgroundImage: 'url(/backgrounds/violet-peaks.jpg)' }}>
-                            <motion.div className={s.isoLabel} style={{ opacity: still ? 1 : labels }}><b>01</b>Wallpaper</motion.div>
+                            <motion.div className={s.isoLabel} animate={{ opacity: open ? 1 : 0 }}><b>01</b>Wallpaper</motion.div>
                         </div>
-                        <motion.div className={`${s.isoLayer} ${s.isoRec}`} style={{ z: still ? 58 : zRec }}>
+                        <motion.div className={`${s.isoLayer} ${s.isoRec}`} initial={false} animate={lift(58, 1)}>
                             <FakeApp />
-                            <motion.div className={s.isoLabel} style={{ opacity: still ? 1 : labels }}><b>02</b>Recording</motion.div>
+                            <motion.div className={s.isoLabel} animate={{ opacity: open ? 1 : 0 }}><b>02</b>Recording</motion.div>
                         </motion.div>
-                        <motion.div className={s.isoCamWrap} style={{ z: still ? 122 : zCam }}>
-                            <motion.div
-                                className={s.isoCam}
-                                style={still
-                                    ? { left: '40%', top: '32%', width: '52%', height: '40%' }
-                                    : { left: camL, top: camT, width: camW, height: camH }}
-                            >
-                                <motion.div className={s.isoLabel} style={{ opacity: still ? 1 : labels }}><b>03</b>Camera 1.35×</motion.div>
+                        <motion.div className={s.isoCamWrap} initial={false} animate={lift(122, 2)}>
+                            <motion.div className={s.isoCam} initial={false} animate={cam} transition={reduce ? { duration: 0 } : { duration: 0.8, ease: [0.65, 0, 0.35, 1], delay: open ? 0.35 : 0 }}>
+                                <motion.div className={s.isoLabel} animate={{ opacity: open ? 1 : 0 }}><b>03</b>Camera 1.35×</motion.div>
                             </motion.div>
                         </motion.div>
-                        <motion.div className={s.isoCursorWrap} style={{ z: still ? 190 : zCur }}>
+                        <motion.div className={s.isoCursorWrap} initial={false} animate={lift(190, 3)}>
                             <div className={s.isoCursor}>
                                 {/* billboard: face the viewer */}
                                 <div style={{ transform: 'rotateZ(40deg) rotateX(-56deg)', transformOrigin: '0 0' }}>

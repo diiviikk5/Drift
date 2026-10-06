@@ -277,22 +277,14 @@
 .h2 { margin-top: 22px; font-size: clamp(38px, 5.6vw, 72px); line-height: 0.95; letter-spacing: -0.05em; font-weight: 900; max-width: 820px; }
 .sub { margin-top: 18px; max-width: 600px; font-size: 18px; line-height: 1.55; color: var(--muted); font-weight: 500; }
 
-/* ---------- exploded layers (sticky, scroll driven) ---------- */
-.layersTrack { position: relative; height: 260vh; }
-.layersSticky {
-    position: sticky;
-    top: 0;
-    min-height: 100vh;
+/* ---------- exploded layers (click to pull apart) ---------- */
+.layersGrid {
     display: grid;
     grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
     align-items: center;
     gap: 24px;
-    padding: 70px 0 30px;
 }
-@media (max-width: 900px) {
-    .layersTrack { height: auto; }
-    .layersSticky { position: relative; min-height: 0; grid-template-columns: 1fr; padding: 0; }
-}
+@media (max-width: 900px) { .layersGrid { grid-template-columns: 1fr; } }
 .layerList { margin-top: 30px; display: flex; flex-direction: column; gap: 12px; }
 .layerItem {
     display: grid;
@@ -320,7 +312,8 @@
 .layerTitle { font-weight: 900; font-size: 19px; letter-spacing: -0.02em; }
 .layerText { margin-top: 3px; font-size: 14.5px; line-height: 1.5; color: var(--muted); font-weight: 500; }
 
-.stage { position: relative; height: 600px; display: flex; align-items: center; justify-content: center; perspective: 2600px; }
+.stage { position: relative; height: 600px; display: flex; align-items: center; justify-content: center; perspective: 2600px; cursor: pointer; outline: none; }
+.stage:focus-visible .iso { outline: 3px solid var(--pink); outline-offset: 12px; }
 @media (max-width: 900px) { .stage { height: 520px; } }
 @media (max-width: 560px) { .stage { height: 400px; } }
 .iso { position: relative; width: 460px; height: 288px; transform-style: preserve-3d; transform: rotateX(56deg) rotateZ(-40deg); margin-top: 80px; }
