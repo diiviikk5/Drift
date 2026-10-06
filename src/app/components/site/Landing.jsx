@@ -67,31 +67,6 @@ function Reveal({ children, delay = 0, y = 22 }) {
     );
 }
 
-/** The recording shortcut as real keys that press themselves (and on click). */
-function Shortcut() {
-    const [down, setDown] = useState(false);
-    const reduce = useReducedMotion();
-    useEffect(() => {
-        if (reduce) return;
-        const id = setInterval(() => {
-            setDown(true);
-            setTimeout(() => setDown(false), 220);
-        }, 3200);
-        return () => clearInterval(id);
-    }, [reduce]);
-    const press = () => { setDown(true); setTimeout(() => setDown(false), 200); };
-    const cls = `${s.keycap} ${s.mono}`;
-    return (
-        <span className={`${s.keys} ${down ? s.keysDown : ''}`} onMouseDown={press} aria-label="Alt + Shift + R">
-            <span className={cls}>Alt</span>
-            <span className={s.plus}>+</span>
-            <span className={cls}>Shift</span>
-            <span className={s.plus}>+</span>
-            <span className={`${cls} ${s.keycapLime}`}>R</span>
-        </span>
-    );
-}
-
 const wordUp = {
     hidden: { y: '110%', rotate: 4 },
     show: (i) => ({ y: '0%', rotate: 0, transition: { delay: 0.08 + i * 0.07, duration: 0.7, ease: [0.22, 1, 0.36, 1] } }),
@@ -133,8 +108,6 @@ export default function Landing() {
     const rotZ = useTransform(p, [0, 1], [-14, 0]);
     const scale = useTransform(p, [0, 1], [0.8, 1]);
     const lift = useTransform(p, [0, 1], [80, 0]);
-    const stickerFast = useTransform(p, [0, 1], [140, -30]);
-    const stickerSlow = useTransform(p, [0, 1], [70, -10]);
 
     const headline = [['Screen', 'recordings'], ['that', 'look']];
 
@@ -235,25 +208,6 @@ export default function Landing() {
 
                     {/* ---------- recording on an isometric slab ---------- */}
                     <div ref={showcase} className={s.showcase}>
-                        <motion.div
-                            className={`${s.sticker} ${s.bob}`}
-                            style={{ left: '-1%', top: '18%', y: reduce ? 0 : stickerFast, rotate: -8 }}
-                        >
-                            <Shortcut />
-                        </motion.div>
-                        <motion.div
-                            className={`${s.sticker} ${s.bobB}`}
-                            style={{ right: '0%', top: '6%', y: reduce ? 0 : stickerSlow, rotate: 6 }}
-                        >
-                            <span className={`${s.tag} ${s.tagPink}`}>Auto zoom · 1.35×</span>
-                        </motion.div>
-                        <motion.div
-                            className={`${s.sticker} ${s.bob}`}
-                            style={{ right: '3%', bottom: '10%', y: reduce ? 0 : stickerFast, rotate: -4 }}
-                        >
-                            <span className={`${s.tag} ${s.tagViolet} ${s.mono}`}>60 FPS · MP4</span>
-                        </motion.div>
-
                         <motion.div
                             className={s.slab}
                             style={reduce ? undefined : { rotateX: rotX, rotateZ: rotZ, scale, y: lift }}
