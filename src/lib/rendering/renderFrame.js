@@ -103,7 +103,8 @@ export function sampleCursor(timeSec, mouseSamples, smooth = true) {
 }
 
 // 1x = the real Windows pointer at 100% display scale (~19 px tall per 1080 px).
-const CURSOR_BASE_SCALE = 1.0;
+// 1.0x pointer size: about 2.8x a real pointer, readable at any playback size.
+const CURSOR_BASE_SCALE = 2.8;
 const CLICK_RIPPLE_MS = 480;
 const PRESS_DOWN_MS = 70;
 const PRESS_UP_MS = 260;
@@ -216,13 +217,13 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
     const {
         background = 'bigSur',
         customBackgroundImage = null,
-        insetPadding = 0.08,      // 8% inset
-        borderRadius = 18,        // corner radius in canvas px
-        windowChrome = true,
+        insetPadding = 0.05,      // 5% inset: the recording is the star
+        borderRadius = 12,        // corner radius in canvas px
+        windowChrome = false,
         titleBarHeight = 34,
-        shadowBlur = 45,
-        shadowOffsetY = 24,
-        shadowOpacity = 0.42,
+        shadowBlur = 40,
+        shadowOffsetY = 16,
+        shadowOpacity = 0.36,
         showCursor = false,
         cursorScale = 1.0,
         cursorTheme = 'macos',    // 'macos' | 'dot' | 'neon'
@@ -1116,10 +1117,11 @@ function _drawThemedCursor(ctx, x, y, scale = 1.0, theme = 'macos', swayAngle = 
         ctx.lineTo(6.4, 11.6);
         ctx.lineTo(11.7, 11.6);
         ctx.closePath();
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-        ctx.shadowBlur = 2.5;
-        ctx.shadowOffsetX = 0.6;
-        ctx.shadowOffsetY = 1;
+        // Canvas shadows ignore the transform: scale them with the pointer.
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.32)';
+        ctx.shadowBlur = 2.5 * scale;
+        ctx.shadowOffsetX = 0.4 * scale;
+        ctx.shadowOffsetY = 1 * scale;
         ctx.fillStyle = '#ffffff';
         ctx.fill();
         ctx.shadowColor = 'transparent';
@@ -1188,8 +1190,8 @@ function _drawSyntheticCursor(ctx, x, y, scale = 1.0, swayAngle = 0) {
 
     // Soft drop shadow
     ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
-    ctx.shadowBlur = 3.5;
-    ctx.shadowOffsetY = 1.4;
+    ctx.shadowBlur = 3.5 * scale;
+    ctx.shadowOffsetY = 1.4 * scale;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 

@@ -134,11 +134,14 @@ function colors(theme) {
         : { fill: '#ffffff', line: '#000000' };
 }
 
+// Canvas shadows ignore the transform, so they're scaled with the pointer.
+let shadowScale = 1;
+
 function shadow(ctx, on) {
-    ctx.shadowColor = on ? 'rgba(0, 0, 0, 0.3)' : 'transparent';
-    ctx.shadowBlur = on ? 2.5 : 0;
-    ctx.shadowOffsetX = on ? 0.5 : 0;
-    ctx.shadowOffsetY = on ? 1 : 0;
+    ctx.shadowColor = on ? 'rgba(0, 0, 0, 0.32)' : 'transparent';
+    ctx.shadowBlur = on ? 2.5 * shadowScale : 0;
+    ctx.shadowOffsetX = on ? 0.4 * shadowScale : 0;
+    ctx.shadowOffsetY = on ? 1 * shadowScale : 0;
 }
 
 /** Fill shapes with an outline only around the outside of their union. */
@@ -185,6 +188,7 @@ function doubleArrow(ctx) {
 export function drawCursorShape(ctx, x, y, scale, shape, theme, timeSec = 0) {
     if (!shape || shape === 'arrow' || !SHAPES.has(shape)) return false;
     const c = colors(theme);
+    shadowScale = scale;
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(scale, scale);

@@ -90,9 +90,9 @@ export class StudioEngine {
         this.splineSmoothing = options.splineSmoothing ?? true;
         this.springProfile = options.springProfile || 'cinematic';
         this.playbackSpeed = options.playbackSpeed ?? 1.0;
-        this.insetPadding = options.insetPadding ?? 0.08;
-        this.borderRadius = options.borderRadius ?? 18;
-        this.windowChrome = options.windowChrome !== false;
+        this.insetPadding = options.insetPadding ?? 0.05;
+        this.borderRadius = options.borderRadius ?? 12;
+        this.windowChrome = options.windowChrome === true;
         this.aspectRatio = options.aspectRatio || '16:9';
         this.frameFit = options.frameFit || 'contain';
         this.autoZoomOnClicks = options.autoZoomOnClicks !== false;
@@ -571,8 +571,8 @@ export class StudioEngine {
     /** Current stage layout, matching what renderFrame draws. */
     getStageLayout() {
         return getFrameMetrics(this.canvas.width, this.canvas.height, this.video, {
-            insetPadding: this.insetPadding ?? 0.08,
-            windowChrome: this.windowChrome !== false,
+            insetPadding: this.insetPadding ?? 0.05,
+            windowChrome: this.windowChrome === true,
             titleBarHeight: this.titleBarHeight ?? 34,
             borderRadius: this.borderRadius ?? 18,
             frameFit: this.frameFit || 'contain',
@@ -765,9 +765,9 @@ export class StudioEngine {
                 frameRate: this._renderFps || 60,
                 // Live preview uses a lighter blur so playback stays smooth.
                 motionBlurSamples: this._renderFps ? 8 : 4,
-                insetPadding: this.insetPadding ?? 0.08,
+                insetPadding: this.insetPadding ?? 0.05,
                 borderRadius: this.borderRadius ?? 18,
-                windowChrome: this.windowChrome !== false,
+                windowChrome: this.windowChrome === true,
                 springProfile: this.springProfile || 'cinematic',
                 showCursor: this.showCursor,
                 cursorTheme: this.cursorTheme || 'macos',
@@ -835,7 +835,7 @@ export class StudioEngine {
     }
 
     setCursorScale(scale) {
-        this.cursorScale = Math.max(0.2, Math.min(3.0, scale));
+        this.cursorScale = Math.max(0.3, Math.min(2.5, scale));
         this.drawFrame();
     }
 

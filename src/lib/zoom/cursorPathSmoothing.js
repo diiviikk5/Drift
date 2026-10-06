@@ -16,8 +16,11 @@ const HZ = 240;
 const STEP_MS = 1000 / HZ;
 const MIN_HOLD_GAP_MS = 60;
 const MOVE_IN_MS = 16;
-const CLICK_PIN_MS = 90;
-const BASE_TAU_MS = 16; // strength 1 -> effective sigma ~32 ms (silky, still lag-free)
+const CLICK_PIN_MS = 200;
+// strength 1 -> effective sigma ~60 ms: the pointer glides along arcs instead
+// of tracing every hand wobble, yet stays on schedule (zero-phase) and lands
+// exactly on clicks.
+const BASE_TAU_MS = 30;
 
 function sampleTime(s) {
     return s.timeMs ?? s.time ?? s.t ?? 0;

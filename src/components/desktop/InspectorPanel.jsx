@@ -82,11 +82,11 @@ export default function InspectorPanel({
     onToggleConnectedZooms,
     reactiveWebcam = true,
     onToggleReactiveWebcam,
-    insetPadding = 0.08,
+    insetPadding = 0.05,
     onChangeInsetPadding,
-    borderRadius = 18,
+    borderRadius = 12,
     onChangeBorderRadius,
-    windowChrome = true,
+    windowChrome = false,
     onToggleWindowChrome,
     springProfile = 'cinematic',
     onChangeSpringProfile,
@@ -672,8 +672,8 @@ export default function InspectorPanel({
                                 </div>
                                 <input
                                     type="range"
-                                    min="0.6"
-                                    max="2.5"
+                                    min="0.4"
+                                    max="2"
                                     step="0.1"
                                     value={cursorScale || 1.0}
                                     onChange={(e) => onChangeCursorScale && onChangeCursorScale(parseFloat(e.target.value))}

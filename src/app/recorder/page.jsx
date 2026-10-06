@@ -122,8 +122,8 @@ export default function RecorderPage() {
     const [isMicAudioMuted, setIsMicAudioMuted] = useState(false);
     const [autoDuck, setAutoDuck] = useState(true);
     const [aspectRatio, setAspectRatio] = useState('16:9');
-    const [insetPadding, setInsetPadding] = useState(0);
-    const [borderRadius, setBorderRadius] = useState(0);
+    const [insetPadding, setInsetPadding] = useState(0.05);
+    const [borderRadius, setBorderRadius] = useState(12);
     const [windowChrome, setWindowChrome] = useState(false);
     const [springProfile, setSpringProfile] = useState('cinematic');
     const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
@@ -1277,10 +1277,10 @@ export default function RecorderPage() {
             }
         } else if (preset === 'studio') {
             setInsetPadding(0.05);
-            setBorderRadius(14);
+            setBorderRadius(12);
             setWindowChrome(false);
             if (studioRef.current) {
-                studioRef.current.setFraming({ insetPadding: 0.05, borderRadius: 14, windowChrome: false });
+                studioRef.current.setFraming({ insetPadding: 0.05, borderRadius: 12, windowChrome: false });
             }
         } else if (preset === 'mockup') {
             setInsetPadding(0.08);
@@ -1741,9 +1741,9 @@ export default function RecorderPage() {
             setIsMicAudioMuted(project.isMicAudioMuted ?? false);
             setAutoDuck(project.autoDuck ?? true);
             setAspectRatio(project.aspectRatio ?? '16:9');
-            setInsetPadding(project.insetPadding ?? 0.08);
-            setBorderRadius(project.borderRadius ?? 18);
-            setWindowChrome(project.windowChrome !== false);
+            setInsetPadding(project.insetPadding ?? 0.05);
+            setBorderRadius(project.borderRadius ?? 12);
+            setWindowChrome(project.windowChrome === true);
             setSpringProfile(project.springProfile ?? 'cinematic');
             setPlaybackSpeed(project.playbackSpeed ?? 1.0);
             setTiltAngle(project.tiltAngle ?? 0);
