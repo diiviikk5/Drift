@@ -470,11 +470,11 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
             ctx.save();
             ctx.beginPath();
             ctx.arc(cx, cy, r, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.18})`;
+            ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.08})`;
             ctx.fill();
             ctx.lineWidth = 2.2 * unit * (1 - p * 0.6);
-            ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.85})`;
-            ctx.shadowColor = `rgba(0, 0, 0, ${alpha * 0.35})`;
+            ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.6})`;
+            ctx.shadowColor = `rgba(0, 0, 0, ${alpha * 0.25})`;
             ctx.shadowBlur = 6 * unit;
             ctx.stroke();
             ctx.restore();
