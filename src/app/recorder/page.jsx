@@ -54,6 +54,7 @@ export default function RecorderPage() {
     const [isNativeSupported, setIsNativeSupported] = useState(false);
     const [nativeAudioTracks, setNativeAudioTracks] = useState({ systemAudioUrl: null, micAudioUrl: null });
     const [autoZoomOnClicks, setAutoZoomOnClicks] = useState(true);
+    const [zoomFrequency, setZoomFrequency] = useState('minimal');
 
     // --- State ---
     const [viewMode, setViewMode] = useState('recorder'); // 'recorder' | 'studio'
@@ -392,6 +393,7 @@ export default function RecorderPage() {
                     recordedMoves,
                     {
                         autoZoomOnClicks,
+                        zoomFrequency,
                         webcamBlob: recordedWebcamBlob,
                         webcamSettings,
                         captions,
@@ -1654,7 +1656,7 @@ export default function RecorderPage() {
                 focusSegments: studioRef.current?.getFocusSegments() ?? focusSegments,
                 annotations, captions, captionsEnabled, background,
                 customBackground: customImage?.src ?? null,
-                zoomLevel, showCursor, cursorBakedIn, cursorTheme, cursorScale, splineSmoothing, aspectRatio, frameFit,
+                zoomLevel, zoomFrequency, showCursor, cursorBakedIn, cursorTheme, cursorScale, splineSmoothing, aspectRatio, frameFit,
                 systemAudioVolume, micAudioVolume, isSystemAudioMuted, isMicAudioMuted, autoDuck,
                 insetPadding, borderRadius, windowChrome, springProfile, playbackSpeed, showKeystrokes,
                 tiltAngle, connectedZooms, reactiveWebcam, webcamSettings, trimStart, trimEnd,
@@ -1729,6 +1731,7 @@ export default function RecorderPage() {
             setBackground(bgKey);
             setCustomImage(image);
             setZoomLevel(project.zoomLevel ?? 1.35);
+            setZoomFrequency(project.zoomFrequency === 'every' ? 'every' : 'minimal');
             setShowCursor(project.showCursor ?? false);
             setCursorBakedIn(Boolean(project.cursorBakedIn));
             setFrameFit(project.frameFit === 'fill' ? 'fill' : 'contain');
@@ -2116,6 +2119,11 @@ export default function RecorderPage() {
                                 if (studioRef.current) studioRef.current.setShowKeystrokes(enabled);
                             }}
                             autoZoomOnClicks={autoZoomOnClicks}
+                            zoomFrequency={zoomFrequency}
+                            onChangeZoomFrequency={(freq) => {
+                                setZoomFrequency(freq);
+                                if (studioRef.current) setFocusSegments([...studioRef.current.setZoomFrequency(freq)]);
+                            }}
                             onToggleAutoZoomOnClicks={(val) => {
                                 setAutoZoomOnClicks(val);
                                 if (studioRef.current) {

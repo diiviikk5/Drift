@@ -22,8 +22,7 @@ import {
     Mic,
     MicOff,
     Activity,
-    AppWindow,
-    Gauge
+    AppWindow
 } from 'lucide-react';
 import WallpaperPicker from './WallpaperPicker';
 import { DEFAULT_BACKGROUND } from '@/lib/rendering/backgrounds';
@@ -96,6 +95,8 @@ export default function InspectorPanel({
     onToggleAutoZoomOnClicks,
     onResetToOverview,
     onChangeFramingPreset,
+    zoomFrequency = 'minimal',
+    onChangeZoomFrequency,
     playbackSpeed = 1.0,
     onChangePlaybackSpeed,
 }) {
@@ -400,209 +401,150 @@ export default function InspectorPanel({
                 )}
 
                 {/* ═══ ZOOM TAB ═══ */}
-                {activeTab === 'camera' && (
-                    <>
-
-                        {/* Global Core Zoom Construct Presets */}
-                        <div className="space-y-2">
-                            <label className="text-xs text-[var(--text-app-muted)] font-medium">
-                                Zoom depth
-                            </label>
-                            <div className="grid grid-cols-3 gap-1.5">
-                                {[
-                                    { id: 'subtle', scale: 1.35, label: 'Subtle', desc: 'Recommended' },
-                                    { id: 'cinema', scale: 1.55, label: 'Balanced', desc: 'Closer' },
-                                    { id: 'focus', scale: 1.85, label: 'Close', desc: 'Small details' },
-                                ].map((preset) => {
-                                    const isSelected = Math.abs((zoomLevel || 1.55) - preset.scale) < 0.05;
-                                    return (
-                                        <button
-                                            key={preset.id}
-                                            onClick={() => onChangeZoomLevel(preset.scale)}
-                                            className={`py-2 px-1.5 rounded-lg border text-center transition-all flex flex-col items-center justify-center gap-0.5 ${
-                                                isSelected
-                                                    ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] border-[var(--accent-app)] font-bold shadow-xs'
-                                                    : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)] bg-black/10 hover:border-white/20'
-                                            }`}
-                                        >
-                                            <span className="text-xs font-semibold">{preset.label}</span>
-                                            <span className="text-[11px] opacity-80 font-mono">{preset.desc}</span>
-                                        </button>
-                                    );
-                                })}
+                {activeTab === 'camera' && (() => {
+                    const mode = !autoZoomOnClicks ? 'off' : (zoomFrequency === 'every' ? 'every' : 'minimal');
+                    const pickMode = (m) => {
+                        if (m === 'off') {
+                            if (autoZoomOnClicks) onToggleAutoZoomOnClicks && onToggleAutoZoomOnClicks(false);
+                            return;
+                        }
+                        onChangeZoomFrequency && onChangeZoomFrequency(m);
+                        if (!autoZoomOnClicks) onToggleAutoZoomOnClicks && onToggleAutoZoomOnClicks(true);
+                    };
+                    const level = zoomLevel || 1.35;
+                    const Option = ({ selected, onClick, title, desc }) => (
+                        <button
+                            onClick={onClick}
+                            className={`py-2 px-2 rounded-lg border text-left transition-colors ${
+                                selected
+                                    ? 'border-[var(--accent-app)] bg-[var(--accent-soft)] text-[var(--text-app)]'
+                                    : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:border-[var(--border-app-hover)]'
+                            }`}
+                        >
+                            <div className="text-xs font-semibold">{title}</div>
+                            {desc && <div className="text-[11px] opacity-75 leading-snug mt-0.5">{desc}</div>}
+                        </button>
+                    );
+                    const Toggle = ({ on, onClick, label, desc }) => (
+                        <div className="flex items-center justify-between gap-3">
+                            <div>
+                                <div className="text-xs font-medium text-[var(--text-app)]">{label}</div>
+                                <div className="text-[11px] text-[var(--text-app-muted)]">{desc}</div>
                             </div>
+                            <button
+                                onClick={onClick}
+                                role="switch"
+                                aria-checked={on}
+                                className={`w-9 h-5 shrink-0 rounded-full transition-colors relative ${on ? 'bg-[var(--accent-app)]' : 'bg-[var(--border-app-hover)]'}`}
+                            >
+                                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${on ? 'left-[18px]' : 'left-0.5'}`} />
+                            </button>
                         </div>
-
-                        {/* Fine-Tune Slider */}
-                        <div className="space-y-2 pt-1">
-                            <div className="flex items-center justify-between">
-                                <span className="text-[11px] text-[var(--text-app-muted)] font-mono">
-                                    Fine-tune
-                                </span>
-                                <span className="text-xs font-mono font-bold text-[var(--accent-app)]">{(zoomLevel || 1.55).toFixed(2)}×</span>
-                            </div>
-                            <input
-                                type="range"
-                                min="1.15"
-                                max="2.8"
-                                step="0.05"
-                                value={zoomLevel || 1.55}
-                                onChange={(e) => onChangeZoomLevel(parseFloat(e.target.value))}
-                                className="w-full accent-[var(--accent-app)] cursor-pointer"
-                            />
-                            <div className="flex justify-between text-[11px] text-[var(--text-app-muted)] font-mono">
-                                <span>1.15× (Overview)</span>
-                                <span>1.55× (Cinema)</span>
-                                <span>2.80× (Deep)</span>
-                            </div>
-                        </div>
-
-                        {/* Motion Presets */}
-                        <div className="space-y-2">
-                            <label className="text-xs text-[var(--text-app-muted)] font-medium">
-                                Camera pace
-                            </label>
-                            <div className="grid grid-cols-3 gap-1">
-                                {[
-                                    { id: 'cinematic', label: 'Cinema' },
-                                    { id: 'natural', label: 'Natural' },
-                                    { id: 'snappy', label: 'Snappy' },
-                                ].map((p) => (
-                                    <button
-                                        key={p.id}
-                                        onClick={() => onChangeSpringProfile && onChangeSpringProfile(p.id)}
-                                        className={`py-1.5 px-1 rounded-md border text-center text-xs transition-all ${
-                                            springProfile === p.id
-                                                ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] font-bold'
-                                                : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)]'
-                                        }`}
-                                    >
-                                        {p.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Recording Tempo & Pacing (Cinema Aesthetic Slowness) */}
-                        <div className="space-y-2 pt-2 border-t border-[var(--border-app)]">
-                            <div className="flex items-center justify-between">
-                                <label className="text-xs text-[var(--text-app-muted)] flex items-center gap-1.5 font-medium">
-                                    <Gauge className="w-3.5 h-3.5 text-[var(--accent-app)]" />
-                                    <span>Pacing & Tempo</span>
-                                </label>
-                                <span className="text-xs font-mono font-bold text-[var(--accent-app)]">
-                                    {(playbackSpeed || 1).toFixed(2)}×
-                                </span>
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-1.5">
-                                {[
-                                    { speed: 1.00, label: 'Normal', desc: '1×' },
-                                    { speed: 1.10, label: 'Brisk', desc: '1.1×' },
-                                    { speed: 1.25, label: 'Fast', desc: '1.25×' },
-                                ].map((p) => {
-                                    const isSelected = Math.abs((playbackSpeed || 1) - p.speed) < 0.02;
-                                    return (
-                                        <button
-                                            key={p.label}
-                                            onClick={() => onChangePlaybackSpeed && onChangePlaybackSpeed(p.speed)}
-                                            className={`py-2 px-1 rounded-lg border text-center transition-all flex flex-col items-center justify-center gap-0.5 ${
-                                                isSelected
-                                                    ? 'bg-[var(--accent-app)] text-[var(--accent-app-fg)] border-[var(--accent-app)] font-bold shadow-xs'
-                                                    : 'border-[var(--border-app)] text-[var(--text-app-muted)] hover:text-[var(--text-app)] bg-black/10 hover:border-white/20'
-                                            }`}
-                                        >
-                                            <span className="text-xs font-semibold">{p.label}</span>
-                                            <span className="text-[11px] opacity-80 font-mono">{p.desc}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-
-                            <input
-                                type="range"
-                                min="0.75"
-                                max="1.25"
-                                step="0.01"
-                                value={playbackSpeed || 1}
-                                onChange={(e) => onChangePlaybackSpeed && onChangePlaybackSpeed(parseFloat(e.target.value))}
-                                className="w-full accent-[var(--accent-app)] cursor-pointer"
-                            />
-                            <div className="flex justify-between text-[11px] text-[var(--text-app-muted)] font-mono">
-                                <span>0.75× (Relaxed)</span>
-                                <span>1.00× (Realtime)</span>
-                                <span>1.25× (Brisk)</span>
-                            </div>
-                        </div>
-
-                        {/* Smart Auto-Zoom */}
-                        <div className="pt-2 border-t border-[var(--border-app)] space-y-2">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <div className="text-xs font-semibold text-[var(--text-app)]">Smart Auto-Zoom</div>
-                                    <div className="text-[11px] text-[var(--text-app-muted)]">Zooms into where you work, follows calmly, zooms out when idle</div>
+                    );
+                    return (
+                        <>
+                            <div className="space-y-2">
+                                <label className="text-xs text-[var(--text-app-muted)] font-medium">Auto zoom</label>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                    <Option selected={mode === 'off'} onClick={() => pickMode('off')} title="Off" desc="Full frame" />
+                                    <Option selected={mode === 'minimal'} onClick={() => pickMode('minimal')} title="Minimal" desc="Focused work only" />
+                                    <Option selected={mode === 'every'} onClick={() => pickMode('every')} title="Every action" desc="Each click" />
                                 </div>
-                                <button
-                                    onClick={() => onToggleAutoZoomOnClicks && onToggleAutoZoomOnClicks(!autoZoomOnClicks)}
-                                    title={autoZoomOnClicks ? 'Turn off and keep the full frame' : 'Plan zooms automatically from clicks, shortcuts and cursor activity'}
-                                    className={`w-9 h-5 rounded-full transition-all relative ${
-                                        autoZoomOnClicks ? 'bg-[var(--accent-app)]' : 'bg-gray-600'
-                                    }`}
-                                >
-                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                                        autoZoomOnClicks ? 'left-[18px]' : 'left-0.5'
-                                    }`} />
-                                </button>
+                                <p className="text-[11px] text-[var(--text-app-faint)] leading-snug">
+                                    {mode === 'minimal' && 'Zooms when you type or work in one spot. Single clicks, scrolling and the scrollbar stay on the full frame.'}
+                                    {mode === 'every' && 'Zooms toward each deliberate click or shortcut. Quick hops across the screen still stay wide.'}
+                                    {mode === 'off' && 'No automatic zooms. Click the preview to add one by hand.'}
+                                </p>
                             </div>
-                        </div>
 
-                        {/* Connected Zooms */}
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <div className="text-xs font-semibold text-[var(--text-app)]">Connected Zooms</div>
-                                    <div className="text-[11px] text-[var(--text-app-muted)]">Pan between nearby zooms instead of zooming out and back in</div>
+                            <div className={`space-y-2 ${mode === 'off' ? 'opacity-50' : ''}`}>
+                                <div className="flex items-center justify-between">
+                                    <label className="text-xs text-[var(--text-app-muted)] font-medium">Zoom depth</label>
+                                    <span className="text-xs font-mono text-[var(--text-app)] tabular-nums">{level.toFixed(2)}×</span>
                                 </div>
-                                <button
-                                    onClick={() => onToggleConnectedZooms && onToggleConnectedZooms(!connectedZooms)}
-                                    className={`w-9 h-5 rounded-full transition-all relative ${
-                                        connectedZooms ? 'bg-[var(--accent-app)]' : 'bg-gray-600'
-                                    }`}
-                                >
-                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                                        connectedZooms ? 'left-[18px]' : 'left-0.5'
-                                    }`} />
-                                </button>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                    {[
+                                        { scale: 1.35, title: 'Subtle', desc: 'Keeps context' },
+                                        { scale: 1.55, title: 'Balanced', desc: 'Closer' },
+                                        { scale: 1.85, title: 'Close', desc: 'Small details' },
+                                    ].map(p => (
+                                        <Option key={p.scale} selected={Math.abs(level - p.scale) < 0.05} onClick={() => onChangeZoomLevel(p.scale)} title={p.title} desc={p.desc} />
+                                    ))}
+                                </div>
+                                <input
+                                    type="range"
+                                    min="1.15"
+                                    max="2.5"
+                                    step="0.05"
+                                    value={level}
+                                    onChange={(e) => onChangeZoomLevel(parseFloat(e.target.value))}
+                                    aria-label="Zoom depth"
+                                    className="w-full accent-[var(--accent-app)] cursor-pointer"
+                                />
                             </div>
-                        </div>
 
-                        {/* 3D Isometric Perspective Tilt */}
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <label className="text-xs text-[var(--text-app-muted)] font-medium">
-                                    3D Perspective Tilt
-                                </label>
-                                <span className="text-xs font-mono font-bold text-[var(--accent-app)]">
-                                    {tiltAngle}°
-                                </span>
+                            <div className={`space-y-2 ${mode === 'off' ? 'opacity-50' : ''}`}>
+                                <label className="text-xs text-[var(--text-app-muted)] font-medium">Camera speed</label>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                    {[
+                                        { id: 'gentle', title: 'Calm' },
+                                        { id: 'cinematic', title: 'Natural' },
+                                        { id: 'snappy', title: 'Quick' },
+                                    ].map(p => (
+                                        <Option key={p.id} selected={(springProfile || 'cinematic') === p.id} onClick={() => onChangeSpringProfile && onChangeSpringProfile(p.id)} title={p.title} />
+                                    ))}
+                                </div>
                             </div>
-                            <input
-                                type="range"
-                                min="0"
-                                max="8"
-                                step="0.5"
-                                value={tiltAngle}
-                                onChange={(e) => onChangeTiltAngle && onChangeTiltAngle(parseFloat(e.target.value))}
-                                className="w-full accent-[var(--accent-app)] cursor-pointer"
-                            />
-                            <div className="flex justify-between text-[11px] text-[var(--text-app-muted)] font-mono">
-                                <span>0° (Flat)</span>
-                                <span>3.5° (Cinema)</span>
-                                <span>8° (High Tilt)</span>
-                            </div>
-                        </div>
-                    </>
-                )}
+
+                            <details className="group pt-2 border-t border-[var(--border-app)]">
+                                <summary className="cursor-pointer list-none flex items-center justify-between text-xs font-medium text-[var(--text-app-muted)] hover:text-[var(--text-app)] py-1">
+                                    <span>More</span>
+                                    <span className="transition-transform group-open:rotate-90">›</span>
+                                </summary>
+                                <div className="space-y-4 pt-3">
+                                    <Toggle
+                                        on={connectedZooms}
+                                        onClick={() => onToggleConnectedZooms && onToggleConnectedZooms(!connectedZooms)}
+                                        label="Pan between nearby zooms"
+                                        desc="Glide across instead of zooming out and back in"
+                                    />
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-xs font-medium text-[var(--text-app)]">Playback speed</label>
+                                            <span className="text-xs font-mono text-[var(--text-app)] tabular-nums">{(playbackSpeed || 1).toFixed(2)}×</span>
+                                        </div>
+                                        <input
+                                            type="range"
+                                            min="0.75"
+                                            max="1.5"
+                                            step="0.05"
+                                            value={playbackSpeed || 1}
+                                            onChange={(e) => onChangePlaybackSpeed && onChangePlaybackSpeed(parseFloat(e.target.value))}
+                                            aria-label="Playback speed"
+                                            className="w-full accent-[var(--accent-app)] cursor-pointer"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-xs font-medium text-[var(--text-app)]">Perspective tilt</label>
+                                            <span className="text-xs font-mono text-[var(--text-app)] tabular-nums">{tiltAngle}°</span>
+                                        </div>
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="8"
+                                            step="0.5"
+                                            value={tiltAngle}
+                                            onChange={(e) => onChangeTiltAngle && onChangeTiltAngle(parseFloat(e.target.value))}
+                                            aria-label="Perspective tilt"
+                                            className="w-full accent-[var(--accent-app)] cursor-pointer"
+                                        />
+                                    </div>
+                                </div>
+                            </details>
+                        </>
+                    );
+                })()}
 
                 {/* ═══ CURSOR TAB ═══ */}
                 {activeTab === 'cursor' && (

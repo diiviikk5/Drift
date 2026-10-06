@@ -99,10 +99,12 @@ export class StudioEngine {
 
         const initialSrcW = options.sourceWidth || (this.canvas?.width) || (typeof window !== 'undefined' ? (window.screen.width * (window.devicePixelRatio || 1)) : 1920);
         const initialSrcH = options.sourceHeight || (this.canvas?.height) || (typeof window !== 'undefined' ? (window.screen.height * (window.devicePixelRatio || 1)) : 1080);
+        this.zoomFrequency = options.zoomFrequency === 'every' ? 'every' : 'minimal';
         this.interactionAnalyzer = new InteractionAnalyzer({
             sourceWidth: initialSrcW,
             sourceHeight: initialSrcH,
             defaultZoomScale: options.zoomLevel || DEFAULT_ZOOM_SCALE,
+            ...StudioEngine.frequencyOptions(this.zoomFrequency),
         });
         this.focusSegments = (options.focusSegments && options.focusSegments.length > 0)
             ? options.focusSegments
@@ -823,6 +825,28 @@ export class StudioEngine {
                 showKeystrokes: this.showKeystrokes !== false,
             }
         );
+    }
+
+    /** Analyzer settings for how often auto zoom zooms. */
+    static frequencyOptions(frequency) {
+        return frequency === 'every'
+            ? { minActions: 1, maxZoomedShare: 1 }      // zoom on each deliberate action
+            : { minActions: 2, maxZoomedShare: 0.4 };   // focused work only, mostly full frame
+    }
+
+    /** 'minimal' | 'every': re-plans auto zooms, keeps zooms placed by hand. */
+    setZoomFrequency(frequency) {
+        this.zoomFrequency = frequency === 'every' ? 'every' : 'minimal';
+        Object.assign(this.interactionAnalyzer.options, StudioEngine.frequencyOptions(this.zoomFrequency));
+        if (this.autoZoomOnClicks) {
+            const dur = this.videoDuration || this.explicitDuration || 10;
+            const auto = this.interactionAnalyzer.analyze(this.clicks, this.getFocusSamples(), dur, this.keystrokes);
+            const manual = (this.focusSegments || []).filter(s => !s.auto);
+            const kept = auto.filter(a => !manual.some(m => a.startTime < m.endTime && a.endTime > m.startTime));
+            this.focusSegments = [...manual, ...kept].sort((a, b) => a.startTime - b.startTime);
+        }
+        this.drawFrame();
+        return this.focusSegments || [];
     }
 
     setZoomLevel(level) {
