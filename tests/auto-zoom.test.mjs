@@ -238,3 +238,21 @@ test('scrolling ends the shot: the camera pulls back while the page moves', () =
     assert.ok(segs[0].endTime <= 3.45, `first shot should end as scrolling starts, ended ${segs[0].endTime}`);
     assert.ok(evaluateCameraAtTime(4.6, segs, moves, { duration: 10 }).scale < 1.1, 'pulled back during the scroll');
 });
+
+test('scrollbar grabs and clicks while scrolling never zoom', async () => {
+    const { InteractionAnalyzer } = await import('../src/lib/zoom/InteractionAnalyzer.js');
+    const moves = [];
+    for (let t = 0; t <= 10000; t += 20) moves.push({ time: t, x: 0.5, y: 0.5 });
+    // Grab the scrollbar on the right edge at 3 s, page scrolls 3.1-5 s.
+    for (let t = 3100; t <= 5000; t += 100) moves.push({ time: t, x: 0.992, y: 0.4, scroll: 40 });
+    moves.sort((a, b) => a.time - b.time);
+    const clicks = [
+        { time: 3000, x: 0.992, y: 0.4 },   // scrollbar grab
+        { time: 4200, x: 0.3, y: 0.6 },     // click mid-scroll
+    ];
+    const segs = new InteractionAnalyzer().analyze(clicks, moves, 10, []);
+    assert.equal(segs.length, 0, JSON.stringify(segs));
+    // A normal click well after the scroll still zooms.
+    const later = new InteractionAnalyzer().analyze([...clicks, { time: 7000, x: 0.4, y: 0.4 }], moves, 10, []);
+    assert.equal(later.length, 1);
+});

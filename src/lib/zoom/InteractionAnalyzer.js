@@ -43,6 +43,9 @@ export const AUTO_ZOOM_DEFAULTS = Object.freeze({
     dwellMaxDuration: 4.0,
     dwellRadius: 0.012,
     dwellMinTravel: 0.08,   // ...and only after it actually travelled somewhere
+    edgeBand: 0.025,        // clicks this close to the left/right edge (scrollbars) never zoom
+    scrollGuardBefore: 0.35, // a click this soon before a scroll is the scroll starting (scrollbar drag)
+    scrollSettle: 0.6,      // after a scroll, wait for the page to settle before zooming again
 });
 
 const NAV_KEY = /^(Enter|Tab|Esc|Backspace|Del|Space|↑|↓|←|→|PgUp|PgDn|Home|End)$/;
@@ -84,17 +87,22 @@ export class InteractionAnalyzer {
         const o = this.options;
         const duration = Number.isFinite(totalDurationSec) && totalDurationSec > 0 ? totalDurationSec : 10;
         const moves = this._normalizeMoves(mouseSamples);
+        const scrolls = this._scrollBursts(moves);
+        // Scrolling is reading, not an action: nothing that happens while the
+        // page moves (or the scrollbar grab that starts it) is worth a zoom.
+        const duringScroll = (t) => scrolls.some(([a, b]) => t >= a - o.scrollGuardBefore && t <= b + o.scrollSettle);
+        const atEdge = (s) => s.kind === 'click' && (s.x > 1 - o.edgeBand || s.x < o.edgeBand);
         const signals = [
             ...this._clickSignals(clicks, duration),
             ...this._keySignals(keystrokes, moves),
             ...(o.enableDwellZooms ? this._dwellSignals(moves) : []),
         ]
             .filter(s => s.time >= o.minActionTime && s.time <= duration - o.endGuard)
+            .filter(s => !atEdge(s) && !duringScroll(s.time))
             .sort((a, b) => a.time - b.time);
 
         if (!signals.length) return [];
 
-        const scrolls = this._scrollBursts(moves);
         const sessions = this._buildSessions(signals, scrolls);
         const planned = sessions
             .filter(sess => sess.signals.some(s => s.strong))
@@ -271,9 +279,9 @@ export class InteractionAnalyzer {
 
         const startTime = Math.max(0, anchors[0].time - o.preRoll);
         const lastAction = sess.signals[sess.signals.length - 1].time;
-        // Pull back once a scroll starts (the page is about to move).
+        // Be back on the full frame as the scroll starts (the page is about to move).
         const scrollAfter = scrolls.find(([s]) => s > lastAction);
-        const endTime = Math.min(duration - o.endGuard * 0.5, lastAction + o.holdAfter, scrollAfter ? Math.max(lastAction + 0.5, scrollAfter[0] + 0.2) : Infinity);
+        const endTime = Math.min(duration - o.endGuard * 0.5, lastAction + o.holdAfter, scrollAfter ? Math.max(lastAction + 0.4, scrollAfter[0] - 0.1) : Infinity);
 
         // Activity box: action points plus where the cursor actually spent the
         // session (robust 10-90% range so a stray flick doesn't widen the zoom).
