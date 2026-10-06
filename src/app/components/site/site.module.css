@@ -91,6 +91,8 @@
 .btn:active { transform: translate(5px, 5px); box-shadow: 1px 1px 0 var(--ex); }
 .btn:focus-visible { outline: 3px solid var(--pink); outline-offset: 4px; }
 .btnPaper { --face: var(--card); --fg: var(--text); }
+.btnLg { height: 64px; padding: 0 28px; font-size: 18px; border-radius: 14px; }
+.btnLg svg { width: 20px; height: 20px; }
 .btnSm { height: 42px; padding: 0 14px; font-size: 14px; border-radius: 10px; box-shadow: var(--ex4); }
 .btnSm:hover { box-shadow: var(--ex6); }
 .btnSm:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--ex); }
@@ -157,7 +159,8 @@
 .lead { margin: 26px auto 0; max-width: 640px; font-size: clamp(17px, 1.6vw, 20px); line-height: 1.5; color: var(--muted); font-weight: 500; }
 .ctaRow { margin-top: 34px; display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; align-items: center; }
 .ctaNote { margin-top: 18px; font-size: 13px; color: var(--faint); font-weight: 700; }
-.ph { display: inline-block; transition: transform 0.15s ease; }
+.ph { display: inline-flex; height: 64px; transition: transform 0.15s ease; }
+.ph svg { display: block; }
 .ph:hover { transform: translateY(-2px) rotate(-1deg); }
 
 /* ---------- the video slab ---------- */

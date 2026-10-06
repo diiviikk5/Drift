@@ -189,18 +189,16 @@ export default function Landing() {
 
                     <Reveal delay={0.45}>
                         <div className={s.ctaRow}>
-                            <a className={s.btn} href={DOWNLOAD_URL} download>
+                            <a className={`${s.btn} ${s.btnLg}`} href={DOWNLOAD_URL} download>
                                 <WindowsIcon />
                                 Download for Windows
                             </a>
-                            <a className={`${s.btn} ${s.btnPaper}`} href={REPO_URL} target="_blank" rel="noreferrer">
+                            <a className={`${s.btn} ${s.btnLg} ${s.btnPaper}`} href={REPO_URL} target="_blank" rel="noreferrer">
                                 <GitHubIcon />
                                 Star on GitHub{stars != null ? ` · ${stars}` : ''}
                             </a>
-                        </div>
-                        <div className={s.ctaRow} style={{ marginTop: 22 }}>
                             <a className={s.ph} href={PH_URL} target="_blank" rel="noreferrer" aria-label="Drift on Product Hunt">
-                                <ProductHuntBadge width={300} height={65} />
+                                <ProductHuntBadge width={296} height={64} />
                             </a>
                         </div>
                         <p className={s.ctaNote}>Windows 10 &amp; 11 · No account needed</p>
