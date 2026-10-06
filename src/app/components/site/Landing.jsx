@@ -200,7 +200,7 @@ export default function Landing() {
                         </div>
                         <div className={s.ctaRow} style={{ marginTop: 22 }}>
                             <a className={s.ph} href={PH_URL} target="_blank" rel="noreferrer" aria-label="Drift on Product Hunt">
-                                <ProductHuntBadge width={220} height={48} />
+                                <ProductHuntBadge width={300} height={65} />
                             </a>
                         </div>
                         <p className={s.ctaNote}>Windows 10 &amp; 11 · No account needed</p>
