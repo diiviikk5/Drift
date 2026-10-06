@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { StudioEngine } from '../src/lib/StudioEngine.js';
+// Camera-mechanics tests zoom on every action and skip the zoom budget.
+const PER_ACTION = { minActions: 1, maxZoomedShare: 1 };
+
 
 function createMockCanvas(width = 1920, height = 1080) {
     const canvas = { width, height };
@@ -160,7 +163,7 @@ test('camera stays rock-solid within deadzone radius without sloppy mouse wobble
 
 test('interaction clustering centers camera on common centroid of multiple clicks', async () => {
     const { InteractionAnalyzer } = await import('../src/lib/zoom/InteractionAnalyzer.js');
-    const analyzer = new InteractionAnalyzer();
+    const analyzer = new InteractionAnalyzer(PER_ACTION);
     // User clicks twice on nearby elements in a dialog or toolbar within 1.5s
     const clicks = [
         { time: 1000, x: 0.30, y: 0.40 },

@@ -26,12 +26,14 @@ import { DEFAULT_ZOOM_SCALE } from './ZoomConstruct.js';
 
 export const AUTO_ZOOM_DEFAULTS = Object.freeze({
     preRoll: 0.55,          // start zooming this long before the first action so we arrive on time
-    holdAfter: 1.6,         // keep the zoom this long after the last action so viewers can read the result
+    holdAfter: 1.2,         // keep the zoom this long after the last action so viewers can read the result
     idleGap: 2.6,           // a pause longer than this ends a session
     bridgeGap: 1.6,         // sessions closer than this are joined by a pan instead of a zoom-out
     minSegmentDuration: 2.4, // a shot must be worth the trip: move in plus time to read
     minZoom: 1.25,          // never bother with a zoom shallower than this
     maxZoomBoost: 1.12,     // tight work may zoom up to preset * boost
+    minActions: 2,          // a zoom needs focused work: this many actions in one area, or typing
+    maxZoomedShare: 0.4,    // shots may cover at most this share of the video (plus moves); weaker shots go first
     hopGap: 1.4,            // actions closer than this in time belong to one burst
     minRunZoom: 1.15,       // a burst that doesn't fit at this zoom stays on the full frame
     minShotHold: 1.0,       // a shot must be watchable this long before the next action elsewhere
@@ -104,11 +106,15 @@ export class InteractionAnalyzer {
         if (!signals.length) return [];
 
         const sessions = this._buildSessions(signals, scrolls);
+        // Minimal by design: a lone click (often just navigation) stays on the
+        // full frame. Zoom for focused work: typing, or several actions in one area.
+        // (Applied after shot economy, which needs every action to spot bursts.)
         const planned = sessions
             .filter(sess => sess.signals.some(s => s.strong))
             .map(sess => this._planSession(sess, moves, duration, scrolls));
+        const worthZoom = (shot) => shot.typed || shot.strongActions >= o.minActions;
 
-        return this._finalize(this._economize(planned), duration);
+        return this._finalize(this._budget(this._economize(planned).filter(worthZoom), duration), duration);
     }
 
     _normalizeX(v) {
@@ -324,6 +330,8 @@ export class InteractionAnalyzer {
             zoomScale,
             reason: anchors[0].kind === 'click' ? 'click' : (anchors[0].kind === 'type' ? 'key' : anchors[0].kind),
             clickCount: sess.signals.filter(s => s.kind === 'click').length,
+            strongActions: strong.length,
+            typed: strong.some(s => s.kind === 'type'),
         };
     }
 
@@ -375,6 +383,8 @@ export class InteractionAnalyzer {
                 zoomScale: Math.min(this._depth(fitZoom, a.actions + b.actions), Math.round(fitZoom * 100) / 100),
                 clickCount: a.clickCount + b.clickCount,
                 actions: a.actions + b.actions,
+                strongActions: a.strongActions + b.strongActions,
+                typed: a.typed || b.typed,
             };
         };
 
@@ -412,6 +422,26 @@ export class InteractionAnalyzer {
             const next = out[k + 1];
             return !next || next.actionTime - shot.lastAction >= o.minShotHold;
         });
+    }
+
+    /**
+     * Keep the video mostly on the full frame: when the shots would cover more
+     * than `maxZoomedShare` of it, keep the ones with the most work in them.
+     */
+    _budget(shots, duration) {
+        const o = this.options;
+        const limit = duration * o.maxZoomedShare;
+        const len = (s) => Math.max(0, s.endTime - s.startTime);
+        if (shots.reduce((a, s) => a + len(s), 0) <= limit) return shots;
+        const ranked = shots.slice().sort((a, b) => (b.actions - a.actions) || (len(b) - len(a)));
+        const keep = new Set();
+        let used = 0;
+        for (const shot of ranked) {
+            if (keep.size && used + len(shot) > limit) continue;
+            keep.add(shot);
+            used += len(shot);
+        }
+        return shots.filter(s => keep.has(s));
     }
 
     _finalize(planned, duration) {

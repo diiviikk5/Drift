@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { typingWindows, buildFocusSamples, typingPointerOpacity } from '../src/lib/zoom/typingFocus.js';
 import { InteractionAnalyzer } from '../src/lib/zoom/InteractionAnalyzer.js';
+// Camera-mechanics tests zoom on every action and skip the zoom budget.
+const PER_ACTION = { minActions: 1, maxZoomedShare: 1 };
+
 
 // Mouse parked bottom-right; user types into a field at the top-left.
 const moves = [];
@@ -28,7 +31,7 @@ test('while typing, focus follows the caret instead of the parked mouse', () => 
 
 test('auto-zoom aims typing zooms at the caret', () => {
     const focus = buildFocusSamples(moves, caret, keys);
-    const segs = new InteractionAnalyzer().analyze([], focus, 10, keys);
+    const segs = new InteractionAnalyzer(PER_ACTION).analyze([], focus, 10, keys);
     const typingSeg = segs.find(s => s.startTime <= 3 && s.endTime >= 3);
     assert.ok(typingSeg, JSON.stringify(segs));
     assert.ok(typingSeg.targetX < 0.45 && typingSeg.targetY < 0.45, JSON.stringify(typingSeg));

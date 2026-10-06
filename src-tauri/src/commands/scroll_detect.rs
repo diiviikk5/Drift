@@ -74,7 +74,7 @@ pub fn detect_shift(prev: &[f32], cur: &[f32]) -> Option<f32> {
         }
     }
     // The shifted match must explain the change far better than "no motion".
-    if best.0 != 0 && best.0.abs() >= 2 && best.1 < still * 0.3 && best.1 < 6.0 {
+    if best.0 != 0 && best.0.abs() >= 2 && best.1 < still * 0.5 && best.1 < 8.0 {
         Some((best.0 * ROW_STEP as isize) as f32)
     } else {
         None

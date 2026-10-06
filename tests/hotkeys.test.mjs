@@ -25,3 +25,17 @@ test('accelerators display with Ctrl on Windows', () => {
     assert.equal(formatAccelerator('CmdOrCtrl+Shift+Z'), 'Ctrl+Shift+Z');
     assert.equal(formatAccelerator('Alt+Shift+R'), 'Alt+Shift+R');
 });
+
+test("Drift's own hotkeys are not recorded as demo actions", async () => {
+    const { stripAppHotkeys } = await import('../src/lib/hotkeys.js');
+    const keys = [
+        { time: 1, text: 'Ctrl+S' },
+        { time: 2, text: 'Alt + Q' },
+        { time: 3, text: 'Alt+Shift+S' },
+        { time: 4, text: '', typed: true },
+    ];
+    const kept = stripAppHotkeys(keys, { stop_recording: 'Alt+Q' });
+    assert.deepEqual(kept.map(k => k.time), [1, 3, 4]);
+    // Defaults fill in: Alt+Shift+S is the default stop key when not overridden.
+    assert.deepEqual(stripAppHotkeys(keys, {}).map(k => k.time), [1, 2, 4]);
+});

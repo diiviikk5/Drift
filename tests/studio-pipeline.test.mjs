@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { computeCursorSwayRotation } from '../src/lib/zoom/cursorTilt.js';
+// Camera-mechanics tests zoom on every action and skip the zoom budget.
+const PER_ACTION = { minActions: 1, maxZoomedShare: 1 };
+
 
 test('cursor tilt leans into motion, scales with speed and stays bounded', () => {
     assert.equal(computeCursorSwayRotation(0, 0, 16, 1.0), 0);
@@ -136,7 +139,7 @@ test('smoothed cursor path is lag-free, removes jitter, pins clicks and handles 
 
 test('InteractionAnalyzer filters startup click at t <= 300ms to preserve unzoomed overview', async () => {
     const { InteractionAnalyzer } = await import('../src/lib/zoom/InteractionAnalyzer.js');
-    const analyzer = new InteractionAnalyzer();
+    const analyzer = new InteractionAnalyzer(PER_ACTION);
 
     // User clicked "Record" button at t = 100ms
     const startupClick = [{ time: 100, x: 0.1, y: 0.1 }];

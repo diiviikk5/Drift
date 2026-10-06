@@ -19,7 +19,7 @@ import StudioTimeline from '@/components/desktop/StudioTimeline';
 import InspectorPanel from '@/components/desktop/InspectorPanel';
 import ExportDialog from '@/components/desktop/ExportDialog';
 import HotkeyModal from '@/components/desktop/HotkeyModal';
-import { normalizeHotkeys, formatAccelerator, matchesAccelerator } from '@/lib/hotkeys';
+import { normalizeHotkeys, formatAccelerator, matchesAccelerator, stripAppHotkeys } from '@/lib/hotkeys';
 import { getAppTheme } from '@/lib/ui/themes';
 import AISettings from '@/app/components/settings/AISettings';
 import NotesTeleprompter from '@/components/desktop/NotesTeleprompter';
@@ -103,7 +103,7 @@ export default function RecorderPage() {
     const [trimEnd, setTrimEnd] = useState(0);
     const [background, setBackground] = useState(DEFAULT_BACKGROUND);
     const [customImage, setCustomImage] = useState(null);
-    const [zoomLevel, setZoomLevel] = useState(1.55);
+    const [zoomLevel, setZoomLevel] = useState(1.35);
     // showCursor defaults to FALSE to completely prevent double cursor!
     const [showCursor, setShowCursor] = useState(true);
     const [frameFit, setFrameFit] = useState('contain');
@@ -1044,7 +1044,8 @@ export default function RecorderPage() {
                             if (res.ok) keystrokeList = await res.json();
                         } catch (e) {}
                     }
-                    setRecordedKeystrokes(keystrokeList || []);
+                    keystrokeList = stripAppHotkeys(keystrokeList, hotkeysRef.current);
+                    setRecordedKeystrokes(keystrokeList);
                     // Text caret track (target pixels -> normalized; y is the caret top).
                     setRecordedCursorShapes((result.cursor_shapes || []).map(c => ({ time: c.t, shape: c.shape })));
                     setRecordedCaret((result.caret || []).map(c => ({
@@ -1727,7 +1728,7 @@ export default function RecorderPage() {
             setCaptionsEnabled(project.captionsEnabled ?? true);
             setBackground(bgKey);
             setCustomImage(image);
-            setZoomLevel(project.zoomLevel ?? 1.55);
+            setZoomLevel(project.zoomLevel ?? 1.35);
             setShowCursor(project.showCursor ?? false);
             setCursorBakedIn(Boolean(project.cursorBakedIn));
             setFrameFit(project.frameFit === 'fill' ? 'fill' : 'contain');

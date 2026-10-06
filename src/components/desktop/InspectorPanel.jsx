@@ -410,8 +410,8 @@ export default function InspectorPanel({
                             </label>
                             <div className="grid grid-cols-3 gap-1.5">
                                 {[
-                                    { id: 'subtle', scale: 1.35, label: 'Subtle', desc: 'More context' },
-                                    { id: 'cinema', scale: 1.55, label: 'Balanced', desc: 'Recommended' },
+                                    { id: 'subtle', scale: 1.35, label: 'Subtle', desc: 'Recommended' },
+                                    { id: 'cinema', scale: 1.55, label: 'Balanced', desc: 'Closer' },
                                     { id: 'focus', scale: 1.85, label: 'Close', desc: 'Small details' },
                                 ].map((preset) => {
                                     const isSelected = Math.abs((zoomLevel || 1.55) - preset.scale) < 0.05;

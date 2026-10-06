@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { InteractionAnalyzer } from '../src/lib/zoom/InteractionAnalyzer.js';
 import { buildCameraTrack, sampleCameraTrack, viewportCenter, focusForCenter } from '../src/lib/zoom/cameraTrack.js';
 import { evaluateCameraAtTime } from '../src/lib/rendering/renderFrame.js';
+// Camera-mechanics tests zoom on every action and skip the zoom budget.
+const PER_ACTION = { minActions: 1, maxZoomedShare: 1 };
+
 
 // Cursor path helper: linear moves between waypoints sampled at 120 Hz (ms timestamps).
 function path(waypoints) {
@@ -33,7 +36,7 @@ test('viewport mapping keeps the focus point fixed on screen and never leaves th
 });
 
 test('a lone click zooms in, holds while reading, then returns to the full frame', () => {
-    const segs = new InteractionAnalyzer().analyze([{ time: 3000, x: 0.3, y: 0.4 }], [], 12);
+    const segs = new InteractionAnalyzer(PER_ACTION).analyze([{ time: 3000, x: 0.3, y: 0.4 }], [], 12);
     assert.equal(segs.length, 1);
     const [seg] = segs;
     assert.ok(seg.startTime < 3 && seg.startTime > 2, 'zoom should anticipate the click');
@@ -45,17 +48,17 @@ test('a lone click zooms in, holds while reading, then returns to the full frame
 
 test('rapid nearby clicks form one calm zoom instead of many', () => {
     const clicks = [1000, 1700, 2300, 3100, 3900].map((time, i) => ({ time, x: 0.4 + i * 0.01, y: 0.5 }));
-    const segs = new InteractionAnalyzer().analyze(clicks, [], 10);
+    const segs = new InteractionAnalyzer(PER_ACTION).analyze(clicks, [], 10);
     assert.equal(segs.length, 1);
     assert.ok(segs[0].endTime - segs[0].startTime > 3);
 });
 
 test('zoom depth: preset for ordinary work, deeper for sustained detail, shallower when spread', () => {
-    const single = new InteractionAnalyzer().analyze([{ time: 1000, x: 0.5, y: 0.5 }], [], 10);
-    assert.equal(single[0].zoomScale, 1.55, 'a lone click uses the preset depth');
-    const tight = new InteractionAnalyzer().analyze(
+    const single = new InteractionAnalyzer(PER_ACTION).analyze([{ time: 1000, x: 0.5, y: 0.5 }], [], 10);
+    assert.equal(single[0].zoomScale, 1.35, 'a lone click uses the preset depth');
+    const tight = new InteractionAnalyzer(PER_ACTION).analyze(
         [{ time: 1000, x: 0.5, y: 0.5 }, { time: 1800, x: 0.52, y: 0.51 }, { time: 2500, x: 0.51, y: 0.5 }], [], 10);
-    const wide = new InteractionAnalyzer().analyze(
+    const wide = new InteractionAnalyzer(PER_ACTION).analyze(
         [{ time: 1000, x: 0.25, y: 0.5 }, { time: 1800, x: 0.7, y: 0.6 }], [], 10);
     assert.equal(tight.length, 1);
     assert.equal(wide.length, 1);
@@ -63,7 +66,7 @@ test('zoom depth: preset for ordinary work, deeper for sustained detail, shallow
 });
 
 test('a long idle pause zooms out, a short one pans without yo-yo', () => {
-    const analyzer = new InteractionAnalyzer();
+    const analyzer = new InteractionAnalyzer(PER_ACTION);
     const shortGap = analyzer.analyze([{ time: 1000, x: 0.2, y: 0.3 }, { time: 4000, x: 0.8, y: 0.7 }], [], 10);
     // A far move in a short gap is one continuous swoop: it may pull back,
     // but never rests on the full frame (no yo-yo).
@@ -77,8 +80,8 @@ test('a long idle pause zooms out, a short one pans without yo-yo', () => {
 
 test('cursor dwell alone never triggers a zoom, keyboard shortcuts do', () => {
     const moves = path([[0, 0.1, 0.1], [1500, 0.6, 0.6], [4000, 0.6, 0.6], [4010, 0.61, 0.6], [5000, 0.9, 0.9]]);
-    assert.equal(new InteractionAnalyzer().analyze([], moves, 8).length, 0);
-    const withShortcut = new InteractionAnalyzer().analyze([], moves, 8, [{ time: 2.0, text: 'Ctrl+S' }]);
+    assert.equal(new InteractionAnalyzer(PER_ACTION).analyze([], moves, 8).length, 0);
+    const withShortcut = new InteractionAnalyzer(PER_ACTION).analyze([], moves, 8, [{ time: 2.0, text: 'Ctrl+S' }]);
     assert.equal(withShortcut.length, 1);
     assert.ok(Math.abs(withShortcut[0].targetX - 0.6) < 0.1);
 });
@@ -86,7 +89,7 @@ test('cursor dwell alone never triggers a zoom, keyboard shortcuts do', () => {
 test('camera motion is continuous: no frame-to-frame jumps across a busy session', () => {
     const moves = path([[0, 0.5, 0.5], [1000, 0.2, 0.2], [2500, 0.25, 0.3], [3000, 0.85, 0.8], [4500, 0.8, 0.85], [6000, 0.1, 0.9], [9000, 0.1, 0.9]]);
     const clicks = [{ time: 1100, x: 0.2, y: 0.2 }, { time: 2400, x: 0.25, y: 0.3 }, { time: 3200, x: 0.85, y: 0.8 }, { time: 6100, x: 0.1, y: 0.9 }];
-    const segs = new InteractionAnalyzer().analyze(clicks, moves, 10);
+    const segs = new InteractionAnalyzer(PER_ACTION).analyze(clicks, moves, 10);
     assert.ok(segs.length >= 2);
     let prev = evaluateCameraAtTime(0, segs, moves);
     for (let t = 1 / 60; t < 10; t += 1 / 60) {
@@ -142,7 +145,7 @@ test('plans hours-long sessions quickly', () => {
         if (t % 5000 === 0) clicks.push({ time: t, x: moves[moves.length - 1].x, y: moves[moves.length - 1].y });
     }
     const start = Date.now();
-    const segs = new InteractionAnalyzer().analyze(clicks, moves, 1800);
+    const segs = new InteractionAnalyzer(PER_ACTION).analyze(clicks, moves, 1800);
     const track = buildCameraTrack(segs, moves, { duration: 1800 });
     const elapsed = Date.now() - start;
     assert.ok(segs.length > 0);
@@ -187,10 +190,10 @@ test('resting cursor fades smoothly and wakes before moving again', async () => 
 test('a burst of typing zooms in; a single stray key does not', () => {
     const moves = path([[0, 0.2, 0.2], [800, 0.7, 0.3], [9000, 0.7, 0.3]]);
     const burst = [2.0, 2.15, 2.3, 2.5, 2.7, 3.0].map(time => ({ time, text: '', typed: true }));
-    const segs = new InteractionAnalyzer().analyze([], moves, 10, burst);
+    const segs = new InteractionAnalyzer(PER_ACTION).analyze([], moves, 10, burst);
     assert.equal(segs.length, 1);
     assert.ok(Math.abs(segs[0].targetX - 0.7) < 0.1);
-    assert.equal(new InteractionAnalyzer().analyze([], moves, 10, [{ time: 2, text: '', typed: true }]).length, 0);
+    assert.equal(new InteractionAnalyzer(PER_ACTION).analyze([], moves, 10, [{ time: 2, text: '', typed: true }]).length, 0);
 });
 
 test('smoothed cursor lands exactly on clicks', async () => {
@@ -212,15 +215,15 @@ test('click press squashes the pointer and springs back', async () => {
 });
 
 test('auto zooms open on the full frame and the video ends on it', () => {
-    const segs = new InteractionAnalyzer().analyze([{ time: 400, x: 0.3, y: 0.4 }, { time: 3000, x: 0.32, y: 0.42 }], [], 6.5);
+    const segs = new InteractionAnalyzer(PER_ACTION).analyze([{ time: 400, x: 0.3, y: 0.4 }, { time: 3000, x: 0.32, y: 0.42 }], [], 6.5);
     assert.ok(segs.length >= 1 && segs[0].auto);
     assert.ok(evaluateCameraAtTime(0.45, segs, [], { duration: 6.5 }).scale < 1.01, 'establishing shot');
     assert.ok(evaluateCameraAtTime(6.5, segs, [], { duration: 6.5 }).scale < 1.02, 'ends on the full frame');
 
     // Not enough time after the last action to get out: stay on it rather
     // than end the video mid zoom-out.
-    const late = new InteractionAnalyzer().analyze([{ time: 400, x: 0.3, y: 0.4 }, { time: 5200, x: 0.32, y: 0.42 }], [], 6.5);
-    assert.ok(evaluateCameraAtTime(6.5, late, [], { duration: 6.5 }).scale > 1.5);
+    const late = new InteractionAnalyzer(PER_ACTION).analyze([{ time: 400, x: 0.3, y: 0.4 }, { time: 5200, x: 0.32, y: 0.42 }], [], 6.5);
+    assert.ok(evaluateCameraAtTime(6.5, late, [], { duration: 6.5 }).scale > 1.3);
 });
 
 test('a zoom placed by hand at the very start is honoured', () => {
@@ -233,7 +236,7 @@ test('scrolling ends the shot: the camera pulls back while the page moves', () =
     for (let t = 3000; t <= 4500; t += 100) moves.push({ time: t, x: 0.3, y: 0.4, scroll: -1 });
     moves.sort((a, b) => a.time - b.time);
     const clicks = [{ time: 1500, x: 0.3, y: 0.4 }, { time: 7000, x: 0.32, y: 0.42 }];
-    const segs = new InteractionAnalyzer().analyze(clicks, moves, 10);
+    const segs = new InteractionAnalyzer(PER_ACTION).analyze(clicks, moves, 10);
     assert.equal(segs.length, 2, 'the click after scrolling is a new shot');
     assert.ok(segs[0].endTime <= 3.45, `first shot should end as scrolling starts, ended ${segs[0].endTime}`);
     assert.ok(evaluateCameraAtTime(4.6, segs, moves, { duration: 10 }).scale < 1.1, 'pulled back during the scroll');
@@ -250,9 +253,24 @@ test('scrollbar grabs and clicks while scrolling never zoom', async () => {
         { time: 3000, x: 0.992, y: 0.4 },   // scrollbar grab
         { time: 4200, x: 0.3, y: 0.6 },     // click mid-scroll
     ];
-    const segs = new InteractionAnalyzer().analyze(clicks, moves, 10, []);
+    const segs = new InteractionAnalyzer(PER_ACTION).analyze(clicks, moves, 10, []);
     assert.equal(segs.length, 0, JSON.stringify(segs));
     // A normal click well after the scroll still zooms.
-    const later = new InteractionAnalyzer().analyze([...clicks, { time: 7000, x: 0.4, y: 0.4 }], moves, 10, []);
+    const later = new InteractionAnalyzer(PER_ACTION).analyze([...clicks, { time: 7000, x: 0.4, y: 0.4 }], moves, 10, []);
     assert.equal(later.length, 1);
+});
+
+test('minimal zooms by default: lone clicks stay wide, focused work zooms, most of the video stays wide', () => {
+    const a = new InteractionAnalyzer();
+    assert.equal(a.analyze([{ time: 2000, x: 0.3, y: 0.4 }], [], 10).length, 0, 'a lone click is navigation, not a shot');
+    const work = a.analyze([{ time: 2000, x: 0.3, y: 0.4 }, { time: 3200, x: 0.33, y: 0.42 }], [], 10);
+    assert.equal(work.length, 1, 'two actions in one area are worth a zoom');
+    assert.equal(work[0].zoomScale, 1.35, 'subtle depth by default');
+
+    // A minute of scattered pairs of clicks: at most ~40% of it is a shot.
+    const clicks = [];
+    for (let t = 2; t < 58; t += 7) clicks.push({ time: t * 1000, x: 0.2 + (t % 3) * 0.3, y: 0.4 }, { time: t * 1000 + 900, x: 0.22 + (t % 3) * 0.3, y: 0.42 });
+    const segs = a.analyze(clicks, [], 60);
+    const covered = segs.reduce((acc, s) => acc + s.endTime - s.startTime, 0);
+    assert.ok(segs.length >= 1 && covered <= 60 * 0.45, `zoomed for ${covered.toFixed(1)} s`);
 });

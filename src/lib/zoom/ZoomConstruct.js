@@ -26,7 +26,8 @@ export const ZOOM_PRESETS = Object.freeze({
     },
 });
 
-export const DEFAULT_ZOOM_SCALE = ZOOM_PRESETS.cinema.scale; // 1.55
+// Subtle by default: context stays readable around the work.
+export const DEFAULT_ZOOM_SCALE = ZOOM_PRESETS.subtle?.scale ?? 1.35;
 
 /**
  * Resolve zoom scale to closest known preset

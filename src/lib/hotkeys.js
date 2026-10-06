@@ -46,3 +46,19 @@ export function matchesAccelerator(e, accel) {
     const code = String(e.code || '').toLowerCase().replace(/^key|^digit/, '');
     return pressed === key || code === key;
 }
+
+function comboKey(text) {
+    const parts = String(text || '').split('+').map(p => p.trim().toLowerCase()).filter(Boolean);
+    const key = parts.pop() || '';
+    const mods = parts.map(p => (['cmdorctrl', 'commandorcontrol', 'control', 'cmd', 'command', 'meta', 'super', '⌘'].includes(p) ? 'ctrl' : p === 'option' ? 'alt' : p));
+    return [...new Set(mods)].sort().concat(key).join('+');
+}
+
+/**
+ * Recorded keystrokes without Drift's own hotkeys (pressing "stop recording"
+ * is not part of the demo and must not count as an action).
+ */
+export function stripAppHotkeys(keystrokes, hotkeys) {
+    const own = new Set(Object.values(normalizeHotkeys(hotkeys)).map(comboKey));
+    return (keystrokes || []).filter(k => k.typed || !own.has(comboKey(k.text)));
+}

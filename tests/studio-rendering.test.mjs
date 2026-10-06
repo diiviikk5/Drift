@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { evaluateCameraAtTime, getInterpolatedCursor, renderFrame, getFrameMetrics } from '../src/lib/rendering/renderFrame.js';
 import { InteractionAnalyzer } from '../src/lib/zoom/InteractionAnalyzer.js';
+// Camera-mechanics tests zoom on every action and skip the zoom budget.
+const PER_ACTION = { minActions: 1, maxZoomedShare: 1 };
+
 
 const segments = [
     { startTime: 0, endTime: 2, zoomScale: 2, targetX: 0.4, targetY: 0.5 },
@@ -42,7 +45,7 @@ test('cursor interpolation accepts recorder timestamps, including zero', () => {
 });
 
 test('clicks in the first second use milliseconds', () => {
-    const track = new InteractionAnalyzer().analyze([{ time: 500, x: 0.5, y: 0.5 }], [], 10);
+    const track = new InteractionAnalyzer(PER_ACTION).analyze([{ time: 500, x: 0.5, y: 0.5 }], [], 10);
     assert.equal(track.length, 1);
     assert.ok(track[0].startTime < 0.5);
     assert.ok(track[0].endTime < 3);
@@ -74,7 +77,7 @@ test('sub-pixel cursor interpolation handles high-frequency telemetry starting a
 });
 
 test('interaction analyzer converts synchronized session clicks to zoom targets', () => {
-    const analyzer = new InteractionAnalyzer();
+    const analyzer = new InteractionAnalyzer(PER_ACTION);
     const clicks = [
         { time: 1200, x: 0.35, y: 0.42 },
         { time: 4500, x: 0.75, y: 0.82 },
@@ -220,7 +223,7 @@ test('evaluateCameraAtTime eases out after the segment with no snap and lands at
 
 test('ZoomConstruct provides global presets and resolves subtle, cinema, and focus levels', async () => {
     const { ZOOM_PRESETS, DEFAULT_ZOOM_SCALE, resolveZoomPreset } = await import('../src/lib/zoom/ZoomConstruct.js');
-    assert.equal(DEFAULT_ZOOM_SCALE, 1.55);
+    assert.equal(DEFAULT_ZOOM_SCALE, 1.35);
     assert.equal(ZOOM_PRESETS.subtle.scale, 1.35);
     assert.equal(ZOOM_PRESETS.cinema.scale, 1.55);
     assert.equal(ZOOM_PRESETS.focus.scale, 1.85);
@@ -232,7 +235,7 @@ test('ZoomConstruct provides global presets and resolves subtle, cinema, and foc
 });
 
 test('multi-click conversational interactions stay continuously chained without dropping to overview', () => {
-    const analyzer = new InteractionAnalyzer();
+    const analyzer = new InteractionAnalyzer(PER_ACTION);
     // 3 clicks across different parts of the UI, separated by 2.0s
     const clicks = [
         { time: 1000, x: 0.2, y: 0.3 },
@@ -258,7 +261,7 @@ test('StudioEngine plays back in real time by default and supports pacing change
 });
 
 test('InteractionAnalyzer: segments never overlap, and corner-hopping stays on the full frame', () => {
-    const analyzer = new InteractionAnalyzer();
+    const analyzer = new InteractionAnalyzer(PER_ACTION);
     const hopping = [
         { time: 1000, x: 0.1, y: 0.1 },
         { time: 1800, x: 0.9, y: 0.9 },
