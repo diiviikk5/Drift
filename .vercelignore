@@ -30,6 +30,7 @@ src-tauri/gen/
 # Allow the public download and the homepage demo clip
 !public/downloads/
 !public/demo/
+!public/demo/*.mp4
 
 # Node modules (handled by Vercel)
 node_modules/
