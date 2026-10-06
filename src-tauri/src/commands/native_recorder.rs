@@ -213,6 +213,7 @@ pub struct CaptureSessionFlags {
     pub is_recording: Arc<AtomicBool>,
     pub frame_counter: Arc<std::sync::atomic::AtomicU64>,
     pub first_frame_at: Arc<Mutex<Option<std::time::Instant>>>,
+    pub scroll_track: Arc<Mutex<Vec<(std::time::Instant, f32)>>>,
 }
 
 #[cfg(windows)]
@@ -221,6 +222,8 @@ pub struct ScreenRecorderHandler {
     is_recording: Arc<AtomicBool>,
     frame_counter: Arc<std::sync::atomic::AtomicU64>,
     first_frame_at: Arc<Mutex<Option<std::time::Instant>>>,
+    scroll: crate::commands::scroll_detect::ScrollDetector,
+    scroll_track: Arc<Mutex<Vec<(std::time::Instant, f32)>>>,
 }
 
 #[cfg(windows)]
@@ -245,6 +248,8 @@ impl GraphicsCaptureApiHandler for ScreenRecorderHandler {
             is_recording: flags.is_recording,
             frame_counter: flags.frame_counter,
             first_frame_at: flags.first_frame_at,
+            scroll: crate::commands::scroll_detect::ScrollDetector::new(),
+            scroll_track: flags.scroll_track,
         })
     }
 
@@ -267,6 +272,25 @@ impl GraphicsCaptureApiHandler for ScreenRecorderHandler {
             }
             encoder.send_frame(frame)?;
             self.frame_counter.fetch_add(1, Ordering::Relaxed);
+        }
+
+        // Scroll detection on a strip down the middle of the picture.
+        if self.scroll.due() {
+            let (w, h) = (frame.width(), frame.height());
+            let (x0, x1) = (w * 35 / 100, w * 65 / 100);
+            if x1 > x0 + 8 && h > 64 {
+                if let Ok(mut buf) = frame.buffer_crop(x0, 0, x1, h) {
+                    let pitch = buf.row_pitch() as usize;
+                    let (bw, bh) = (buf.width() as usize, buf.height() as usize);
+                    let found = self.scroll.track.len();
+                    self.scroll.push(buf.as_raw_buffer(), pitch, bw, bh);
+                    if self.scroll.track.len() > found {
+                        if let Some(last) = self.scroll.track.last() {
+                            self.scroll_track.lock().push(*last);
+                        }
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -295,6 +319,7 @@ pub struct NativeSessionManager {
     pub caret_track: Arc<Mutex<Vec<(std::time::Instant, i32, i32, i32)>>>,
     pub shape_track: Arc<Mutex<Vec<(std::time::Instant, &'static str)>>>,
     pub first_frame_at: Arc<Mutex<Option<std::time::Instant>>>,
+    pub scroll_track: Arc<Mutex<Vec<(std::time::Instant, f32)>>>,
     #[cfg(windows)]
     capture_control: Arc<Mutex<Option<CaptureControl<ScreenRecorderHandler, Box<dyn std::error::Error + Send + Sync>>>>>,
     audio_stop_sender: Arc<Mutex<Option<std::sync::mpsc::Sender<()>>>>,
@@ -321,6 +346,7 @@ impl Default for NativeSessionManager {
             caret_track: Arc::new(Mutex::new(Vec::new())),
             shape_track: Arc::new(Mutex::new(Vec::new())),
             first_frame_at: Arc::new(Mutex::new(None)),
+            scroll_track: Arc::new(Mutex::new(Vec::new())),
             #[cfg(windows)]
             capture_control: Arc::new(Mutex::new(None)),
             audio_stop_sender: Arc::new(Mutex::new(None)),
@@ -597,6 +623,7 @@ pub async fn start_native_session(
         state.caret_track.lock().clear();
         crate::commands::caret::spawn_caret_sampler(state.is_recording.clone(), state.caret_track.clone());
         state.shape_track.lock().clear();
+        state.scroll_track.lock().clear();
         crate::commands::cursor_shape::spawn_shape_sampler(state.is_recording.clone(), state.shape_track.clone());
 
         // 5. Configure and launch windows-capture free-threaded
@@ -614,6 +641,7 @@ pub async fn start_native_session(
             is_recording: state.is_recording.clone(),
             frame_counter: state.frame_counter.clone(),
             first_frame_at: state.first_frame_at.clone(),
+            scroll_track: state.scroll_track.clone(),
         };
 
         *state.start_time.lock() = Some(std::time::Instant::now());
@@ -759,6 +787,24 @@ pub async fn stop_native_session(app: AppHandle) -> Result<NativeSessionResult, 
                 .map(|&(_, x, y)| (x, y))
                 .unwrap_or(fallback)
         };
+        // Scrolls seen in the picture join the telemetry as scroll samples at the
+        // pointer's position (wheel events miss precision-touchpad scrolling).
+        {
+            let detected = std::mem::take(&mut *state.scroll_track.lock());
+            if let Some(t0) = tele_start {
+                let mut samples = input_state.session_samples.lock();
+                let mut extra = Vec::with_capacity(detected.len());
+                for (at, shift) in detected {
+                    let ms = if at > t0 { at.duration_since(t0).as_secs_f64() * 1000.0 } else { 0.0 };
+                    let pos = samples.iter().rev().find(|s| s.t <= ms && s.scroll.is_none()).map(|s| (s.x, s.y));
+                    if let Some((x, y)) = pos {
+                        extra.push(crate::commands::input::CursorSample { t: ms, x, y, click: None, scroll: Some(shift as f64) });
+                    }
+                }
+                samples.extend(extra);
+                samples.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap_or(std::cmp::Ordering::Equal));
+            }
+        }
         crate::commands::input::rebase_session(&input_state, offset, origin_at);
 
         // Caret samples onto the video timeline, local to the recorded target.

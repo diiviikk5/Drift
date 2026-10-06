@@ -276,7 +276,7 @@ pub fn start_global_listener(app: AppHandle) {
                     // Scrolling: kept so auto-zoom can pull back while the page moves.
                     if is_rec && now - last_scroll_at >= 50.0 {
                         last_scroll_at = now;
-                        let delta = if delta_y != 0 { delta_y as f64 } else { delta_x as f64 };
+                        let delta = if delta_y != 0 { delta_y as f64 } else if delta_x != 0 { delta_x as f64 } else { 0.5 };
                         session_samples.lock().push(CursorSample {
                             t: elapsed,
                             x: last_pos.0,
