@@ -4,10 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { DriftEngine } from '@/lib/DriftEngine';
 import { StudioEngine } from '@/lib/StudioEngine';
 import drift from '@/lib/tauri-bridge';
-import { transcribeWithSpeechAPI } from '@/lib/ai/captions';
 import { encodeProject, decodeProject } from '@/lib/project-file';
-import { parseEditInstruction } from '@/lib/ai/nl-editor';
-import { getAIClient } from '@/lib/ai/openrouter-client';
 import { focusForCenter } from '@/lib/zoom/cameraTrack';
 import { BACKGROUNDS, DEFAULT_BACKGROUND } from '@/lib/rendering/backgrounds';
 
@@ -21,7 +18,6 @@ import ExportDialog from '@/components/desktop/ExportDialog';
 import HotkeyModal from '@/components/desktop/HotkeyModal';
 import { normalizeHotkeys, formatAccelerator, matchesAccelerator, stripAppHotkeys } from '@/lib/hotkeys';
 import { getAppTheme } from '@/lib/ui/themes';
-import AISettings from '@/app/components/settings/AISettings';
 import NotesTeleprompter from '@/components/desktop/NotesTeleprompter';
 
 
@@ -144,7 +140,6 @@ export default function RecorderPage() {
     // Captions & Annotations State
     const [captions, setCaptions] = useState([]);
     const [captionsEnabled, setCaptionsEnabled] = useState(true);
-    const [isTranscribing, setIsTranscribing] = useState(false);
     const [annotations, setAnnotations] = useState([]);
 
     // Export State
@@ -154,7 +149,6 @@ export default function RecorderPage() {
     const [exportStage, setExportStage] = useState('Rendering & Encoding');
 
     // AI BYOK Settings Modal State
-    const [isAISettingsOpen, setIsAISettingsOpen] = useState(false);
 
     // Hotkeys & Telemetry
     const [showHotkeySettings, setShowHotkeySettings] = useState(false);
@@ -658,173 +652,6 @@ export default function RecorderPage() {
         handleChangeBackground(DEFAULT_BACKGROUND);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    const handleGenerateCaptions = async () => {
-        if (!recordedBlob) return;
-        setIsTranscribing(true);
-        try {
-            const segs = await transcribeWithSpeechAPI(recordedBlob);
-            if (segs && segs.length > 0) {
-                setCaptions(segs);
-                if (studioRef.current) studioRef.current.setCaptions(segs);
-            } else {
-                throw new Error('No speech detected');
-            }
-        } catch (err) {
-            console.warn('[Captions] Speech recognition notice:', err);
-            setNotice(`Captions could not be generated: ${err.message}`);
-        } finally {
-            setIsTranscribing(false);
-        }
-    };
-
-    const handleApplyAICommand = async (instruction) => {
-        if (!studioRef.current) return 'Studio not initialized';
-        const lower = instruction.toLowerCase().trim();
-
-        // 1. Fast heuristic path (instant 0ms execution)
-        const bgKeys = Object.keys(BACKGROUNDS);
-        const foundBg = bgKeys.find(k => {
-            const name = (BACKGROUNDS[k].name || '').toLowerCase();
-            return lower === k.toLowerCase() ||
-                   lower === name ||
-                   lower.includes(k.toLowerCase()) ||
-                   (name && lower.includes(name));
-        });
-
-        if (foundBg && (lower.includes('background') || lower.includes('wallpaper') || lower.includes('theme') || lower.includes('set') || lower.includes('use') || lower.includes('change') || lower === foundBg.toLowerCase())) {
-            handleChangeBackground(foundBg);
-            return `Background set to ${BACKGROUNDS[foundBg].name} ⚡ Cerebras`;
-        }
-
-        if (lower.includes('clear zoom') || lower.includes('remove all zoom') || lower.includes('reset camera') || lower.includes('zoom out') || lower.includes('overview')) {
-            clearManualZooms();
-            if (studioRef.current) {
-                studioRef.current.resetToOverview();
-                studioRef.current.drawFrame();
-            }
-            return `Reset to full overview ⚡ Cerebras`;
-        }
-
-        if (lower.includes('zoom level') || lower.includes('zoom depth') || lower.match(/^zoom\s+(\d+\.?\d*)x?$/i)) {
-            const m = lower.match(/(\d+\.?\d*)/);
-            if (m) {
-                const z = Math.max(1.0, Math.min(4.0, parseFloat(m[1])));
-                setZoomLevel(z);
-                if (studioRef.current) {
-                    studioRef.current.setZoomLevel(z);
-                    const segs = studioRef.current.getFocusSegments() || [];
-                    if (segs.length > 0) {
-                        const updated = segs.map(s => ({ ...s, zoomScale: z }));
-                        studioRef.current.setFocusSegments(updated);
-                        setFocusSegments(updated);
-                    } else {
-                        const ct = studioVideoRef.current?.currentTime || 0;
-                        studioRef.current.addZoom(ct, 0.5, 0.5, z);
-                        setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
-                        handleSeek(Math.min(duration || 10, ct + 0.6));
-                    }
-                    studioRef.current.drawFrame();
-                }
-                return `Zoom depth set to ${z}x ⚡ Cerebras`;
-            }
-        }
-
-        if (lower.includes('zoom in') || lower.includes('zoom at') || lower.includes('focus at') || lower.includes('focus here') || lower === 'zoom') {
-            const m = lower.match(/(\d+)\s*s/);
-            const timeSec = m ? parseInt(m[1]) : (studioVideoRef.current?.currentTime || 0);
-            const cursor = studioRef.current?.getCursorAtTime ? studioRef.current.getCursorAtTime(timeSec) : null;
-            const targetX = (cursor && Number.isFinite(cursor.x)) ? cursor.x : 0.5;
-            const targetY = (cursor && Number.isFinite(cursor.y)) ? cursor.y : 0.5;
-            const zScale = zoomLevel || 1.55;
-            studioRef.current?.addZoom(timeSec, targetX, targetY, zScale);
-            setFocusSegments([...(studioRef.current?.getFocusSegments() || [])]);
-            // Seek playhead into zoom region so the preview immediately displays the zoom!
-            handleSeek(Math.min(duration || 10, timeSec + 0.6));
-            return `Added zoom point at ${timeSec.toFixed(1)}s (${zScale}x) ⚡ Cerebras`;
-        }
-
-        // 2. Deep Cerebras Qwen 27B AI Natural Language parsing
-        try {
-            const timelineState = {
-                duration: (duration || 10) * 1000,
-                zooms: focusSegments,
-                zoomLevel,
-                speedPreset: springProfile,
-            };
-            const parsed = await parseEditInstruction(instruction, timelineState);
-            const commands = Array.isArray(parsed) ? parsed : (parsed?.commands || []);
-            const appliedActions = [];
-
-            for (const cmd of commands) {
-                if (cmd.action === 'setBackground') {
-                    const foundKey = Object.keys(BACKGROUNDS).find(
-                        k => k.toLowerCase() === cmd.name.toLowerCase() ||
-                             BACKGROUNDS[k].name?.toLowerCase().includes(cmd.name.toLowerCase()) ||
-                             cmd.name.toLowerCase().includes(k.toLowerCase())
-                    ) || cmd.name;
-                    if (BACKGROUNDS[foundKey]) {
-                        handleChangeBackground(foundKey);
-                        appliedActions.push(`Background set to ${BACKGROUNDS[foundKey]?.name || foundKey}`);
-                    }
-                } else if (cmd.action === 'addZoom') {
-                    const timeSec = (cmd.time != null) ? (cmd.time / 1000) : (studioVideoRef.current?.currentTime || 0);
-                    const zScale = cmd.scale || zoomLevel || 1.55;
-                    const x = cmd.x ?? 0.5;
-                    const y = cmd.y ?? 0.5;
-                    if (studioRef.current) {
-                        studioRef.current.addZoom(timeSec, x, y, zScale);
-                        setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
-                        handleSeek(Math.min(duration || 10, timeSec + 0.6));
-                    }
-                    appliedActions.push(`Zoom at ${timeSec.toFixed(1)}s (${zScale}x)`);
-                } else if (cmd.action === 'clearZooms' || cmd.action === 'removeZoom') {
-                    clearManualZooms();
-                    if (studioRef.current) {
-                        studioRef.current.resetToOverview();
-                        studioRef.current.drawFrame();
-                    }
-                    appliedActions.push('Cleared zoom keyframes');
-                } else if (cmd.action === 'setZoomLevel') {
-                    const z = Math.max(1.0, Math.min(4.0, Number(cmd.level) || 1.55));
-                    setZoomLevel(z);
-                    if (studioRef.current) {
-                        studioRef.current.setZoomLevel(z);
-                        const segs = studioRef.current.getFocusSegments() || [];
-                        if (segs.length > 0) {
-                            const updated = segs.map(s => ({ ...s, zoomScale: z }));
-                            studioRef.current.setFocusSegments(updated);
-                            setFocusSegments(updated);
-                        } else {
-                            const ct = studioVideoRef.current?.currentTime || 0;
-                            studioRef.current.addZoom(ct, 0.5, 0.5, z);
-                            setFocusSegments([...(studioRef.current.getFocusSegments() || [])]);
-                            handleSeek(Math.min(duration || 10, ct + 0.6));
-                        }
-                        studioRef.current.drawFrame();
-                    }
-                    appliedActions.push(`Zoom scale set to ${z}x`);
-                } else if (cmd.action === 'setSpeed') {
-                    const profile = cmd.preset === 'fast' ? 'punchy' : (cmd.preset === 'slow' ? 'gentle' : 'cinematic');
-                    setSpringProfile(profile);
-                    if (studioRef.current) {
-                        studioRef.current.setSpringProfile(profile);
-                        studioRef.current.drawFrame();
-                    }
-                    appliedActions.push(`Spring physics set to ${profile}`);
-                }
-            }
-
-            const metrics = getAIClient().lastMetrics;
-            const latencyStr = metrics?.latencyMs ? ` ⚡ ${metrics.latencyMs}ms (${metrics.provider === 'cerebras' ? 'Cerebras' : 'AI'})` : '';
-            return appliedActions.length > 0
-                ? `Applied: ${appliedActions.join(', ')}${latencyStr}`
-                : `AI Command processed${latencyStr}`;
-        } catch (err) {
-            addManualZoom();
-            return `Added focal point to timeline (${err.message})`;
-        }
-    };
 
     const startRecordingActual = async () => {
         try {
@@ -1805,7 +1632,6 @@ export default function RecorderPage() {
                 platform={platform}
                 hookStatus={hookStatus}
                 onOpenHotkeys={() => setShowHotkeySettings(true)}
-                onOpenSettings={() => setIsAISettingsOpen(true)}
                 onNewRecording={handleNewRecording}
                 onOpenProject={() => projectInputRef.current?.click()}
                 onSaveProject={saveProject}
@@ -2061,10 +1887,6 @@ export default function RecorderPage() {
                             captions={captions}
                             captionsEnabled={captionsEnabled}
                             onToggleCaptions={() => setCaptionsEnabled(prev => !prev)}
-                            onGenerateCaptions={handleGenerateCaptions}
-                            isTranscribing={isTranscribing}
-                            onApplyAICommand={handleApplyAICommand}
-                            onOpenAISettings={() => setIsAISettingsOpen(true)}
                             onTriggerExport={() => setIsExportDialogOpen(true)}
                             isExporting={isExporting}
                             aspectRatio={aspectRatio}
@@ -2144,8 +1966,6 @@ export default function RecorderPage() {
                                     setFocusSegments([]);
                                 }
                             }}
-                            onOpenAISettings={() => setIsAISettingsOpen(true)}
-                            onApplyAICommand={handleApplyAICommand}
                         />
                     </div>
                 )}
@@ -2172,12 +1992,6 @@ export default function RecorderPage() {
                 isExporting={isExporting}
                 exportProgress={exportProgress}
                 exportStage={exportStage}
-            />
-
-            {/* AI Settings Modal (BYOK: Claude, OpenAI, Gemini, OpenRouter) */}
-            <AISettings
-                isOpen={isAISettingsOpen}
-                onClose={() => setIsAISettingsOpen(false)}
             />
 
             {/* Hotkeys Modal */}

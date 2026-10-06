@@ -6,17 +6,12 @@ import {
     Camera, 
     MousePointer, 
     Video, 
-    Sparkles, 
     Download, 
     Upload, 
     Check, 
     Circle, 
     Square, 
     RectangleHorizontal,
-    Send,
-    Subtitles,
-    RefreshCw,
-    Settings2,
     Volume2,
     VolumeX,
     Mic,
@@ -65,10 +60,6 @@ export default function InspectorPanel({
     captions = [],
     captionsEnabled = true,
     onToggleCaptions,
-    onGenerateCaptions,
-    isTranscribing = false,
-    onApplyAICommand,
-    onOpenAISettings,
     onTriggerExport,
     isExporting = false,
     aspectRatio = '16:9',
@@ -102,8 +93,6 @@ export default function InspectorPanel({
 }) {
     const [activeTab, setActiveTab] = useState('style');
     const fileInputRef = useRef(null);
-    const [aiInput, setAiInput] = useState('');
-    const [aiNotice, setAiNotice] = useState('');
 
     const aspectRatios = [
         { id: '16:9', label: '16:9', desc: 'Landscape (YouTube, X)' },
@@ -120,33 +109,16 @@ export default function InspectorPanel({
         }
     };
 
-    const handleAISubmit = async (e) => {
-        e.preventDefault();
-        if (!aiInput.trim()) return;
-        const text = aiInput.trim();
-        setAiInput('');
-        if (onApplyAICommand) {
-            try {
-                const res = await onApplyAICommand(text);
-                setAiNotice(res || 'Edit command applied to timeline');
-            } catch (err) {
-                setAiNotice(`Failed: ${err.message}`);
-            }
-            setTimeout(() => setAiNotice(''), 4500);
-        }
-    };
-
     return (
         <aside className="w-80 flex-shrink-0 border-l border-[var(--border-app)] bg-[var(--bg-card)] flex flex-col h-full select-none">
             {/* Tab Bar */}
-            <div className="grid grid-cols-6 gap-0.5 p-1.5 border-b border-[var(--border-app)]">
+            <div className="grid grid-cols-5 gap-0.5 p-1.5 border-b border-[var(--border-app)]">
                 {[
                     { id: 'style', label: 'Canvas', icon: Palette },
                     { id: 'camera', label: 'Zoom', icon: Camera },
                     { id: 'cursor', label: 'Cursor', icon: MousePointer },
                     { id: 'audio', label: 'Audio', icon: Volume2 },
                     { id: 'webcam', label: 'Camera', icon: Video },
-                    { id: 'ai', label: 'AI', icon: Sparkles },
                 ].map((tab) => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
@@ -912,91 +884,6 @@ export default function InspectorPanel({
                 )}
 
                 {/* ═══ AI STUDIO & CAPTIONS TAB ═══ */}
-                {activeTab === 'ai' && (
-                    <div className="space-y-4">
-                        {/* Auto-Captions Section */}
-                        <div className="p-3.5 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] space-y-3">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Subtitles className="w-4 h-4 text-[var(--accent-app)]" />
-                                    <span className="text-xs font-semibold text-[var(--text-app)]">
-                                        Captions
-                                    </span>
-                                </div>
-                                <button
-                                    onClick={onToggleCaptions}
-                                    className={`w-9 h-5 rounded-full transition-all relative ${
-                                        captionsEnabled ? 'bg-[var(--accent-app)]' : 'bg-gray-600'
-                                    }`}
-                                >
-                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                                        captionsEnabled ? 'left-[18px]' : 'left-0.5'
-                                    }`} />
-                                </button>
-                            </div>
-
-                            <p className="text-[11px] text-[var(--text-app-muted)] leading-relaxed">
-                                Free, offline voiceover transcription rendered in sleek cinema subtitle pills.
-                            </p>
-
-                            <button
-                                onClick={onGenerateCaptions}
-                                disabled={isTranscribing}
-                                className="w-full py-2 px-3 rounded-lg border border-[var(--border-app)] hover:border-[var(--accent-app)] text-xs font-mono flex items-center justify-center gap-2 transition-all"
-                            >
-                                <RefreshCw className={`w-3.5 h-3.5 ${isTranscribing ? 'animate-spin' : ''}`} />
-                                <span>{isTranscribing ? 'Transcribing...' : `Transcribe Audio (${captions.length} captions)`}</span>
-                            </button>
-                        </div>
-
-                        {/* Natural Language AI Editor */}
-                        <div className="p-3.5 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-app)] space-y-3">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Sparkles className="w-4 h-4 text-[var(--accent-app)]" />
-                                    <span className="text-xs font-semibold text-[var(--text-app)]">
-                                        AI editing
-                                    </span>
-                                </div>
-                                {onOpenAISettings && (
-                                    <button
-                                        onClick={onOpenAISettings}
-                                        className="p-1 rounded-md text-[var(--text-app-muted)] hover:text-[var(--text-app)] hover:bg-[var(--bg-card)] transition-colors"
-                                        title="Configure AI Providers (BYOK: Claude, OpenAI, Gemini, OpenRouter)"
-                                    >
-                                        <Settings2 className="w-3.5 h-3.5" />
-                                    </button>
-                                )}
-                            </div>
-
-                            <p className="text-[11px] text-[var(--text-app-muted)] leading-relaxed">
-                                Describe timeline edits in plain English (e.g., &quot;zoom into center at 3s&quot;, &quot;speed 2x&quot;).
-                            </p>
-
-                            <form onSubmit={handleAISubmit} className="flex gap-1.5">
-                                <input
-                                    type="text"
-                                    value={aiInput}
-                                    onChange={(e) => setAiInput(e.target.value)}
-                                    placeholder="Describe edit..."
-                                    className="flex-1 bg-black/20 border border-[var(--border-app)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--text-app)] focus:outline-none focus:border-[var(--accent-app)] font-sans"
-                                />
-                                <button
-                                    type="submit"
-                                    className="px-3 py-1.5 bg-[var(--accent-app)] text-[var(--accent-app-fg)] rounded-lg text-xs font-bold hover:opacity-90 transition-all flex items-center justify-center"
-                                >
-                                    <Send className="w-3.5 h-3.5" />
-                                </button>
-                            </form>
-
-                            {aiNotice && (
-                                <div className="text-[11px] text-[var(--accent-app)] font-mono animate-fadeIn">
-                                    ✓ {aiNotice}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
             </div>
 
             {/* Bottom Export Action */}

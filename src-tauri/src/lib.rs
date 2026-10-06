@@ -65,7 +65,6 @@ pub fn run() {
             tray::get_close_to_tray,
             tray::set_close_to_tray,
             tray::is_window_visible,
-            commands::ai::ai_completion,
             commands::export::convert_webm_to_mp4,
             commands::native_recorder::start_native_session,
             commands::native_recorder::stop_native_session,

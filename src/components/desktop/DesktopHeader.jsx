@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Monitor, Film, Keyboard, Check, FileText, FolderOpen, Save, Settings, ChevronDown } from 'lucide-react';
+import { Monitor, Film, Keyboard, Check, FileText, FolderOpen, Save, ChevronDown } from 'lucide-react';
 import { APP_THEMES, getAppTheme } from '@/lib/ui/themes';
 
 /** Small ghost button used across the header. */
@@ -36,7 +36,6 @@ export default function DesktopHeader({
     viewMode,
     setViewMode,
     onOpenHotkeys,
-    onOpenSettings,
     onOpenProject,
     onSaveProject,
     hasRecording,
@@ -149,9 +148,6 @@ export default function DesktopHeader({
                 <HeaderButton onClick={onOpenHotkeys} title="Keyboard shortcuts">
                     <Keyboard className="w-4 h-4" />
                     <span>Shortcuts</span>
-                </HeaderButton>
-                <HeaderButton onClick={onOpenSettings} title="Settings">
-                    <Settings className="w-4 h-4" />
                 </HeaderButton>
             </div>
         </header>

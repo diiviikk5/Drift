@@ -228,54 +228,6 @@ export async function setHotkeys(hotkeys) {
 }
 
 /**
- * Call AI completion through Rust backend (avoids CORS in Tauri)
- * Supports custom endpoints (Cerebras Ultra-Fast or OpenRouter)
- * Falls back to direct fetch in browser
- */
-export async function aiCompletion({ apiKey, model, messages, maxTokens, temperature, endpoint }) {
-    if (isTauri()) {
-        const api = await getTauriApi();
-        const result = await api.invoke('ai_completion', {
-            apiKey,
-            model,
-            messages,
-            maxTokens: maxTokens || null,
-            temperature: temperature || null,
-            endpoint: endpoint || null,
-        });
-        return JSON.parse(result);
-    }
-
-    // Browser fallback — direct API call
-    const targetUrl = endpoint || 'https://openrouter.ai/api/v1/chat/completions';
-    const headers = {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-    };
-    if (targetUrl.includes('openrouter.ai')) {
-        headers['HTTP-Referer'] = 'https://getdrift.app';
-        headers['X-Title'] = 'Drift Screen Recorder';
-    }
-
-    const response = await fetch(targetUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-            model,
-            messages,
-            ...(maxTokens && { max_tokens: maxTokens }),
-            ...(temperature && { temperature }),
-        }),
-    });
-
-    if (!response.ok) {
-        throw new Error(`AI API error: ${response.status} ${await response.text()}`);
-    }
-
-    return response.json();
-}
-
-/**
  * Capture a screenshot of a monitor (Tauri only)
  */
 export async function captureScreenshot(monitorId = 0) {
@@ -660,7 +612,6 @@ export const drift = {
     restoreWindow,
     getHotkeys,
     setHotkeys,
-    aiCompletion,
     captureScreenshot,
     // Native capture pipeline
     onNativeFrame,
