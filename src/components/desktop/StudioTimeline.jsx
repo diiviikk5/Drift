@@ -412,18 +412,12 @@ export default function StudioTimeline({
                                 <div className="w-0.5 h-3 bg-white/70 rounded-full" />
                             </div>
 
-                            <span className="text-[11px] font-mono font-bold truncate select-none flex items-center gap-1 pl-1">
-                                {seg.sceneMode === 'spotlight' ? '🎙️ Spotlight' :
-                                 seg.sceneMode === 'overview' ? '🖥️ Overview' :
-                                 seg.sceneMode === 'speed' ? `⏩ ${seg.speed || 2}x Speed` :
-                                 isConnectedPrev ? (
-                                     <span className="opacity-90 flex items-center gap-0.5">
-                                         <span>→</span>
-                                         <span>🎯 {Math.round((seg.targetX ?? 0.5) * 100)}%</span>
-                                     </span>
-                                 ) : (
-                                     `${seg.reason === 'manual' ? '📌' : seg.reason === 'key' ? '⌨' : '⚡'} ${seg.zoomScale}x ${seg.speed && seg.speed !== 1 ? `(${seg.speed}x)` : ''}`
-                                 )}
+                            <span className="text-[11px] font-medium tabular-nums truncate select-none pl-1">
+                                {seg.sceneMode === 'spotlight' ? 'Spotlight' :
+                                 seg.sceneMode === 'overview' ? 'Overview' :
+                                 seg.sceneMode === 'speed' ? `${seg.speed || 2}× speed` :
+                                 isConnectedPrev ? 'Pan' :
+                                 `${seg.zoomScale}×${seg.speed && seg.speed !== 1 ? ` · ${seg.speed}× speed` : ''}`}
                             </span>
 
                             <div className="flex items-center pr-0.5">
