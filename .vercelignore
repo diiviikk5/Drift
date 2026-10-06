@@ -27,8 +27,9 @@ src-tauri/gen/
 *.snap
 *.mp4
 
-# Allow the public download
+# Allow the public download and the homepage demo clip
 !public/downloads/
+!public/demo/
 
 # Node modules (handled by Vercel)
 node_modules/
