@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Drift Recorder",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "identifier": "com.drift.studio",
   "build": {
     "frontendDist": "../out",
