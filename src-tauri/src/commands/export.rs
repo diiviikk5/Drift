@@ -6,6 +6,18 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use tauri::{command, AppHandle, Emitter};
 
+/// A command that never flashes a console window on Windows.
+fn quiet_command(program: impl AsRef<std::ffi::OsStr>) -> Command {
+    let mut cmd = Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd
+}
+
 #[derive(Debug, Clone)]
 struct EncoderConfig {
     codec: String,
@@ -46,7 +58,7 @@ fn find_ffmpeg() -> Result<PathBuf, String> {
         if loc.is_file() {
             return Ok(loc.clone());
         }
-        if let Ok(output) = Command::new(loc).arg("-version").output() {
+        if let Ok(output) = quiet_command(loc).arg("-version").output() {
             if output.status.success() {
                 return Ok(loc.clone());
             }
@@ -74,7 +86,7 @@ fn detect_encoder(ffmpeg: &PathBuf, use_hw: bool) -> EncoderConfig {
     ];
 
     for (encoder, extra) in &hw_encoders {
-        if let Ok(output) = Command::new(ffmpeg)
+        if let Ok(output) = quiet_command(ffmpeg)
             .args(["-f", "lavfi", "-i", "color=c=black:s=64x64:d=0.1",
                    "-c:v", encoder, "-f", "null", "-"])
             .output()
@@ -226,7 +238,7 @@ pub async fn convert_webm_to_mp4(
     let input_path_clone = input_path.clone();
 
     let result = tokio::task::spawn_blocking(move || -> Result<String, String> {
-        let output = Command::new(&ffmpeg)
+        let output = quiet_command(&ffmpeg)
             .args(&args)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
