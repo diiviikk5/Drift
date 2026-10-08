@@ -409,7 +409,12 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
             const hy = halfY(s) * M.safeZone;
             // The cursor working on another screen: ease out rather than chase.
             if (awayFor(t, t + 0.8) > 0.9) return t;
-            const outside = (p) => !p.hidden && ((kx * s > 1.001 && Math.abs(p.x - state.x) > hx) || (ky * s > 1.001 && Math.abs(p.y - state.y) > hy));
+            // Past the safe area, but not towards a side where the view already
+            // touches the edge of the recording (it couldn't move that way anyway).
+            const pinned = (c, p, h) => (p < c - h && c - h * (1 / M.safeZone) <= 1e-3) || (p > c + h && c + h * (1 / M.safeZone) >= 1 - 1e-3);
+            const outside = (p) => !p.hidden && (
+                (kx * s > 1.001 && Math.abs(p.x - state.x) > hx && !pinned(state.x, p.x, hx))
+                || (ky * s > 1.001 && Math.abs(p.y - state.y) > hy && !pinned(state.y, p.y, hy)));
             const leaving = (p) => !p.hidden && ((kx * s > 1.001 && Math.abs(p.x - state.x) > halfX(s) * 0.92) || (ky * s > 1.001 && Math.abs(p.y - state.y) > halfY(s) * 0.92));
             // Heading out of the frame: act now, a move needs time to get going.
             const later = positions(t + M.urgentAnticipate - 0.4, t + M.urgentAnticipate);
