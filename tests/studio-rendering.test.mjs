@@ -234,7 +234,7 @@ test('ZoomConstruct provides global presets and resolves subtle, cinema, and foc
     assert.equal(resolveZoomPreset(1.9).id, 'focus');
 });
 
-test('multi-click conversational interactions stay continuously chained without dropping to overview', () => {
+test('far chained clicks pull back between areas instead of dragging a zoomed view across the screen', () => {
     const analyzer = new InteractionAnalyzer(PER_ACTION);
     // 3 clicks across different parts of the UI, separated by 2.0s
     const clicks = [
@@ -245,10 +245,17 @@ test('multi-click conversational interactions stay continuously chained without 
     const track = analyzer.analyze(clicks, [], 10);
     assert.ok(track.length >= 2, 'Should create focal segments for distinct UI locations');
 
-    // In the gap between click 1 and click 2 (e.g. t = 3.0s), camera remains zoomed in
-    const camDuringTransition = evaluateCameraAtTime(3.0, track);
-    assert.ok(camDuringTransition.scale >= 1.30, `Expected camera to remain zoomed in during chained clicks, got ${camDuringTransition.scale}`);
-    assert.notEqual(camDuringTransition.scale, 1.0, 'Camera must not drop back to 1.0x overview in between chained clicks');
+    // Each area gets its zoom (arriving with or shortly after its click)...
+    const peakNear = (t0) => {
+        let s = 0;
+        for (let t = t0; t <= t0 + 2.5; t += 0.05) s = Math.max(s, evaluateCameraAtTime(t, track).scale);
+        return s;
+    };
+    for (const t of [1.0, 3.0]) assert.ok(peakNear(t) > 1.3, `expected a zoom around ${t}s`);
+    // ...but travelling between far areas widens the view on the way.
+    let widest = Infinity;
+    for (let t = 1.5; t <= 3.0; t += 0.05) widest = Math.min(widest, evaluateCameraAtTime(t, track).scale);
+    assert.ok(widest < 1.3, `camera stayed zoomed (${widest.toFixed(2)}x) while travelling across the screen`);
 });
 
 test('StudioEngine plays back in real time by default and supports pacing changes', async () => {
