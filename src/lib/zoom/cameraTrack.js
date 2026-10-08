@@ -479,7 +479,10 @@ export function buildCameraTrack(segments = [], samples = [], options = {}) {
             // Only this shot's own work, never the next shot's.
             const d = moveDuration(state, target);
             const limit = Math.min(seg.endTime, next && Number.isFinite(next.actionTime) ? next.actionTime - 0.6 : Infinity);
-            target = frameWork(target, start + d * 0.6, Math.min(start + d + 0.6, limit), false);
+            // Frame the shot's whole span of work when it fits, so a row of
+            // actions is held in one framing instead of panned along zoomed.
+            const workEnd = Number.isFinite(seg.lastActionTime) ? seg.lastActionTime + 0.3 : start + d + 0.6;
+            target = frameWork(target, start + d * 0.6, Math.min(Math.max(start + d + 0.6, workEnd), limit), false);
         }
         if (!zoomed(state)) zoomedSince = start;
         const alreadyThere = zoomed(state) && Math.abs(state.x - target.x) < 0.02 && Math.abs(state.y - target.y) < 0.02 && Math.abs(state.s - target.s) < 0.02;
