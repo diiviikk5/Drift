@@ -83,6 +83,23 @@ export function measure(scenario) {
             prevDir = dir;
         }
     }
+    // Zoomed travel: the longest distance (source widths) the view pans in one
+    // continuous move while staying zoomed in. Dragging a zoomed view across
+    // the screen reads as a chase; long trips should go through a wider shot.
+    let zoomedTravel = 0;
+    let run = 0;
+    for (let i = 1; i < frames.length; i++) {
+        const a = frames[i - 1];
+        const b = frames[i];
+        const step = Math.hypot(b.x - a.x, b.y - a.y);
+        const panning = step * FPS > 0.02;
+        if (panning && Math.min(a.s, b.s) > 1.15) {
+            run += step;
+            zoomedTravel = Math.max(zoomedTravel, run);
+        } else {
+            run = 0;
+        }
+    }
     // How often the cursor is off-screen while zoomed in (should be ~0).
     let mi = 0;
     for (const f of frames) {
@@ -120,6 +137,7 @@ export function measure(scenario) {
         movingPct: (moving / ms.length) * 100,
         movesPerMin: starts / (frames.length / FPS / 60),
         reversals,
+        zoomedTravel,
         zoomedPct: zoomed * 100,
         peakScale,
         cursorOffPct: cursorSeen ? (cursorOut / cursorSeen) * 100 : 0,
@@ -139,7 +157,7 @@ if (import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}` || proc
         const f = (v, d = 2) => (typeof v === 'number' ? v.toFixed(d) : v);
         console.log('scenario'.padEnd(40), 'segs peak  p95   pan   zoom  accel  move% moves/min rev zoom% maxS  curOff% clicks  dur(min-max) outs');
         for (const r of rows) {
-            console.log(r.name.padEnd(40), String(r.segments).padStart(4), f(r.peakMotion).padStart(5), f(r.p95Motion).padStart(5), f(r.peakPan).padStart(5), f(r.peakZoom).padStart(5), f(r.peakAccel, 1).padStart(6), f(r.movingPct, 0).padStart(5), f(r.movesPerMin, 1).padStart(8), String(r.reversals).padStart(4), f(r.zoomedPct, 0).padStart(5), f(r.peakScale).padStart(5), f(r.cursorOffPct, 1).padStart(7), r.clicksFramed.padStart(7), `${f(r.moveDurMin)}-${f(r.moveDurMax)}`.padStart(12), String(r.overviewReturns).padStart(4));
+            console.log(r.name.padEnd(40), String(r.segments).padStart(4), f(r.peakMotion).padStart(5), f(r.p95Motion).padStart(5), f(r.peakPan).padStart(5), f(r.peakZoom).padStart(5), f(r.peakAccel, 1).padStart(6), f(r.movingPct, 0).padStart(5), f(r.movesPerMin, 1).padStart(8), String(r.reversals).padStart(4), f(r.zoomedPct, 0).padStart(5), f(r.peakScale).padStart(5), f(r.cursorOffPct, 1).padStart(7), r.clicksFramed.padStart(7), `${f(r.moveDurMin)}-${f(r.moveDurMax)}`.padStart(12), String(r.overviewReturns).padStart(4), f(r.zoomedTravel).padStart(6));
         }
     }
 }

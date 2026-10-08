@@ -166,4 +166,42 @@ export const SCENARIOS = {
         for (let i = 0; i < 14; i++) steps.push({ move: [0.1 + r() * 0.8, 0.1 + r() * 0.8], speed: 0.7 }, { wait: 0.4 });
         return buildScenario(steps);
     },
+    // --- moving on while zoomed in (the camera must not drag a zoomed view across the screen)
+    'work, then rush to a far spot and keep working': () => buildScenario([
+        { wait: 1 },
+        { click: [0.25, 0.3] }, { type: 1.2 }, { click: [0.3, 0.35] }, { type: 0.8 },
+        { click: [0.78, 0.72], speed: 1.5 }, { type: 1.0 }, { click: [0.74, 0.7] }, { type: 0.8 },
+        { wait: 2 },
+    ]),
+
+    'work, then drift slowly to the next area': () => buildScenario([
+        { wait: 1 },
+        { click: [0.3, 0.4] }, { type: 1.0 }, { click: [0.32, 0.43] }, { type: 0.6 },
+        { move: [0.45, 0.48], speed: 0.35 }, { move: [0.6, 0.55], speed: 0.45 }, { move: [0.68, 0.6], speed: 0.6 },
+        { click: [0.7, 0.62] }, { type: 1.2 }, { click: [0.72, 0.6] }, { type: 0.6 },
+        { wait: 2 },
+    ]),
+
+    'work, quick flick away and back, keep working': () => buildScenario([
+        { wait: 1 },
+        { click: [0.4, 0.4] }, { type: 1.0 }, { click: [0.42, 0.44] },
+        { move: [0.88, 0.15], speed: 2.2 }, { wait: 0.25 }, { move: [0.43, 0.45], speed: 2.2 },
+        { click: [0.44, 0.46] }, { type: 1.2 }, { click: [0.41, 0.42] },
+        { wait: 2 },
+    ]),
+
+    'work, then a far area with no pause at all': () => buildScenario([
+        { wait: 1 },
+        { click: [0.2, 0.25] }, { type: 1.0 }, { click: [0.23, 0.28] }, { type: 0.5 },
+        { click: [0.82, 0.78], speed: 2.0 }, { click: [0.8, 0.74], speed: 1.5 }, { type: 1.2 }, { click: [0.78, 0.76] },
+        { wait: 2 },
+    ]),
+
+    'two areas back and forth, slow and fast moves': () => buildScenario([
+        { wait: 1 },
+        { click: [0.25, 0.6] }, { type: 1.0 }, { click: [0.27, 0.63] }, { wait: 0.6 },
+        { click: [0.75, 0.3], speed: 0.5 }, { type: 1.0 }, { click: [0.73, 0.32] }, { wait: 0.4 },
+        { click: [0.26, 0.62], speed: 1.8 }, { type: 0.9 }, { click: [0.24, 0.6] }, { wait: 0.5 },
+        { click: [0.76, 0.28], speed: 1.0 }, { type: 0.8 }, { wait: 2 },
+    ]),
 };
