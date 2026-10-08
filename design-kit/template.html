@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Isometric Brutalism — design system</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..900&family=Geist+Mono:wght@400..800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="iso-brutal.css" />
+<style>
+  /* page-only layout helpers (not part of the system) */
+  html, body { margin: 0; }
+  .row { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+  .stack { display: flex; flex-direction: column; gap: 14px; }
+  .g2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px; }
+  .g3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 26px; }
+  .g4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+  @media (max-width: 900px) { .g2, .g3, .g4 { grid-template-columns: 1fr; } }
+  .sec { padding: 88px 0; border-top: 3px solid var(--ib-line); position: relative; }
+  .sec h2 { margin-top: 18px; }
+  .sub { margin: 14px 0 40px; max-width: 640px; }
+  .swatch { width: 26px; height: 26px; border-radius: 8px; border: 3px solid var(--ib-line); cursor: pointer; box-shadow: 2px 2px 0 var(--ib-ex); padding: 0; }
+  .chipcolor { height: 92px; border: 3px solid var(--ib-line); border-radius: 14px; box-shadow: var(--ib-ex6); display: flex; align-items: flex-end; padding: 10px; font-family: var(--ib-mono); font-size: 12px; font-weight: 700; }
+  .depth { height: 70px; border: 3px solid var(--ib-line); border-radius: 12px; background: var(--ib-card); display: grid; place-content: center; font-family: var(--ib-mono); font-weight: 700; font-size: 13px; }
+  .iso-demo { width: 380px; height: 236px; margin-top: 50px; }
+  .iso-demo .l2 { inset: 9%; background: var(--ib-night); border-radius: 10px; }
+  .iso-demo .l3 { inset: 22% 30% 30% 22%; border-color: var(--ib-accent); border-width: 4px; background: color-mix(in srgb, var(--ib-accent) 14%, transparent); box-shadow: 0 0 0 3px #0b0b0d; }
+  .iso-demo.open .l2 { transform: translateZ(60px); }
+  .iso-demo.open .l3 { transform: translateZ(125px); }
+  .iso-demo .ib-iso__label { opacity: 0; transition: opacity .3s; }
+  .iso-demo.open .ib-iso__label { opacity: 1; }
+  .mini { border: 3px solid var(--ib-line); border-radius: 18px; overflow: hidden; box-shadow: var(--ib-ex10); }
+  .mini .ib-shell { min-height: 0; grid-template-columns: 200px 1fr; }
+</style>
+</head>
+<body class="ib">
+
+<nav class="ib-nav">
+  <div class="ib-container ib-nav__inner">
+    <a class="ib-brand" href="#"><span class="ib-brand__mark">B</span>Brand</a>
+    <div class="row" style="gap:8px">
+      <a class="ib-navlink" href="#foundations">Foundations</a>
+      <a class="ib-navlink" href="#components">Components</a>
+      <a class="ib-navlink" href="#patterns">Patterns</a>
+      <span class="row" style="gap:6px;margin:0 6px" title="Try an accent">
+        <button class="swatch" style="background:#d2ff2e" data-accent="#d2ff2e" aria-label="Lime"></button>
+        <button class="swatch" style="background:#ff8a3d" data-accent="#ff8a3d" aria-label="Orange"></button>
+        <button class="swatch" style="background:#5ee6ff" data-accent="#5ee6ff" aria-label="Cyan"></button>
+        <button class="swatch" style="background:#b69cff" data-accent="#b69cff" aria-label="Lilac"></button>
+        <button class="swatch" style="background:#ffd23d" data-accent="#ffd23d" aria-label="Yellow"></button>
+      </span>
+      <button class="ib-btn ib-btn--sm ib-btn--paper ib-btn--icon" id="theme" aria-label="Toggle dark mode">◐</button>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO (one example of a hero; the system has many) -->
+<header style="padding:72px 0 88px;position:relative;text-align:center">
+  <div class="ib-gridpaper"></div>
+  <div class="ib-container" style="position:relative">
+    <div class="row" style="justify-content:center;gap:10px">
+      <span class="ib-chip"><span class="ib-dot"></span>Design system</span>
+      <span class="ib-chip">Light + dark</span>
+      <span class="ib-chip">Any accent</span>
+    </div>
+    <h1 class="ib-h1" style="margin:26px auto 0;max-width:1000px">Interfaces that feel <span class="ib-block">solid.</span></h1>
+    <p class="ib-lead" style="margin:24px auto 0;max-width:620px">Warm paper, ink outlines, and shadows that are real blocks. Everything presses like a key. Swap one accent and it becomes your brand.</p>
+    <div class="row" style="justify-content:center;margin-top:32px">
+      <a class="ib-btn ib-btn--lg" href="#components">Browse components</a>
+      <a class="ib-btn ib-btn--lg ib-btn--paper" href="#patterns">See patterns</a>
+    </div>
+  </div>
+</header>
+
+<!-- FOUNDATIONS -->
+<section class="sec" id="foundations">
+  <div class="ib-container">
+    <span class="ib-kicker">Foundations</span>
+    <h2 class="ib-h2">Paper, ink, one accent, one signal.</h2>
+    <p class="ib-lead sub">Neutrals stay fixed across projects. Only the accent, hot and alt colours change per brand.</p>
+    <div class="g4">
+      <div class="chipcolor" style="background:var(--ib-paper)">paper</div>
+      <div class="chipcolor" style="background:var(--ib-card)">card</div>
+      <div class="chipcolor" style="background:var(--ib-text);color:var(--ib-paper)">ink</div>
+      <div class="chipcolor" style="background:var(--ib-night);color:#f5f2ea">night</div>
+      <div class="chipcolor" style="background:var(--ib-accent);color:var(--ib-accent-ink)">accent — block fills only</div>
+      <div class="chipcolor" style="background:var(--ib-hot);color:#fff">hot — signals only</div>
+      <div class="chipcolor" style="background:var(--ib-alt);color:#fff">alt — illustration / tags</div>
+      <div class="chipcolor" style="background:var(--ib-paper-2)">paper-2 — sunken</div>
+    </div>
+
+    <h3 class="ib-h3" style="margin-top:56px">Depth scale — extrusion, never blur</h3>
+    <div class="g4" style="margin-top:20px">
+      <div class="depth" style="box-shadow:var(--ib-ex2)">ex2 · kbd</div>
+      <div class="depth" style="box-shadow:var(--ib-ex4)">ex4 · small btn</div>
+      <div class="depth" style="box-shadow:var(--ib-ex8)">ex8 · card</div>
+      <div class="depth" style="box-shadow:var(--ib-ex14)">ex14 · hero</div>
+    </div>
+
+    <h3 class="ib-h3" style="margin-top:56px">Type</h3>
+    <div class="stack" style="margin-top:16px">
+      <div class="ib-h1" style="font-size:72px">Display 900, tight</div>
+      <div class="ib-h2" style="font-size:44px">Section heading</div>
+      <div class="ib-h3">Card title</div>
+      <p class="ib-lead" style="margin:0">Lead paragraph — muted, medium weight, generous line height.</p>
+      <p class="ib-body" style="margin:0">Body text for cards and descriptions.</p>
+      <span class="ib-mono ib-note">MONO · LABELS · DATA · 12:04:09</span>
+    </div>
+  </div>
+</section>
+
+<!-- COMPONENTS -->
+<section class="sec" id="components">
+  <div class="ib-container">
+    <span class="ib-kicker">Components</span>
+    <h2 class="ib-h2">Everything presses like a key.</h2>
+    <p class="ib-lead sub">Hover lifts, click sinks into the extrusion. Inputs are sunken, buttons are raised.</p>
+
+    <div class="g2">
+      <div class="ib-card stack">
+        <span class="ib-label">Buttons</span>
+        <div class="row">
+          <button class="ib-btn">Primary</button>
+          <button class="ib-btn ib-btn--paper">Secondary</button>
+          <button class="ib-btn ib-btn--ink">Ink</button>
+          <button class="ib-btn ib-btn--sm">Small</button>
+        </div>
+        <span class="ib-label" style="margin-top:12px">Chips · badges · tags · keys</span>
+        <div class="row" style="gap:10px">
+          <span class="ib-chip"><span class="ib-dot"></span>Live</span>
+          <span class="ib-badge">Draft</span><span class="ib-badge ib-badge--accent">New</span><span class="ib-badge ib-badge--hot">Beta</span>
+          <span class="ib-tag ib-tag--alt">Tag</span>
+          <span class="ib-keys" id="keys"><span class="ib-keycap">Ctrl</span><span class="ib-plus">+</span><span class="ib-keycap ib-keycap--accent">K</span></span>
+        </div>
+        <span class="ib-label" style="margin-top:12px">Tabs</span>
+        <div class="ib-tabs" role="tablist"><button class="ib-tab" aria-selected="true">Overview</button><button class="ib-tab" aria-selected="false">Activity</button><button class="ib-tab" aria-selected="false">Settings</button></div>
+      </div>
+
+      <form class="ib-card stack" onsubmit="return false">
+        <div><label class="ib-label" for="e">Email</label><input class="ib-input" id="e" placeholder="you@example.com" /><div class="ib-help">We never share it.</div></div>
+        <div><label class="ib-label" for="p">Plan</label><select class="ib-select" id="p"><option>Starter</option><option>Pro</option></select></div>
+        <div><label class="ib-label" for="m">Message</label><textarea class="ib-textarea" id="m" placeholder="Say hi"></textarea></div>
+        <div class="row" style="justify-content:space-between">
+          <label class="ib-check"><input type="checkbox" checked /> Send me updates</label>
+          <label class="ib-check"><input type="checkbox" class="ib-switch" checked /> Dark emails</label>
+        </div>
+        <button class="ib-btn">Submit</button>
+      </form>
+    </div>
+
+    <div class="g2" style="margin-top:26px">
+      <div class="stack">
+        <div class="ib-alert"><span class="ib-alert__icon">✓</span><div><b>Saved.</b> Your changes are live.</div></div>
+        <div class="ib-alert ib-alert--hot"><span class="ib-alert__icon">!</span><div><b>Payment failed.</b> Update your card to keep access.</div></div>
+        <div class="row" style="gap:12px"><span class="ib-avatar">AK</span><span class="ib-avatar" style="background:var(--ib-hot)">JM</span><span class="ib-avatar" style="background:var(--ib-accent);color:#0b0b0d">RS</span></div>
+      </div>
+      <div class="stack">
+        <details class="ib-faq" open><summary>Is it free?</summary><div>FAQ rows are native &lt;details&gt; — no JS needed.</div></details>
+        <details class="ib-faq"><summary>Does it work in dark mode?</summary><div>Yes. Ink and extrusions flip to warm white.</div></details>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PATTERNS: show how the style adapts to different kinds of sites -->
+<section class="sec" id="patterns">
+  <div class="ib-container">
+    <span class="ib-kicker">Patterns</span>
+    <h2 class="ib-h2">Same materials, any kind of site.</h2>
+    <p class="ib-lead sub">A dashboard, a pricing page, a blog and a product explainer — the style is the materials, not the layout.</p>
+
+    <!-- App / dashboard -->
+    <h3 class="ib-h3" style="margin-bottom:18px">App &amp; dashboard</h3>
+    <div class="mini">
+      <div class="ib-shell">
+        <aside class="ib-sidebar">
+          <a class="ib-brand" href="#" style="font-size:18px;margin:0 6px 14px"><span class="ib-brand__mark" style="width:32px;height:32px">B</span>Brand</a>
+          <a class="ib-sidelink" aria-current="page" href="#">Overview</a>
+          <a class="ib-sidelink" href="#">Customers</a>
+          <a class="ib-sidelink" href="#">Billing</a>
+          <a class="ib-sidelink" href="#">Settings</a>
+        </aside>
+        <main style="padding:24px;background:var(--ib-paper)" class="stack">
+          <div class="g3" style="gap:16px">
+            <div class="ib-stat"><div class="ib-stat__label">Revenue</div><div class="ib-stat__value">$48.2k</div><span class="ib-delta">+12%</span></div>
+            <div class="ib-stat"><div class="ib-stat__label">Users</div><div class="ib-stat__value">3,914</div><span class="ib-delta">+4%</span></div>
+            <div class="ib-stat"><div class="ib-stat__label">Churn</div><div class="ib-stat__value">2.1%</div><span class="ib-delta ib-delta--down">+0.3</span></div>
+          </div>
+          <div class="ib-table-wrap">
+            <table class="ib-table">
+              <thead><tr><th>Customer</th><th>Plan</th><th>Usage</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Northwind</td><td>Pro</td><td style="width:30%"><div class="ib-bar"><i style="width:72%"></i></div></td><td><span class="ib-badge ib-badge--accent">Active</span></td></tr>
+                <tr><td>Globex</td><td>Starter</td><td><div class="ib-bar"><i style="width:35%"></i></div></td><td><span class="ib-badge">Trial</span></td></tr>
+                <tr><td>Initech</td><td>Pro</td><td><div class="ib-bar"><i style="width:94%"></i></div></td><td><span class="ib-badge ib-badge--hot">Limit</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <h3 class="ib-h3" style="margin:72px 0 34px">Pricing</h3>
+    <div class="g3" style="align-items:start">
+      <div class="ib-price"><span class="ib-badge" style="align-self:start">Starter</span><div class="ib-price__amount">$0<small> / mo</small></div><ul><li>1 project</li><li>Community support</li></ul><button class="ib-btn ib-btn--paper">Start free</button></div>
+      <div class="ib-price ib-price--featured"><span class="ib-badge ib-badge--hot" style="align-self:start">Most popular</span><div class="ib-price__amount">$12<small> / mo</small></div><ul><li>Unlimited projects</li><li>Priority support</li><li>Custom domain</li></ul><button class="ib-btn ib-btn--ink">Go Pro</button></div>
+      <div class="ib-price"><span class="ib-badge" style="align-self:start">Team</span><div class="ib-price__amount">$49<small> / mo</small></div><ul><li>10 seats</li><li>SSO</li></ul><button class="ib-btn ib-btn--paper">Talk to us</button></div>
+    </div>
+
+    <!-- Social proof -->
+    <h3 class="ib-h3" style="margin:72px 0 22px">Testimonials</h3>
+    <div class="g2">
+      <figure class="ib-quote" style="margin:0"><blockquote>It replaced three tools and my team actually likes using it.</blockquote><figcaption class="row" style="margin-top:16px;gap:12px"><span class="ib-avatar">AK</span><span><b>Ana K.</b><br /><span class="ib-note">Head of Ops, Northwind</span></span></figcaption></figure>
+      <figure class="ib-quote" style="margin:0;transform:rotate(1deg)"><blockquote>The first app in years that feels made by a person.</blockquote><figcaption class="row" style="margin-top:16px;gap:12px"><span class="ib-avatar" style="background:var(--ib-hot)">JM</span><span><b>Jon M.</b><br /><span class="ib-note">Indie maker</span></span></figcaption></figure>
+    </div>
+
+    <!-- Editorial -->
+    <h3 class="ib-h3" style="margin:72px 0 22px">Blog &amp; docs</h3>
+    <div class="g2" style="grid-template-columns:1.3fr .7fr;align-items:start">
+      <article class="ib-prose">
+        <span class="ib-badge ib-badge--accent">Guide</span>
+        <h2 style="margin-top:.4em">Long-form stays calm</h2>
+        <p>Reading pages drop most of the extrusion. Text sits on paper at a comfortable measure; only <a href="#">links</a>, <span class="ib-mark">highlights</span> and code blocks carry the brand.</p>
+        <pre>npm install your-thing
+your-thing init --style iso</pre>
+        <blockquote>Hot colour marks the one idea worth quoting.</blockquote>
+        <p>Inline <code>code</code> gets a small outlined chip.</p>
+      </article>
+      <div class="stack">
+        <a class="ib-card ib-card--hover" href="#"><span class="ib-note ib-mono">MAR 12 · 6 MIN</span><h3 class="ib-h3" style="margin-top:8px">A post card with a lift on hover</h3></a>
+        <a class="ib-card ib-card--hover" href="#"><span class="ib-note ib-mono">FEB 28 · 4 MIN</span><h3 class="ib-h3" style="margin-top:8px">Keep cards to a title and a meta line</h3></a>
+      </div>
+    </div>
+
+    <!-- Explainer + marquee (marketing flourishes, optional) -->
+    <h3 class="ib-h3" style="margin:72px 0 0">Product explainer (optional flourish)</h3>
+    <div class="g2" style="align-items:center">
+      <div class="stack" style="gap:12px;margin-top:20px">
+        <div class="ib-row"><div class="ib-row__num">01</div><div><b>Base</b><p class="ib-body" style="margin:2px 0 0">Click the stack to pull it apart.</p></div></div>
+        <div class="ib-row"><div class="ib-row__num">02</div><div><b>Content</b><p class="ib-body" style="margin:2px 0 0">Good for architectures, pipelines, file formats.</p></div></div>
+        <div class="ib-row"><div class="ib-row__num">03</div><div><b>Focus</b><p class="ib-body" style="margin:2px 0 0">Interactive on click, never scroll-jacked.</p></div></div>
+      </div>
+      <div class="ib-iso-stage" style="height:420px;cursor:pointer" id="stage" role="button" tabindex="0" aria-label="Pull the stack apart">
+        <div class="ib-iso iso-demo" id="iso">
+          <div class="ib-iso__layer" style="background:linear-gradient(135deg,#7c5cff,#ff3d6e 55%,#ffb03d)"><div class="ib-iso__label"><b>01</b>Base</div></div>
+          <div class="ib-iso__layer l2"><div class="ib-iso__label"><b>02</b>Content</div></div>
+          <div class="ib-iso__layer l3"><div class="ib-iso__label"><b>03</b>Focus</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:60px">
+    <div class="ib-marquee"><div class="ib-marquee__track">
+      <span class="ib-marquee__item">Solid<i class="ib-marquee__star"></i>Warm<i class="ib-marquee__star"></i>Pressable<i class="ib-marquee__star"></i>Honest<i class="ib-marquee__star"></i></span>
+      <span class="ib-marquee__item">Solid<i class="ib-marquee__star"></i>Warm<i class="ib-marquee__star"></i>Pressable<i class="ib-marquee__star"></i>Honest<i class="ib-marquee__star"></i></span>
+      <span class="ib-marquee__item">Solid<i class="ib-marquee__star"></i>Warm<i class="ib-marquee__star"></i>Pressable<i class="ib-marquee__star"></i>Honest<i class="ib-marquee__star"></i></span>
+      <span class="ib-marquee__item">Solid<i class="ib-marquee__star"></i>Warm<i class="ib-marquee__star"></i>Pressable<i class="ib-marquee__star"></i>Honest<i class="ib-marquee__star"></i></span>
+    </div></div>
+  </div>
+</section>
+
+<section class="ib-container" style="padding:40px 24px 80px">
+  <div class="ib-final">
+    <div class="ib-gridpaper"></div>
+    <div style="position:relative">
+      <h2 class="ib-h2" style="max-width:780px;margin:0 auto">Closing panel: one promise, one button.</h2>
+      <div class="row" style="justify-content:center;margin-top:28px"><a class="ib-btn ib-btn--lg ib-btn--ink" href="#">Primary action</a></div>
+    </div>
+  </div>
+</section>
+
+<footer class="ib-footer">
+  <div class="ib-container row" style="justify-content:space-between">
+    <a class="ib-brand" href="#"><span class="ib-brand__mark">B</span>Brand</a>
+    <span class="ib-note">Isometric Brutalism · swap the accent tokens and go</span>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('theme').onclick = () => { const b = document.body; b.dataset.theme = b.dataset.theme === 'dark' ? 'light' : 'dark'; };
+  document.querySelectorAll('[data-accent]').forEach(s => s.onclick = () => document.body.style.setProperty('--ib-accent', s.dataset.accent));
+  document.querySelectorAll('.ib-tabs').forEach(t => t.addEventListener('click', e => { if (!e.target.matches('.ib-tab')) return; t.querySelectorAll('.ib-tab').forEach(b => b.setAttribute('aria-selected', b === e.target)); }));
+  const keys = document.getElementById('keys');
+  keys.onclick = () => { keys.classList.add('is-down'); setTimeout(() => keys.classList.remove('is-down'), 160); };
+  const iso = document.getElementById('iso'), stage = document.getElementById('stage');
+  const toggle = () => iso.classList.toggle('open');
+  stage.onclick = toggle;
+  stage.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
+</script>
+</body>
+</html>
