@@ -18,7 +18,7 @@ import { getCameraTrack } from '../src/lib/zoom/cameraTrack.js';
 const FPS = 60;
 
 /** Load a recorder session folder (telemetry.json, keystrokes.json, session.json). */
-function loadSession(dir) {
+export function loadSession(dir) {
     const read = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); } catch { return null; } };
     const meta = read('session.json') || {};
     const w = meta.width || 1920;

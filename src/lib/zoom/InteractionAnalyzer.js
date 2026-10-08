@@ -36,6 +36,8 @@ export const AUTO_ZOOM_DEFAULTS = Object.freeze({
     maxZoomedShare: 0.4,    // shots may cover at most this share of the video (plus moves); weaker shots go first
     hopGap: 1.4,            // actions closer than this in time belong to one burst
     minRunZoom: 1.15,       // a burst that doesn't fit at this zoom stays on the full frame
+    minMergeZoom: 1.3,      // two areas only share one shot if it is still a real zoom; otherwise they stay separate
+    maxRoaming: 0.3,        // a shot whose cursor is outside the zoomed view more than this share of the time stays wide
     minShotHold: 1.0,       // a shot must be watchable this long before the next action elsewhere
     fitMargin: 0.14,        // breathing room (normalized) around the session's activity box
     maxSessionSpan: 0.45,   // activity spread (normalized) above which a session is split (fits at ~1.5x)
@@ -46,6 +48,8 @@ export const AUTO_ZOOM_DEFAULTS = Object.freeze({
     dwellRadius: 0.012,
     dwellMinTravel: 0.08,   // ...and only after it actually travelled somewhere
     edgeBand: 0.025,        // clicks this close to the left/right edge (scrollbars) never zoom
+    topBand: 0.03,          // ...nor in the title bar / tab strip
+    bottomBand: 0.955,      // ...nor on the taskbar
     scrollGuardBefore: 0.35, // a click this soon before a scroll is the scroll starting (scrollbar drag)
     scrollSettle: 0.6,      // after a scroll, wait for the page to settle before zooming again
 });
@@ -93,7 +97,8 @@ export class InteractionAnalyzer {
         // Scrolling is reading, not an action: nothing that happens while the
         // page moves (or the scrollbar grab that starts it) is worth a zoom.
         const duringScroll = (t) => scrolls.some(([a, b]) => t >= a - o.scrollGuardBefore && t <= b + o.scrollSettle);
-        const atEdge = (s) => s.kind === 'click' && (s.x > 1 - o.edgeBand || s.x < o.edgeBand);
+        // Window chrome is navigation, not work: scrollbars, title bars / tabs, the taskbar.
+        const atEdge = (s) => s.kind === 'click' && (s.x > 1 - o.edgeBand || s.x < o.edgeBand || s.y < o.topBand || s.y > o.bottomBand);
         const signals = [
             ...this._clickSignals(clicks, duration),
             ...this._keySignals(keystrokes, moves),
@@ -112,7 +117,9 @@ export class InteractionAnalyzer {
         const planned = sessions
             .filter(sess => sess.signals.some(s => s.strong))
             .map(sess => this._planSession(sess, moves, duration, scrolls));
-        const worthZoom = (shot) => shot.typed || shot.strongActions >= o.minActions;
+        // Focused work only: typing, or several actions in one area, with the
+        // cursor actually staying in the shot (roaming work reads better wide).
+        const worthZoom = (shot) => (shot.typed || shot.strongActions >= o.minActions) && this._roaming(shot, moves) <= o.maxRoaming;
 
         return this._finalize(this._budget(this._economize(planned).filter(worthZoom), duration), duration);
     }
@@ -336,6 +343,31 @@ export class InteractionAnalyzer {
     }
 
     /**
+     * Share of the shot's working time (first to last action) the cursor
+     * spends outside the zoomed view. High values mean the user is moving
+     * around, not working in one place: a zoom would keep losing the cursor.
+     */
+    _roaming(shot, moves) {
+        const t0 = shot.actionTime;
+        const t1 = shot.lastAction;
+        if (!(t1 - t0 > 0.5) || !moves.length) return 0;
+        const s = Math.max(1, shot.zoomScale);
+        // The view the camera would hold: centred on the focus, kept on screen.
+        const half = 0.5 / s;
+        const vx = clamp(shot.targetX - (shot.targetX - 0.5) / s, half, 1 - half);
+        const vy = clamp(shot.targetY - (shot.targetY - 0.5) / s, half, 1 - half);
+        let n = 0;
+        let out = 0;
+        for (let t = t0; t <= t1; t += 0.05) {
+            const c = this._cursorAt(moves, t);
+            if (!c || c.hidden) continue;
+            n++;
+            if (Math.abs(c.x - vx) > half || Math.abs(c.y - vy) > half) out++;
+        }
+        return n ? out / n : 0;
+    }
+
+    /**
      * Zoom depth: the preset for ordinary work, a little deeper only for
      * sustained detail work (3+ actions in a tight spot), shallower when the
      * work is spread out.
@@ -393,7 +425,7 @@ export class InteractionAnalyzer {
         const merged = [];
         for (const shot of shots) {
             const prev = merged[merged.length - 1];
-            if (prev && shot.actionTime - prev.lastAction < o.hopGap && fitOf(union(prev.box, shot.box)) >= o.minRunZoom) {
+            if (prev && shot.actionTime - prev.lastAction < o.hopGap && fitOf(union(prev.box, shot.box)) >= o.minMergeZoom) {
                 merged[merged.length - 1] = merge(prev, shot);
             } else {
                 merged.push(shot);
@@ -409,7 +441,7 @@ export class InteractionAnalyzer {
             const run = merged.slice(i, j + 1);
             if (run.length >= 3) {
                 const all = run.reduce((acc, r) => merge(acc, r));
-                if (fitOf(all.box) >= o.minRunZoom) out.push(all);
+                if (fitOf(all.box) >= o.minMergeZoom) out.push(all);
             } else {
                 out.push(...run);
             }
