@@ -13,9 +13,12 @@
  *  3. Each session gets a depth (the preset for ordinary work, deeper for
  *     sustained detail work, shallower when spread out) and a focus at the
  *     weighted centre of that activity.
- *  4. Shot economy: quick neighbours merge into a wider shot, bursts of quick
- *     hops across the screen stay on the full frame, and shots that couldn't
- *     be watched for a moment are skipped.
+ *  4. Shot economy: quick neighbours merge into a wider shot (only while it
+ *     is still a real zoom), bursts of quick hops across the screen stay on
+ *     the full frame, and shots that couldn't be watched for a moment are skipped.
+ *  5. Knowing when to stay wide: window chrome (scrollbars, title bars / tabs,
+ *     the taskbar) is navigation, and a shot whose cursor keeps roaming outside
+ *     the zoomed view is better watched on the full frame.
  *
  * Segments are emitted in the studio's focus-segment format with the time of
  * their first and last action. The camera (cameraTrack.js) plans the actual
