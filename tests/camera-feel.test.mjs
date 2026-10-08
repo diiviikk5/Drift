@@ -37,3 +37,19 @@ test('camera feel: a chained form fill is one calm shot', () => {
     assert.equal(m.segments, 1);
     assert.ok(m.reversals <= 1);
 });
+
+test('camera feel: the rhythm is the same in the output at any playback speed', async () => {
+    const { getCameraTrack } = await import('../src/lib/zoom/cameraTrack.js');
+    const { InteractionAnalyzer } = await import('../src/lib/zoom/InteractionAnalyzer.js');
+    const s = SCENARIOS['deliberate tour of four areas']();
+    const segs = new InteractionAnalyzer().analyze(s.clicks, s.moves, s.duration, s.keys);
+    const outputDurations = (speed) => getCameraTrack(segs, s.moves, { duration: s.duration, playbackSpeed: speed })
+        .moves.map(m => m.d / speed);
+    const base = outputDurations(1);
+    assert.ok(base.length > 0);
+    for (const speed of [0.75, 1.5]) {
+        for (const d of outputDurations(speed)) {
+            assert.ok(base.some(b => Math.abs(b - d) < 0.01), `a ${d.toFixed(2)} s move at ${speed}x breaks the output tempo`);
+        }
+    }
+});

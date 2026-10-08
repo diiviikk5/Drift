@@ -105,7 +105,7 @@ function sampleY(s) {
  * affects it changes (segments are edited in place by the studio UI).
  */
 export function cameraTrackSignature(segments, samples, options = {}) {
-    let sig = `${options.springProfile || 'cinematic'}|${options.zoomMultiplier ?? 1}|${options.connectedZooms !== false}|${options.trackCursor !== false}|${options.duration ?? ''}|${options.cropKx ?? 1}|${options.cropKy ?? 1}|`;
+    let sig = `${options.springProfile || 'cinematic'}|${options.playbackSpeed ?? 1}|${options.zoomMultiplier ?? 1}|${options.connectedZooms !== false}|${options.trackCursor !== false}|${options.duration ?? ''}|${options.cropKx ?? 1}|${options.cropKy ?? 1}|`;
     for (const s of segments || []) {
         sig += `${s.startTime},${s.endTime},${s.actionTime ?? ''},${s.lastActionTime ?? ''},${s.targetX},${s.targetY},${s.zoomScale},${s.sceneMode || ''},${s.followCursor === false ? 0 : 1};`;
     }
@@ -163,7 +163,10 @@ function framing(x, y, s) {
  */
 export function buildCameraTrack(segments = [], samples = [], options = {}) {
     const M = CAMERA_MOTION;
-    const pace = resolveCameraPace(options.springProfile);
+    // Plans live in recording time; at a faster playback speed every move would
+    // play faster too. Scale durations so the rhythm is the same in the output.
+    const speed = clamp(Number(options.playbackSpeed) || 1, 0.25, 4);
+    const pace = resolveCameraPace(options.springProfile) * speed;
     const zoomMultiplier = options.zoomMultiplier ?? 1;
     const connected = options.connectedZooms !== false;
     const trackCursor = options.trackCursor !== false;

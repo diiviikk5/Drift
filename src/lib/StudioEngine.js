@@ -585,15 +585,27 @@ export class StudioEngine {
     resolveClick(normX, normY) {
         const layout = this.getStageLayout();
         const curTimeSec = this.video?.currentTime || 0;
-        const cam = evaluateCameraAtTime(curTimeSec, this.focusSegments || [], this.getFocusSamples(), {
-            zoomMultiplier: 1.0,
-            connectedZooms: this.connectedZooms !== false,
+        const cam = evaluateCameraAtTime(curTimeSec, this.focusSegments || [], this.getFocusSamples(), this._cameraOptions({
             tiltAngle: 0, // invert from the untilted projection
-            springProfile: this.springProfile || 'cinematic',
             cropKx: layout.cropKx,
             cropKy: layout.cropKy,
-        });
+        }));
         return canvasToSource(normX * this.canvas.width, normY * this.canvas.height, layout, cam);
+    }
+
+    /**
+     * Camera options shared by preview, click mapping and export, so they all
+     * sample the same planned camera track.
+     */
+    _cameraOptions(extra = {}) {
+        return {
+            zoomMultiplier: 1.0,
+            connectedZooms: this.connectedZooms !== false,
+            springProfile: this.springProfile || 'cinematic',
+            playbackSpeed: this.playbackSpeed ?? 1.0,
+            duration: this.videoDuration || this.explicitDuration || undefined,
+            ...extra,
+        };
     }
 
     renderLoop() {
@@ -676,12 +688,12 @@ export class StudioEngine {
 
     updateCamera() {
         const curTimeSec = this.video?.currentTime || 0;
-        this.camera = evaluateCameraAtTime(curTimeSec, this.focusSegments || [], this.getFocusSamples(), {
-            zoomMultiplier: 1.0,
-            connectedZooms: this.connectedZooms !== false,
+        const layout = this.getStageLayout();
+        this.camera = evaluateCameraAtTime(curTimeSec, this.focusSegments || [], this.getFocusSamples(), this._cameraOptions({
             tiltAngle: this.tiltAngle ?? 0,
-            springProfile: this.springProfile || 'cinematic',
-        });
+            cropKx: layout.cropKx,
+            cropKy: layout.cropKy,
+        }));
         this._updateBrowserCursor(curTimeSec * 1000);
     }
 
@@ -803,6 +815,8 @@ export class StudioEngine {
                 borderRadius: this.borderRadius ?? 18,
                 windowChrome: this.windowChrome === true,
                 springProfile: this.springProfile || 'cinematic',
+                playbackSpeed: this.playbackSpeed ?? 1.0,
+                duration: this.videoDuration || this.explicitDuration || undefined,
                 showCursor: this.showCursor,
                 cursorTheme: this.cursorTheme || 'macos',
                 cursorScale: this.cursorScale ?? 1,

@@ -59,6 +59,7 @@ export function evaluateCameraAtTime(timeSec, focusSegments = [], mouseSamples =
         cropKx: kx,
         cropKy: ky,
         springProfile: options.springProfile,
+        playbackSpeed: options.playbackSpeed,
         zoomMultiplier: options.zoomMultiplier ?? 1.0,
         connectedZooms: options.connectedZooms,
         trackCursor: options.trackCursor,
@@ -376,6 +377,8 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         connectedZooms: renderSettings.connectedZooms,
         tiltAngle: renderSettings.tiltAngle,
         springProfile: renderSettings.springProfile,
+        playbackSpeed: renderSettings.playbackSpeed,
+        duration: renderSettings.duration,
         cropKx: layout.cropKx,
         cropKy: layout.cropKy,
     };
