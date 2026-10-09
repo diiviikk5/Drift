@@ -23,6 +23,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .manage(InputListenerState::default())
         .manage(NativeSessionManager::default())
+        .manage(commands::area::AreaPickerState::default())
         .setup(|app| {
             use tauri::Manager;
             log::info!("Drift setup starting...");
@@ -71,6 +72,8 @@ pub fn run() {
             commands::native_recorder::get_native_session_status,
             commands::native_recorder::is_native_capture_supported,
             commands::native_recorder::list_capture_windows,
+            commands::area::enter_area_picker,
+            commands::area::exit_area_picker,
         ]);
 
     let app = builder

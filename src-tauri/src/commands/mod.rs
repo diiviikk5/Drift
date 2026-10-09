@@ -7,3 +7,4 @@ pub mod caret;
 pub mod display;
 pub mod cursor_shape;
 pub mod scroll_detect;
+pub mod area;
