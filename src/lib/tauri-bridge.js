@@ -190,6 +190,20 @@ export async function minimizeWindow() {
     }
 }
 
+/** Freeze a monitor for area selection: returns { image_path, width, height }. */
+export async function enterAreaPicker(monitorIndex = 0) {
+    if (!isTauri()) throw new Error('Area recording needs the desktop app');
+    const api = await getTauriApi();
+    return api.invoke('enter_area_picker', { monitorIndex });
+}
+
+export async function exitAreaPicker() {
+    if (isTauri()) {
+        const api = await getTauriApi();
+        return api.invoke('exit_area_picker');
+    }
+}
+
 /**
  * Restore and focus app window after recording
  */
@@ -610,6 +624,8 @@ export const drift = {
     onGlobalKeystroke,
     minimizeWindow,
     restoreWindow,
+    enterAreaPicker,
+    exitAreaPicker,
     getHotkeys,
     setHotkeys,
     captureScreenshot,

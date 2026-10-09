@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Monitor, Mic, Camera, Timer, Play, Square, AppWindow, RefreshCw, ExternalLink } from 'lucide-react';
+import { Monitor, Mic, Camera, Timer, Play, Square, AppWindow, RefreshCw, ExternalLink, Crop } from 'lucide-react';
 import { createAudioLevelMeter } from '@/lib/audio/audioMix';
 
 /** Accessible on/off switch. */
@@ -90,6 +90,9 @@ export default function CaptureCockpit({
     autoMinimize = true,
     onToggleAutoMinimize = null,
     isNativeSupported = false,
+    captureArea = null,
+    onPickArea = null,
+    onClearArea = null,
 }) {
     const [audioLevel, setAudioLevel] = useState(0);
 
@@ -112,13 +115,28 @@ export default function CaptureCockpit({
         : !isWindowMode
         ? (sources.find(s => s.id === selectedSource) || sources[0] || { name: 'Primary display', width: 1920, height: 1080, is_primary: true })
         : { name: 'Window' };
-    const resolution = activeSource.width ? `${activeSource.width} × ${activeSource.height}` : null;
+    const isAreaMode = !isWindowMode && Boolean(captureArea);
+    const areaPx = isAreaMode && activeSource.width
+        ? { w: Math.round(captureArea.w * activeSource.width), h: Math.round(captureArea.h * activeSource.height) }
+        : null;
+    const resolution = areaPx ? `${areaPx.w} × ${areaPx.h}` : (activeSource.width ? `${activeSource.width} × ${activeSource.height}` : null);
     const thumb = !isWindowMode ? (sourceThumbnails[activeSource.id] || activeSource.thumbnailDataUrl) : null;
 
     const selectScreen = () => {
-        const primary = sources.find(s => s.is_primary) || sources[0];
-        onSelectSource(primary ? primary.id : 'screen:0');
+        onClearArea && onClearArea();
+        if (isWindowMode || !selectedSource) {
+            const primary = sources.find(s => s.is_primary) || sources[0];
+            onSelectSource(primary ? primary.id : 'screen:0');
+        }
     };
+    const selectArea = () => {
+        if (isWindowMode) {
+            const primary = sources.find(s => s.is_primary) || sources[0];
+            onSelectSource(primary ? primary.id : 'screen:0');
+        }
+        onPickArea && onPickArea();
+    };
+    const canPickArea = isNativeSupported && Boolean(onPickArea);
 
     const sourceButton = (active, onClick, Icon, label) => (
         <button
@@ -145,8 +163,9 @@ export default function CaptureCockpit({
                         Clicks, typing and scrolling are tracked so Drift can zoom and edit for you.
                     </p>
                 </div>
-                <div className="grid grid-cols-2 gap-0.5 p-0.5 rounded-lg bg-[var(--pill-bg)] border border-[var(--border-app)] w-56 flex-shrink-0">
-                    {sourceButton(!isWindowMode, selectScreen, Monitor, 'Screen')}
+                <div className={`grid ${canPickArea ? 'grid-cols-3 w-80' : 'grid-cols-2 w-56'} gap-0.5 p-0.5 rounded-lg bg-[var(--pill-bg)] border border-[var(--border-app)] flex-shrink-0`}>
+                    {sourceButton(!isWindowMode && !isAreaMode, selectScreen, Monitor, 'Screen')}
+                    {canPickArea && sourceButton(isAreaMode, selectArea, Crop, 'Area')}
                     {sourceButton(isWindowMode, useNativeWindows ? onSelectWindowMode : onSelectBrowserSource, AppWindow, 'Window')}
                 </div>
             </div>
@@ -172,6 +191,17 @@ export default function CaptureCockpit({
                             </button>
                         );
                     })}
+                </div>
+            )}
+
+            {/* Area */}
+            {isAreaMode && (
+                <div className="flex items-center justify-between px-3.5 h-10 rounded-xl bg-[var(--bg-card)] border border-[var(--border-app)] text-[13px]">
+                    <span className="text-[var(--text-app)] flex items-center gap-2">
+                        <Crop className="w-3.5 h-3.5" />
+                        Area {areaPx ? `${areaPx.w} × ${areaPx.h}` : ''} on {activeSource.name || 'display'}
+                    </span>
+                    <button type="button" onClick={onPickArea} className="text-[var(--text-app-muted)] hover:text-[var(--text-app)]">Change</button>
                 </div>
             )}
 
@@ -231,6 +261,12 @@ export default function CaptureCockpit({
                 {!hasActiveStream && (thumb ? (
                     <div className="relative w-full h-full">
                         <img src={thumb} alt="" className="w-full h-full object-cover opacity-90" />
+                        {isAreaMode && (
+                            <div
+                                className="absolute rounded-sm border-2 border-[var(--accent-app)] shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] pointer-events-none"
+                                style={{ left: `${captureArea.x * 100}%`, top: `${captureArea.y * 100}%`, width: `${captureArea.w * 100}%`, height: `${captureArea.h * 100}%` }}
+                            />
+                        )}
                         <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <button
                                 type="button"

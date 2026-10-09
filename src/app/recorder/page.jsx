@@ -15,6 +15,7 @@ import CountdownOverlay from '@/components/desktop/CountdownOverlay';
 import StudioTimeline from '@/components/desktop/StudioTimeline';
 import InspectorPanel from '@/components/desktop/InspectorPanel';
 import BlurHandles from '@/components/desktop/BlurHandles';
+import AreaPicker from '@/components/desktop/AreaPicker';
 import ExportDialog from '@/components/desktop/ExportDialog';
 import HotkeyModal from '@/components/desktop/HotkeyModal';
 import { normalizeHotkeys, formatAccelerator, matchesAccelerator, stripAppHotkeys } from '@/lib/hotkeys';
@@ -134,6 +135,11 @@ export default function RecorderPage() {
     const [selectedBlurId, setSelectedBlurId] = useState(null);
     const [blurDrawMode, setBlurDrawMode] = useState(false);
     const [sourceArea, setSourceArea] = useState(null);
+    // Area recording: the part of the monitor to record (normalized), the
+    // picker state while selecting, and the area locked in when recording starts.
+    const [captureArea, setCaptureArea] = useState(null);
+    const [areaPicker, setAreaPicker] = useState(null);
+    const recordAreaRef = useRef(null);
     const isDraggingCanvasRef = useRef(false);
     const dragStartPosRef = useRef({ clientX: 0, clientY: 0, canvasX: 0, canvasY: 0, rect: null });
 
@@ -517,6 +523,7 @@ export default function RecorderPage() {
 
     // Source selection & live preview
     const selectSource = async (id) => {
+        if (id !== selectedSource) setCaptureArea(null); // an area belongs to one display
         setSelectedSource(id);
         if (String(id).startsWith('window:')) return;
         if (platform === 'tauri') {
@@ -672,6 +679,25 @@ export default function RecorderPage() {
         studioRef.current?.setSourceArea?.(sourceArea);
     }, [sourceArea]);
 
+    const monitorIndexOf = (src) => (typeof src === 'number' ? src : (parseInt(String(src || '0').replace(/\D+/g, ''), 10) || 0));
+
+    const handlePickArea = async () => {
+        try {
+            const backdrop = await drift.enterAreaPicker(monitorIndexOf(selectedSource));
+            const url = await drift.resolveAssetUrl(backdrop.image_path);
+            setAreaPicker({ imageUrl: `${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`, width: backdrop.width, height: backdrop.height });
+        } catch (e) {
+            setNotice(`Couldn't open the area picker: ${e?.message || e}`);
+            try { await drift.exitAreaPicker(); } catch {}
+        }
+    };
+
+    const closeAreaPicker = async (area) => {
+        if (area) setCaptureArea(area);
+        setAreaPicker(null);
+        try { await drift.exitAreaPicker(); } catch {}
+    };
+
     const startRecordingActual = async () => {
         try {
             const isWindowTarget = selectedSource === 'browser-source';
@@ -688,6 +714,7 @@ export default function RecorderPage() {
                         ? selectedSource
                         : (parseInt(String(selectedSource || '0').replace(/\D+/g, ''), 10) || 0);
 
+                    recordAreaRef.current = nativeWindowId ? null : captureArea;
                     await drift.startNativeSession({
                         windowId: nativeWindowId,
                         monitorIndex,
@@ -884,6 +911,25 @@ export default function RecorderPage() {
                         ...(outside(s) ? { hidden: true } : {}),
                     }));
 
+                    // Area recording: the video keeps the whole monitor and the studio
+                    // shows only the area, so tracking moves into area coordinates.
+                    const recordArea = recordAreaRef.current;
+                    const toArea = (list) => {
+                        if (!recordArea) return list;
+                        return list.map(p => {
+                            const u = (p.x - recordArea.x) / recordArea.w;
+                            const v = (p.y - recordArea.y) / recordArea.h;
+                            const out = u < -0.005 || u > 1.005 || v < -0.005 || v > 1.005;
+                            return {
+                                ...p,
+                                x: Math.max(0, Math.min(1, u)),
+                                y: Math.max(0, Math.min(1, v)),
+                                ...(p.h != null ? { h: p.h / recordArea.h } : {}),
+                                ...(out || p.hidden ? { hidden: true } : {}),
+                            };
+                        });
+                    };
+
                     let keystrokeList = [];
                     if (typeof drift.getSessionKeystrokes === 'function') {
                         try {
@@ -903,18 +949,19 @@ export default function RecorderPage() {
                     setRecordedKeystrokes(keystrokeList);
                     // Text caret track (target pixels -> normalized; y is the caret top).
                     setRecordedCursorShapes((result.cursor_shapes || []).map(c => ({ time: c.t, shape: c.shape })));
-                    setRecordedCaret((result.caret || []).map(c => ({
+                    setRecordedCaret(toArea((result.caret || []).map(c => ({
                         time: c.t,
                         x: Math.max(0, Math.min(1, c.x / srcW)),
                         y: Math.max(0, Math.min(1, c.y / srcH)),
                         h: Math.max(0, c.h / srcH),
                         ...(c.x < 0 || c.y < 0 || c.x > srcW || c.y > srcH ? { hidden: true } : {}),
-                    })));
+                    }))));
 
                     setNativeAudioTracks({ systemAudioUrl: sysAudioUrl, micAudioUrl });
                     setRecordedBlob(videoUrl);
-                    setRecordedClicks(clickList);
-                    setRecordedMoves(moves);
+                    setRecordedClicks(toArea(clickList));
+                    setRecordedMoves(toArea(moves));
+                    setSourceArea(recordArea);
 
                     // Finalize native webcam recording if active
                     if (nativeWebcamRecorderRef.current) {
@@ -1658,6 +1705,16 @@ export default function RecorderPage() {
 
     return (
         <div className={`drift-app h-screen select-none flex flex-col overflow-hidden theme-${getAppTheme(theme).id} ${isDark ? 'dark' : ''} bg-[var(--bg-app)] text-[var(--text-app)]`}>
+            {areaPicker && (
+                <AreaPicker
+                    imageUrl={areaPicker.imageUrl}
+                    screenWidth={areaPicker.width}
+                    screenHeight={areaPicker.height}
+                    initial={captureArea}
+                    onConfirm={(area) => closeAreaPicker(area)}
+                    onCancel={() => closeAreaPicker(null)}
+                />
+            )}
             {/* Offscreen media elements for Canvas pipeline - MUST NOT use display:none so Chromium decodes frames */}
             <video
                 ref={recorderVideoRef}
@@ -1702,6 +1759,9 @@ export default function RecorderPage() {
                     <div className="flex-1 flex flex-col w-full overflow-y-auto px-8 py-8">
                         {/* Centered Cockpit Card */}
                         <CaptureCockpit
+                            captureArea={captureArea}
+                            onPickArea={handlePickArea}
+                            onClearArea={() => setCaptureArea(null)}
                             sources={sources}
                             selectedSource={selectedSource}
                             onSelectSource={selectSource}
