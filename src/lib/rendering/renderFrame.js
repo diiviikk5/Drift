@@ -184,6 +184,95 @@ export function cursorIdleOpacity(timeSec, mouseSamples) {
     return 1 - dim * (1 - IDLE_MIN_OPACITY);
 }
 
+function intrinsicWidth(src) {
+    return src ? (src.videoWidth || src.displayWidth || src.codedWidth || src.naturalWidth || src.width || 0) : 0;
+}
+
+function intrinsicHeight(src) {
+    return src ? (src.videoHeight || src.displayHeight || src.codedHeight || src.naturalHeight || src.height || 0) : 0;
+}
+
+/** The recorded area as a normalized rect; the full frame when unset or invalid. */
+export function normalizeSourceArea(a) {
+    if (!a || !(a.w > 0) || !(a.h > 0)) return { x: 0, y: 0, w: 1, h: 1, full: true };
+    const x = Math.max(0, Math.min(1, a.x || 0));
+    const y = Math.max(0, Math.min(1, a.y || 0));
+    const w = Math.max(0.02, Math.min(1 - x, a.w));
+    const h = Math.max(0.02, Math.min(1 - y, a.h));
+    const full = x < 1e-4 && y < 1e-4 && w > 0.9999 && h > 0.9999;
+    return { x, y, w, h, full };
+}
+
+/** Is a blur region visible at time t, and how strongly (fades at its edges)? */
+export function blurRegionAlpha(r, t, fade = 0.2) {
+    const start = Number.isFinite(r.start) ? r.start : -Infinity;
+    const end = Number.isFinite(r.end) ? r.end : Infinity;
+    if (t < start || t > end) return 0;
+    const a = Number.isFinite(start) ? Math.min(1, (t - start) / fade) : 1;
+    const b = Number.isFinite(end) ? Math.min(1, (end - t) / fade) : 1;
+    return Math.max(0, Math.min(a, b));
+}
+
+/**
+ * Frosted-glass blur over parts of the recording: the same pixels redrawn
+ * through a Gaussian blur (sampling a margin around the region so the edges
+ * blur into real surroundings), clipped to a rounded rect, with a faint tint
+ * and a hairline edge so it reads as deliberate, not as damage.
+ * Drawn in content space (inside the camera transform).
+ */
+function drawBlurRegions(ctx, src, regions, t, { contentW, contentH, area, fullW, fullH, scale, unit }) {
+    const vw = intrinsicWidth(src) || fullW;
+    const vh = intrinsicHeight(src) || fullH;
+    const s = Math.max(1, scale || 1);
+    for (const r of regions) {
+        const alpha = blurRegionAlpha(r, t);
+        if (alpha <= 0) continue;
+        const x = r.x * contentW;
+        const y = r.y * contentH;
+        const w = r.w * contentW;
+        const h = r.h * contentH;
+        if (!(w > 2 && h > 2)) continue;
+        const strength = Math.max(0.3, Math.min(2, r.strength ?? 1));
+        // Blur radius in content units: enough to make text unreadable at any size.
+        const blur = (6 + Math.min(w, h) * 0.08) * strength * Math.max(0.6, unit);
+        const radius = Math.min(14 * unit, Math.min(w, h) * 0.3);
+        const m = blur * 2;
+        const cx0 = Math.max(0, x - m);
+        const cy0 = Math.max(0, y - m);
+        const cx1 = Math.min(contentW, x + w + m);
+        const cy1 = Math.min(contentH, y + h + m);
+        const sx = (area.x + (cx0 / contentW) * area.w) * vw;
+        const sy = (area.y + (cy0 / contentH) * area.h) * vh;
+        const sw = ((cx1 - cx0) / contentW) * area.w * vw;
+        const sh = ((cy1 - cy0) / contentH) * area.h * vh;
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        _drawRoundedRectPath(ctx, x, y, w, h, radius);
+        ctx.clip();
+        try {
+            // Canvas filters work in canvas pixels; the content is scaled by the camera.
+            ctx.filter = `blur(${(blur * s).toFixed(1)}px) saturate(1.35) brightness(1.04)`;
+            ctx.drawImage(src, sx, sy, sw, sh, cx0, cy0, cx1 - cx0, cy1 - cy0);
+        } catch (e) {
+            ctx.fillStyle = 'rgba(120, 128, 140, 0.9)';
+            ctx.fillRect(x, y, w, h);
+        }
+        ctx.filter = 'none';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
+        ctx.fillRect(x, y, w, h);
+        ctx.restore();
+
+        ctx.save();
+        ctx.globalAlpha = alpha * 0.9;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.24)';
+        ctx.lineWidth = (1.2 * unit) / s;
+        _drawRoundedRectPath(ctx, x, y, w, h, radius);
+        ctx.stroke();
+        ctx.restore();
+    }
+}
+
 /**
  * Computes window frame dimensions and offsets preserving video aspect ratio inside canvas
  */
@@ -256,6 +345,11 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         cursorShapes = [],
     } = sessionData;
 
+    // Recorded area: only this part of the capture is shown (normalized rect).
+    const area = normalizeSourceArea(renderSettings.sourceArea);
+    const fullW = renderSettings.sourceWidth || intrinsicWidth(videoSource) || 1920;
+    const fullH = renderSettings.sourceHeight || intrinsicHeight(videoSource) || 1080;
+
     // 2. Stage layout (resolution independent: 1 unit = 1px at 1080p)
     const layout = getFrameMetrics(width, height, videoSource, {
         insetPadding,
@@ -263,8 +357,8 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
         titleBarHeight,
         borderRadius,
         frameFit: renderSettings.frameFit,
-        sourceWidth: renderSettings.sourceWidth,
-        sourceHeight: renderSettings.sourceHeight,
+        sourceWidth: fullW * area.w,
+        sourceHeight: fullH * area.h,
     });
     const { padX, padY, frameW, frameH, headerH, videoH, contentW, contentH, unit, radius } = layout;
 
@@ -434,7 +528,13 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
 
     const drawVideo = () => {
         try {
-            ctx.drawImage(videoSource, 0, 0, contentW, contentH);
+            if (area.full) {
+                ctx.drawImage(videoSource, 0, 0, contentW, contentH);
+            } else {
+                const vw = intrinsicWidth(videoSource) || fullW;
+                const vh = intrinsicHeight(videoSource) || fullH;
+                ctx.drawImage(videoSource, area.x * vw, area.y * vh, area.w * vw, area.h * vh, 0, 0, contentW, contentH);
+            }
         } catch (e) {
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(0, 0, contentW, contentH);
@@ -456,6 +556,13 @@ export function renderFrame(ctx, timeSec, videoSource, sessionData = {}, renderS
     applyCamera(camera);
     if (videoSource) drawVideo();
     ctx.globalAlpha = 1;
+
+    // Privacy blur: sticks to the content, so it moves and zooms with the camera.
+    if (videoSource && renderSettings.blurRegions && renderSettings.blurRegions.length) {
+        drawBlurRegions(ctx, videoSource, renderSettings.blurRegions, timeSec, {
+            contentW, contentH, area, fullW, fullH, scale: camera.scale, unit,
+        });
+    }
 
     // 7. Click ripples (content space, so they zoom with the camera)
     if (clickRipples && clicks && clicks.length > 0) {
