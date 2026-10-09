@@ -231,12 +231,15 @@ export class StudioEngine {
         };
         this.video.onpause = () => {
             this.isPlaying = false;
-            cancelAnimationFrame(this.animationFrame);
+            this._stopRenderLoop();
+            this.drawFrame();
         };
         this.video.onended = () => {
             this.isPlaying = false;
+            this._stopRenderLoop();
         };
         this.video.onseeked = () => {
+            if (this._frameTime != null) this._frameTime = this.video.currentTime;
             if (this.webcamVideo) {
                 this.webcamVideo.currentTime = Math.max(0, this.video.currentTime + (this.webcamOffset || 0));
             }
@@ -609,9 +612,25 @@ export class StudioEngine {
     }
 
     renderLoop() {
-        let frameCount = 0;
+        this._stopRenderLoop();
+        const v = this.video;
+        // Preferred: draw once per presented video frame, at that frame's exact
+        // media time - the same thing export does, so the camera and pointer
+        // can't drift against the picture (no jitter, no backwards steps).
+        if (v && typeof v.requestVideoFrameCallback === 'function') {
+            const onFrame = (_now, meta) => {
+                if (!this.isPlaying || this.video !== v) return;
+                this._frameTime = meta.mediaTime;
+                this._applyPlaybackRate(meta.mediaTime);
+                this.drawFrame();
+                this._videoFrameRequest = v.requestVideoFrameCallback(onFrame);
+            };
+            this._frameTime = v.currentTime || 0;
+            this.drawFrame();
+            this._videoFrameRequest = v.requestVideoFrameCallback(onFrame);
+            return;
+        }
         const loop = () => {
-            frameCount++;
             if (this.video) {
                 this._applyPlaybackRate(this.video.currentTime);
             }
@@ -620,6 +639,16 @@ export class StudioEngine {
             if (this.isPlaying) this.animationFrame = requestAnimationFrame(loop);
         };
         loop();
+    }
+
+    _stopRenderLoop() {
+        if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
+        this.animationFrame = null;
+        if (this._videoFrameRequest != null && this.video && typeof this.video.cancelVideoFrameCallback === 'function') {
+            this.video.cancelVideoFrameCallback(this._videoFrameRequest);
+        }
+        this._videoFrameRequest = null;
+        this._frameTime = null;
     }
 
     _applyPlaybackRate(curTimeSec) {
@@ -647,10 +676,7 @@ export class StudioEngine {
 
     dispose() {
         this.isPlaying = false;
-        if (this.animationFrame) {
-            cancelAnimationFrame(this.animationFrame);
-            this.animationFrame = null;
-        }
+        this._stopRenderLoop();
         if (this.video) {
             this.video.pause();
             if (this.video.src && this.video.src.startsWith('blob:')) {
@@ -755,6 +781,8 @@ export class StudioEngine {
         const v = this.video;
         if (!v) return 0;
         const actual = v.currentTime || 0;
+        // Playing with per-frame callbacks: the time of the frame on screen.
+        if (!v.paused && !v.seeking && this._frameTime != null) return this._frameTime;
         if (v.paused || v.seeking || v.readyState < 3) {
             this._clock = null;
             return actual;
