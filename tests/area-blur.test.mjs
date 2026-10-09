@@ -63,3 +63,12 @@ test('blur regions fade in and out at their time edges', () => {
     assert.equal(blurRegionAlpha(r, 3), 1);
     assert.equal(blurRegionAlpha({}, 100), 1, 'no range = whole video');
 });
+
+test('sourceToCanvas inverts canvasToSource', async () => {
+    const { canvasToSource, sourceToCanvas, getFrameMetrics } = await import('../src/lib/rendering/renderFrame.js');
+    const layout = getFrameMetrics(1920, 1080, null, { insetPadding: 0.06, sourceWidth: 960, sourceHeight: 270 });
+    const cam = { x: 0.4, y: 0.6, scale: 1.5 };
+    const c = sourceToCanvas(0.45, 0.55, layout, cam);
+    const back = canvasToSource(c.x, c.y, layout, cam);
+    assert.ok(Math.abs(back.x - 0.45) < 1e-9 && Math.abs(back.y - 0.55) < 1e-9);
+});

@@ -6,7 +6,7 @@ import { isTauri } from './tauri-bridge.js';
 import { InteractionAnalyzer } from './zoom/InteractionAnalyzer.js';
 import { openSequentialFrames } from './export/frameSource.js';
 import { buildFocusSamples } from './zoom/typingFocus.js';
-import { renderFrame, getFrameMetrics, canvasToSource, evaluateCameraAtTime, getInterpolatedCursor } from './rendering/renderFrame.js';
+import { renderFrame, getFrameMetrics, canvasToSource, sourceToCanvas, normalizeSourceArea, evaluateCameraAtTime, getInterpolatedCursor } from './rendering/renderFrame.js';
 import { getSmoothedCursorPath } from './zoom/cursorPathSmoothing.js';
 import { ZOOM_PRESETS, DEFAULT_ZOOM_SCALE, resolveZoomPreset } from './zoom/ZoomConstruct.js';
 
@@ -96,6 +96,10 @@ export class StudioEngine {
         this.aspectRatio = options.aspectRatio || '16:9';
         this.frameFit = options.frameFit || 'contain';
         this.autoZoomOnClicks = options.autoZoomOnClicks !== false;
+        // Recorded area (normalized rect of the capture) and privacy blur regions
+        // (normalized to the recorded area, {x, y, w, h, start, end, strength}).
+        this.sourceArea = options.sourceArea || null;
+        this.blurRegions = options.blurRegions || [];
 
         const initialSrcW = options.sourceWidth || (this.canvas?.width) || (typeof window !== 'undefined' ? (window.screen.width * (window.devicePixelRatio || 1)) : 1920);
         const initialSrcH = options.sourceHeight || (this.canvas?.height) || (typeof window !== 'undefined' ? (window.screen.height * (window.devicePixelRatio || 1)) : 1080);
@@ -575,13 +579,44 @@ export class StudioEngine {
 
     /** Current stage layout, matching what renderFrame draws. */
     getStageLayout() {
+        const area = normalizeSourceArea(this.sourceArea);
+        const fullW = this.video?.videoWidth || 1920;
+        const fullH = this.video?.videoHeight || 1080;
         return getFrameMetrics(this.canvas.width, this.canvas.height, this.video, {
             insetPadding: this.insetPadding ?? 0.05,
             windowChrome: this.windowChrome === true,
             titleBarHeight: this.titleBarHeight ?? 34,
             borderRadius: this.borderRadius ?? 18,
             frameFit: this.frameFit || 'contain',
+            sourceWidth: fullW * area.w,
+            sourceHeight: fullH * area.h,
         });
+    }
+
+    /**
+     * Inverse of resolveClick: where a normalized source point is on the canvas
+     * right now (normalized 0..1 canvas coordinates). Used to place editor handles.
+     */
+    sourceToCanvasNorm(x, y) {
+        const layout = this.getStageLayout();
+        const t = this.video?.currentTime || 0;
+        const cam = evaluateCameraAtTime(t, this.focusSegments || [], this.getFocusSamples(), this._cameraOptions({
+            tiltAngle: 0,
+            cropKx: layout.cropKx,
+            cropKy: layout.cropKy,
+        }));
+        const p = sourceToCanvas(x, y, layout, cam);
+        return { x: p.x / this.canvas.width, y: p.y / this.canvas.height, scale: cam.scale };
+    }
+
+    setSourceArea(area) {
+        this.sourceArea = area || null;
+        this.drawFrame();
+    }
+
+    setBlurRegions(regions) {
+        this.blurRegions = Array.isArray(regions) ? regions : [];
+        this.drawFrame();
     }
 
     /** Map a normalized canvas point (0..1) to normalized source coordinates. */
@@ -865,6 +900,8 @@ export class StudioEngine {
                 captionsEnabled: this.captionsEnabled,
                 annotations: this.annotations || [],
                 showKeystrokes: this.showKeystrokes !== false,
+                sourceArea: this.sourceArea,
+                blurRegions: this.blurRegions || [],
             }
         );
     }

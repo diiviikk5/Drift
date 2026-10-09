@@ -295,6 +295,17 @@ export function canvasToSource(canvasX, canvasY, layout, camera) {
     return { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) };
 }
 
+/** Inverse of canvasToSource (no clamping): canvas pixel position of a source point. */
+export function sourceToCanvas(x, y, layout, camera) {
+    const cx = layout.padX + layout.videoW * 0.5;
+    const cy = layout.padY + layout.headerH + layout.videoH * 0.5;
+    const s = camera?.scale || 1;
+    return {
+        x: cx + (x - (camera?.x ?? 0.5)) * layout.contentW * s,
+        y: cy + (y - (camera?.y ?? 0.5)) * layout.contentH * s,
+    };
+}
+
 let _cachedBackdropCanvas = null;
 let _cachedBackdropKey = '';
 
