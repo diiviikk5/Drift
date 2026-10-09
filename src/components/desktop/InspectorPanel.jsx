@@ -17,9 +17,11 @@ import {
     Mic,
     MicOff,
     Activity,
-    AppWindow
+    AppWindow,
+    EyeOff
 } from 'lucide-react';
 import WallpaperPicker from './WallpaperPicker';
+import PrivacyPanel from './PrivacyPanel';
 import { DEFAULT_BACKGROUND } from '@/lib/rendering/backgrounds';
 
 export default function InspectorPanel({
@@ -90,6 +92,7 @@ export default function InspectorPanel({
     onChangeZoomFrequency,
     playbackSpeed = 1.0,
     onChangePlaybackSpeed,
+    privacy = null,
 }) {
     const [activeTab, setActiveTab] = useState('style');
     const fileInputRef = useRef(null);
@@ -112,13 +115,14 @@ export default function InspectorPanel({
     return (
         <aside className="w-80 flex-shrink-0 border-l border-[var(--border-app)] bg-[var(--bg-card)] flex flex-col h-full select-none">
             {/* Tab Bar */}
-            <div className="grid grid-cols-5 gap-0.5 p-1.5 border-b border-[var(--border-app)]">
+            <div className="grid grid-cols-6 gap-0.5 p-1.5 border-b border-[var(--border-app)]">
                 {[
                     { id: 'style', label: 'Canvas', icon: Palette },
                     { id: 'camera', label: 'Zoom', icon: Camera },
                     { id: 'cursor', label: 'Cursor', icon: MousePointer },
                     { id: 'audio', label: 'Audio', icon: Volume2 },
                     { id: 'webcam', label: 'Camera', icon: Video },
+                    { id: 'privacy', label: 'Blur', icon: EyeOff },
                 ].map((tab) => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
@@ -143,6 +147,8 @@ export default function InspectorPanel({
             {/* Tab Contents */}
             <div className="flex-1 overflow-y-auto p-4 space-y-5">
                 {/* ═══ CANVAS TAB ═══ */}
+                {activeTab === 'privacy' && privacy && <PrivacyPanel {...privacy} />}
+
                 {activeTab === 'style' && (
                     <>
                         {/* Aspect Ratio */}

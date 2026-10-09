@@ -14,6 +14,7 @@ import CaptureCockpit from '@/components/desktop/CaptureCockpit';
 import CountdownOverlay from '@/components/desktop/CountdownOverlay';
 import StudioTimeline from '@/components/desktop/StudioTimeline';
 import InspectorPanel from '@/components/desktop/InspectorPanel';
+import BlurHandles from '@/components/desktop/BlurHandles';
 import ExportDialog from '@/components/desktop/ExportDialog';
 import HotkeyModal from '@/components/desktop/HotkeyModal';
 import { normalizeHotkeys, formatAccelerator, matchesAccelerator, stripAppHotkeys } from '@/lib/hotkeys';
@@ -128,6 +129,11 @@ export default function RecorderPage() {
 
     // Interactive Drag-to-Zoom State
     const [dragBox, setDragBox] = useState(null);
+    // Privacy blur regions (normalized to the recording) and the recorded area.
+    const [blurRegions, setBlurRegions] = useState([]);
+    const [selectedBlurId, setSelectedBlurId] = useState(null);
+    const [blurDrawMode, setBlurDrawMode] = useState(false);
+    const [sourceArea, setSourceArea] = useState(null);
     const isDraggingCanvasRef = useRef(false);
     const dragStartPosRef = useRef({ clientX: 0, clientY: 0, canvasX: 0, canvasY: 0, rect: null });
 
@@ -313,6 +319,9 @@ export default function RecorderPage() {
 
             engineRef.current.onStopCallback = (blob, clicks, dur, meta = {}) => {
                 savedSegmentsRef.current = null;
+                setBlurRegions([]);
+                setSelectedBlurId(null);
+                setSourceArea(null);
                 setIsRecording(false);
                 setHasActiveStream(false);
                 if (drift.isTauri() && typeof drift.restoreWindow === 'function') {
@@ -415,6 +424,8 @@ export default function RecorderPage() {
                         showCursor: showCursor,
                         systemAudioUrl: nativeAudioTracks.systemAudioUrl,
                         micAudioUrl: nativeAudioTracks.micAudioUrl,
+                        blurRegions,
+                        sourceArea,
                     }
                 );
                 studioRef.current.background = background;
@@ -653,6 +664,14 @@ export default function RecorderPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    useEffect(() => {
+        studioRef.current?.setBlurRegions?.(blurRegions);
+    }, [blurRegions]);
+
+    useEffect(() => {
+        studioRef.current?.setSourceArea?.(sourceArea);
+    }, [sourceArea]);
+
     const startRecordingActual = async () => {
         try {
             const isWindowTarget = selectedSource === 'browser-source';
@@ -802,6 +821,8 @@ export default function RecorderPage() {
                 }
                 savedSegmentsRef.current = null;
                 setFocusSegments([]);
+                setBlurRegions([]);
+                setSelectedBlurId(null);
                 setIsRecording(false);
                 setTimer('00:00');
                 setHasActiveStream(false);
@@ -1128,6 +1149,7 @@ export default function RecorderPage() {
     };
 
     const handleCanvasClick = (e) => {
+        if (blurDrawMode) { setBlurDrawMode(false); return; }
         if (viewMode !== 'studio' || !studioRef.current || !studioVideoRef.current) return;
         const rect = studioCanvasRef.current ? studioCanvasRef.current.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
         const canvasX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -1192,6 +1214,26 @@ export default function RecorderPage() {
         if (dist <= 6) {
             // Quick point click
             handleCanvasClick(e);
+        } else if (blurDrawMode && dragBox && dragBox.width > 6 && dragBox.height > 6 && studioRef.current) {
+            // Draw a privacy blur over the dragged box (in recording coordinates).
+            const rect = start.rect || (studioCanvasRef.current ? studioCanvasRef.current.getBoundingClientRect() : null);
+            if (rect) {
+                const a = studioRef.current.resolveClick(dragBox.left / rect.width, dragBox.top / rect.height);
+                const b = studioRef.current.resolveClick((dragBox.left + dragBox.width) / rect.width, (dragBox.top + dragBox.height) / rect.height);
+                const region = {
+                    id: `blur_${Date.now().toString(36)}`,
+                    x: Math.min(a.x, b.x),
+                    y: Math.min(a.y, b.y),
+                    w: Math.max(0.02, Math.abs(b.x - a.x)),
+                    h: Math.max(0.02, Math.abs(b.y - a.y)),
+                    start: null,
+                    end: null,
+                    strength: 1,
+                };
+                setBlurRegions(prev => [...prev, region]);
+                setSelectedBlurId(region.id);
+            }
+            setBlurDrawMode(false);
         } else if (dragBox && dragBox.width > 12 && dragBox.height > 12 && studioRef.current && studioVideoRef.current) {
             // Drag box focal crop
             const rect = start.rect || (studioCanvasRef.current ? studioCanvasRef.current.getBoundingClientRect() : null);
@@ -1492,6 +1534,7 @@ export default function RecorderPage() {
                 systemAudioVolume, micAudioVolume, isSystemAudioMuted, isMicAudioMuted, autoDuck,
                 insetPadding, borderRadius, windowChrome, springProfile, playbackSpeed, showKeystrokes,
                 tiltAngle, connectedZooms, reactiveWebcam, webcamSettings, trimStart, trimEnd,
+                blurRegions, sourceArea,
             });
             triggerBlobDownload(project, 'drift');
             setNotice('Project saved.');
@@ -1586,6 +1629,9 @@ export default function RecorderPage() {
             setConnectedZooms(project.connectedZooms ?? true);
             setReactiveWebcam(project.reactiveWebcam ?? true);
             setWebcamSettings(project.webcamSettings ?? { enabled: false, size: 0.22, shape: 'circle', position: 'bottom-right' });
+            setBlurRegions(Array.isArray(project.blurRegions) ? project.blurRegions : []);
+            setSourceArea(project.sourceArea ?? null);
+            setSelectedBlurId(null);
             setTrimStart(project.trimStart ?? 0);
             setTrimEnd(project.trimEnd ?? project.duration);
             setViewMode('studio');
@@ -1719,7 +1765,7 @@ export default function RecorderPage() {
                                         onMouseDown={handleCanvasMouseDown}
                                         onMouseMove={handleCanvasMouseMove}
                                         onMouseUp={handleCanvasMouseUp}
-                                        title="Click or drag a box to frame a zoom focus area"
+                                        title={blurDrawMode ? 'Drag over anything you want to blur' : 'Click or drag a box to frame a zoom focus area'}
                                     >
                                         <canvas
                                             ref={studioCanvasRef}
@@ -1728,8 +1774,29 @@ export default function RecorderPage() {
                                             className="max-w-full max-h-full w-auto h-auto object-contain pointer-events-none block"
                                         />
 
+                                        {/* Privacy blur boxes (editable while paused) */}
+                                        {!isPlaying && (
+                                            <BlurHandles
+                                                studio={studioRef.current}
+                                                regions={blurRegions}
+                                                selectedId={selectedBlurId}
+                                                frame={currentTime}
+                                                onSelect={setSelectedBlurId}
+                                                onChange={(id, patch) => setBlurRegions(prev => prev.map(r => (r.id === id ? { ...r, ...patch } : r)))}
+                                                onDelete={(id) => { setBlurRegions(prev => prev.filter(r => r.id !== id)); setSelectedBlurId(null); }}
+                                            />
+                                        )}
+
+                                        {/* While drawing a blur: a frosted preview of the box */}
+                                        {dragBox && blurDrawMode && (
+                                            <div
+                                                className="absolute pointer-events-none rounded-md border border-white/50 bg-white/10 backdrop-blur-md z-30"
+                                                style={{ left: dragBox.left, top: dragBox.top, width: dragBox.width, height: dragBox.height }}
+                                            />
+                                        )}
+
                                         {/* Live Glowing Drag-to-Zoom Selection Box */}
-                                        {dragBox && (
+                                        {dragBox && !blurDrawMode && (
                                             <div
                                                 className="absolute pointer-events-none border-2 border-[var(--accent-app)] bg-[var(--accent-app)]/15 rounded-lg shadow-[0_0_15px_rgba(220,254,80,0.45)] z-30 transition-none"
                                                 style={{
@@ -1820,6 +1887,16 @@ export default function RecorderPage() {
 
                         {/* Right Inspector Sidebar */}
                         <InspectorPanel
+                            privacy={{
+                                blurRegions,
+                                selectedBlurId,
+                                drawingBlur: blurDrawMode,
+                                currentTime,
+                                onStartDrawBlur: () => { studioVideoRef.current?.pause(); setBlurDrawMode(m => !m); },
+                                onSelectBlur: setSelectedBlurId,
+                                onUpdateBlur: (id, patch) => setBlurRegions(prev => prev.map(r => (r.id === id ? { ...r, ...patch } : r))),
+                                onDeleteBlur: (id) => { setBlurRegions(prev => prev.filter(r => r.id !== id)); setSelectedBlurId(null); },
+                            }}
                             background={background}
                             onChangeBackground={handleChangeBackground}
                             backgrounds={BACKGROUNDS}
