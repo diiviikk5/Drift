@@ -9,7 +9,7 @@ import { useTheme } from '../ThemeProvider';
 import ProductHuntBadge from '../ProductHuntBadge';
 
 // Drift Recorder is the current app; the 2.0 installer stays up as Legacy Drift.
-const DOWNLOAD_URL = '/downloads/Drift-Recorder_3.0.0_x64-setup.exe';
+const DOWNLOAD_URL = '/downloads/Drift-Recorder_3.1.0_x64-setup.exe';
 const LEGACY_URL = '/downloads/Drift_2.0.0_x64-setup.exe';
 const REPO_URL = 'https://github.com/diiviikk5/Drift';
 const PH_URL = 'https://www.producthunt.com/products/drift-6?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_campaign=badge-drift-6ef740e8-671a-4130-90b6-140b7784af27';
