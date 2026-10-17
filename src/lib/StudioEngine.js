@@ -9,6 +9,7 @@ import { buildFocusSamples } from './zoom/typingFocus.js';
 import { renderFrame, getFrameMetrics, canvasToSource, sourceToCanvas, normalizeSourceArea, evaluateCameraAtTime, getInterpolatedCursor } from './rendering/renderFrame.js';
 import { getSmoothedCursorPath } from './zoom/cursorPathSmoothing.js';
 import { ZOOM_PRESETS, DEFAULT_ZOOM_SCALE, resolveZoomPreset } from './zoom/ZoomConstruct.js';
+import { createCursorEraser } from './vision/cursorEraser.js';
 
 const FRAME_SCALE = 0.82;
 const TITLE_BAR_HEIGHT = 36;
@@ -33,6 +34,11 @@ export class StudioEngine {
         this.caret = options.caret || [];
         this.cursorShapes = options.cursorShapes || [];
         this.showKeystrokes = options.showKeystrokes !== false;
+        // Web recordings carry the real pointer in their pixels; its recorded
+        // track lets each frame be cleaned so only Drift's pointer shows.
+        this.pointerTrack = options.pointerTrack || null;
+        this.cursorEraser = createCursorEraser(this.pointerTrack);
+        this.eraseBakedCursor = options.eraseBakedCursor !== false;
 
         // Webcam PiP Video & Settings
         this.webcamBlob = options.webcamBlob || null;
@@ -854,7 +860,14 @@ export class StudioEngine {
         this._lastDrawSize = sizeKey;
         const isVideoReady = override ? Boolean(override.video) : (v && v.readyState >= 2 && v.videoWidth > 0);
         if (isVideoReady && !override) this._hasDrawnVideo = true;
-        const videoSource = override ? override.video : (isVideoReady ? v : null);
+        let videoSource = override ? override.video : (isVideoReady ? v : null);
+        if (videoSource && this.cursorEraser && this.eraseBakedCursor) {
+            try {
+                videoSource = this.cursorEraser.clean(videoSource, curTimeSec * 1000);
+            } catch (e) {
+                console.warn('[Studio] Pointer cleanup skipped:', e?.message || e);
+            }
+        }
 
         renderFrame(
             ctx,
@@ -1010,6 +1023,11 @@ export class StudioEngine {
         if (insetPadding !== undefined) this.insetPadding = Math.max(0, Math.min(0.2, insetPadding));
         if (borderRadius !== undefined) this.borderRadius = Math.max(0, Math.min(48, borderRadius));
         if (windowChrome !== undefined) this.windowChrome = Boolean(windowChrome);
+        this.drawFrame();
+    }
+
+    setEraseBakedCursor(enabled) {
+        this.eraseBakedCursor = Boolean(enabled);
         this.drawFrame();
     }
 
