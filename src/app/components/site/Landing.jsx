@@ -10,6 +10,25 @@ import ProductHuntBadge from '../ProductHuntBadge';
 
 // Drift Recorder is the current app; the 2.0 installer stays up as Legacy Drift.
 const DOWNLOAD_URL = '/downloads/Drift-Recorder_3.1.0_x64-setup.exe';
+// macOS and Linux builds come from CI and live on the GitHub release.
+const RELEASE_URL = 'https://github.com/diiviikk5/Drift/releases/download/v3.1.0';
+const DOWNLOADS = {
+    windows: { url: DOWNLOAD_URL, label: 'Windows', note: 'Windows 10 & 11 · 4.4 MB' },
+    mac: { url: `${RELEASE_URL}/Drift-Recorder_3.1.0_mac-universal.dmg`, label: 'macOS', note: 'macOS 11+ · Apple Silicon & Intel · beta' },
+    linux: { url: `${RELEASE_URL}/Drift-Recorder_3.1.0_linux-x86_64.AppImage`, label: 'Linux', note: 'Linux x86-64 · X11 session · beta' },
+};
+const DEB_URL = `${RELEASE_URL}/Drift-Recorder_3.1.0_linux-amd64.deb`;
+
+/** The visitor's desktop OS; Windows until the browser says otherwise. */
+function useVisitorOs() {
+    const [os, setOs] = useState('windows');
+    useEffect(() => {
+        const p = `${navigator.userAgentData?.platform || ''} ${navigator.platform || ''} ${navigator.userAgent || ''}`;
+        if (/Mac|iPhone|iPad/i.test(p)) setOs('mac');
+        else if (/Linux|X11|CrOS/i.test(p) && !/Android/i.test(p)) setOs('linux');
+    }, []);
+    return os;
+}
 const LEGACY_URL = '/downloads/Drift_2.0.0_x64-setup.exe';
 const REPO_URL = 'https://github.com/diiviikk5/Drift';
 const PH_URL = 'https://www.producthunt.com/products/drift-6?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_campaign=badge-drift-6ef740e8-671a-4130-90b6-140b7784af27';
@@ -39,6 +58,43 @@ function WindowsIcon() {
         <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M3 5.1 10.4 4v7.2H3V5.1Zm0 13.8 7.4 1.1v-7.1H3v6Zm8.3 1.2L21 21.5v-8.6h-9.7v7.2Zm0-16.2v7.3H21V2.5l-9.7 1.4Z" />
         </svg>
+    );
+}
+
+function AppleIcon() {
+    return (
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M16.37 12.6c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.82-.81-3-.79-1.54.02-2.96.9-3.76 2.28-1.6 2.78-.41 6.9 1.15 9.16.76 1.1 1.67 2.34 2.86 2.3 1.15-.05 1.58-.74 2.97-.74 1.38 0 1.77.74 2.98.72 1.23-.02 2.01-1.12 2.76-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.4-.92-2.37-3.69ZM14.1 5.85c.63-.77 1.06-1.83.94-2.9-.91.04-2.01.61-2.66 1.37-.58.67-1.1 1.76-.96 2.8 1.02.08 2.05-.52 2.68-1.27Z" />
+        </svg>
+    );
+}
+
+function LinuxIcon() {
+    return (
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 2c-2.2 0-3.6 1.9-3.6 4.6 0 1.3.3 2.3-.5 3.6-.9 1.4-2.6 3.3-2.6 6 0 .7.1 1.3.4 1.8-.8.3-1.7.8-1.7 1.6 0 1 1.5 1.2 3.1 1.6 1.2.3 2 .8 2.9.8.8 0 1.4-.5 2-.5s1.2.5 2 .5c.9 0 1.7-.5 2.9-.8 1.6-.4 3.1-.6 3.1-1.6 0-.8-.9-1.3-1.7-1.6.3-.5.4-1.1.4-1.8 0-2.7-1.7-4.6-2.6-6-.8-1.3-.5-2.3-.5-3.6C15.6 3.9 14.2 2 12 2Zm-1.6 4.2c.4 0 .7.5.7 1.1s-.3 1.1-.7 1.1-.7-.5-.7-1.1.3-1.1.7-1.1Zm3.2 0c.4 0 .7.5.7 1.1s-.3 1.1-.7 1.1-.7-.5-.7-1.1.3-1.1.7-1.1ZM12 9.3c.8 0 1.9.5 1.9 1s-1.1 1-1.9 1-1.9-.5-1.9-1 1.1-1 1.9-1Z" />
+        </svg>
+    );
+}
+
+const OS_ICONS = { windows: WindowsIcon, mac: AppleIcon, linux: LinuxIcon };
+
+/** Links to the builds for the other two systems. */
+function OtherDownloads({ os }) {
+    const link = { textDecoration: 'underline', textUnderlineOffset: 3 };
+    const others = Object.entries(DOWNLOADS).filter(([key]) => key !== os);
+    return (
+        <>
+            Also for{' '}
+            {others.map(([key, d], i) => (
+                <span key={key}>
+                    {i > 0 && ' and '}
+                    <a href={d.url} download style={link}>{d.label}</a>
+                    {key === 'linux' && <> (<a href={DEB_URL} download style={link}>.deb</a>)</>}
+                </span>
+            ))}
+            {os === 'linux' && <> · <a href={DEB_URL} download style={link}>Ubuntu/Debian .deb</a></>}
+        </>
     );
 }
 
@@ -80,6 +136,9 @@ export default function Landing() {
     const dark = theme === 'dark';
     const [scrolled, setScrolled] = useState(false);
     const [stars, setStars] = useState(null);
+    const os = useVisitorOs();
+    const download = DOWNLOADS[os];
+    const OsIcon = OS_ICONS[os];
     const showcase = useRef(null);
 
     // Overscroll / page edges match the site, not the app's default page colour.
@@ -135,7 +194,7 @@ export default function Landing() {
                             <GitHubIcon />
                             <span>{stars != null ? stars : 'Star'}</span>
                         </a>
-                        <a className={`${s.btn} ${s.btnSm}`} href={DOWNLOAD_URL} download>Download</a>
+                        <a className={`${s.btn} ${s.btnSm}`} href={download.url} download>Download</a>
                     </nav>
                 </div>
             </header>
@@ -191,9 +250,9 @@ export default function Landing() {
 
                     <Reveal delay={0.45}>
                         <div className={s.ctaRow}>
-                            <a className={`${s.btn} ${s.btnLg}`} href={DOWNLOAD_URL} download>
-                                <WindowsIcon />
-                                Download Drift Recorder
+                            <a className={`${s.btn} ${s.btnLg}`} href={download.url} download>
+                                <OsIcon />
+                                Download for {download.label}
                             </a>
                             <a className={`${s.btn} ${s.btnLg} ${s.btnPaper}`} href={REPO_URL} target="_blank" rel="noreferrer">
                                 <GitHubIcon />
@@ -204,8 +263,13 @@ export default function Landing() {
                             </a>
                         </div>
                         <p className={s.ctaNote}>
-                            Drift Recorder 3.0 · 4.4 MB · Windows 10 &amp; 11 · No account needed ·{' '}
-                            <a href={LEGACY_URL} download style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}>Legacy Drift 2.0</a>
+                            Drift Recorder 3.1 · {download.note} · No account needed · <OtherDownloads os={os} />
+                            {os === 'windows' && (
+                                <>
+                                    {' · '}
+                                    <a href={LEGACY_URL} download style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}>Legacy Drift 2.0</a>
+                                </>
+                            )}
                         </p>
                     </Reveal>
 
@@ -332,9 +396,9 @@ export default function Landing() {
                                     <h2 className={s.h2}>Your next demo, already edited.</h2>
                                     <p className={s.sub}>Record a minute of your product and see what Drift makes of it.</p>
                                     <div className={s.ctaRow}>
-                                        <a className={`${s.btn} ${s.finalBtn}`} href={DOWNLOAD_URL} download>
-                                            <WindowsIcon />
-                                            Download Drift Recorder
+                                        <a className={`${s.btn} ${s.finalBtn}`} href={download.url} download>
+                                            <OsIcon />
+                                            Download for {download.label}
                                         </a>
                                     </div>
                                 </div>
