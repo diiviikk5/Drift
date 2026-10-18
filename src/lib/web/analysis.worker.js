@@ -192,9 +192,17 @@ async function analyzeFile(blob) {
                 if (t - last < 30) continue;
                 last = t;
                 const frame = sample.toVideoFrame();
-                ctx.drawImage(frame, 0, 0, size.width, size.height);
-                frame.close();
-                local.push(ctx.getImageData(0, 0, size.width, size.height).data, t);
+                try {
+                    let L = null;
+                    try { L = await frameLuma(frame); } catch { L = null; }
+                    if (L) local.pushLuma(L, t);
+                    else {
+                        ctx.drawImage(frame, 0, 0, size.width, size.height);
+                        local.push(ctx.getImageData(0, 0, size.width, size.height).data, t);
+                    }
+                } finally {
+                    frame.close();
+                }
                 if (duration && t - lastReport > 500) {
                     lastReport = t;
                     self.postMessage({ type: 'progress', value: Math.min(1, t / 1000 / duration) });
