@@ -84,6 +84,14 @@ class TrackRecorder {
     }
 }
 
+/** Browsers label tracks like 'screen:0:0' or 'web-contents-media-stream://…'. */
+function prettyLabel(label, surface) {
+    if (!label || /^screen:|^window:|^web-contents|:\/\//.test(label)) {
+        return surface === 'monitor' ? 'Entire screen' : surface === 'window' ? 'Window' : surface === 'browser' ? 'Browser tab' : 'Shared screen';
+    }
+    return label;
+}
+
 export class WebRecorder {
     constructor() {
         this.screenStream = null;
@@ -152,7 +160,7 @@ export class WebRecorder {
         const track = this.screenStream?.getVideoTracks()[0];
         return {
             surface: this.surface,
-            label: track?.label || '',
+            label: prettyLabel(track?.label || '', this.surface),
             width: s.width || 0,
             height: s.height || 0,
             hasAudio: Boolean(this.screenStream?.getAudioTracks().length),

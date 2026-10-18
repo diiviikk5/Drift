@@ -1004,6 +1004,22 @@ export default function RecorderPage() {
             } else {
                 setRecordedWebcamBlob(null);
             }
+            // Summary of the last take (read by the browser E2E run).
+            window.__driftLastTake = {
+                durationMs: result.durationMs,
+                surface: result.source?.surface,
+                moves: moves.length,
+                clicks: (tele?.clicks || []).map(c => ({ time: c.time, x: c.x, y: c.y, confidence: c.confidence })),
+                keystrokes: (tele?.keystrokes || []).length,
+                caret: (tele?.caret || []).length,
+                scrolls: (result.telemetry?.scrolls || []).length,
+                shapes: (tele?.cursorShapes || []).map(c => c.shape),
+                sprites: Object.keys(result.telemetry?.pointer?.sprites || {}),
+                stats: result.telemetry?.stats || null,
+                audio: { system: Boolean(result.systemAudio), mic: Boolean(result.micAudio) },
+                webcam: Boolean(result.webcam),
+                screenBytes: result.screen?.size || 0,
+            };
             // With the pointer tracked, the recorded one is erased and Drift draws its own.
             setShowCursor(tracked);
             setCursorBakedIn(!tracked);
@@ -1741,6 +1757,8 @@ export default function RecorderPage() {
                 }
             } else {
                 triggerBlobDownload(finalBlob, ext);
+                const warn = studioRef.current?.lastExportWarning;
+                setNotice(`Exported ${ext.toUpperCase()} (${(finalBlob.size / 1024 / 1024).toFixed(1)} MB) to your downloads${warn ? ` — ${warn}` : ''}`);
             }
         } catch (error) {
             console.error('Export failed:', error);

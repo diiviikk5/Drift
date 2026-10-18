@@ -1,0 +1,21 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Drift E2E target</title>
+<style>
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; background: #f5f6f8; color: #1f2430; }
+  header { height: 56px; background: #1f2430; color: #fff; display: flex; align-items: center; padding: 0 24px; font-weight: 600; }
+  main { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 32px; }
+  .card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.08); min-height: 280px; }
+  button { font: inherit; padding: 12px 22px; border-radius: 10px; border: 0; background: #2563eb; color: #fff; cursor: default; }
+  button.done { background: #16a34a; }
+  input { font: inherit; width: 90%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; }
+  #log p { margin: 6px 0; }
+</style></head>
+<body>
+<header>Acme Dashboard</header>
+<main>
+  <div class="card"><h2>Orders</h2><p>Press the button to sync orders with the warehouse.</p>
+    <button id="sync" onclick="this.classList.add('done'); this.textContent='Synced ✓'; document.getElementById('log').insertAdjacentHTML('beforeend', '<p>Synced 128 orders at ' + new Date().toLocaleTimeString() + '</p>')">Sync orders</button>
+    <div id="log"></div></div>
+  <div class="card"><h2>Notes</h2><input id="note" placeholder="Write a note"></div>
+</main>
+</body></html>

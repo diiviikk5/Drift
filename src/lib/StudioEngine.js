@@ -10,6 +10,7 @@ import { renderFrame, getFrameMetrics, canvasToSource, sourceToCanvas, normalize
 import { getSmoothedCursorPath } from './zoom/cursorPathSmoothing.js';
 import { ZOOM_PRESETS, DEFAULT_ZOOM_SCALE, resolveZoomPreset } from './zoom/ZoomConstruct.js';
 import { createCursorEraser } from './vision/cursorEraser.js';
+import { createMuxer, WEBM_VIDEO_CODECS } from './export/muxers.js';
 
 const FRAME_SCALE = 0.82;
 const TITLE_BAR_HEIGHT = 36;
@@ -1182,6 +1183,14 @@ export class StudioEngine {
         const { format = 'mp4', resolution = '1080p' } = options;
 
         if (format === 'webm') {
+            // Frame-accurate WebCodecs WebM first; real-time capture only as a last resort.
+            if (typeof VideoEncoder !== 'undefined') {
+                try {
+                    return await this._exportMP4(onProgress, resolution, { ...options, forceWebm: true });
+                } catch (e) {
+                    console.warn('[Studio] WebCodecs WebM export failed, using real-time capture:', e?.message || e);
+                }
+            }
             return await this._exportWebM(onProgress, resolution, options);
         }
 
@@ -1207,8 +1216,6 @@ export class StudioEngine {
 
     // --- WebCodecs + mp4-muxer → direct MP4 blob (no ffmpeg) ---
     async _exportMP4(onProgress, resolution = '1080p', options = {}) {
-        const { Muxer, ArrayBufferTarget } = await import('mp4-muxer');
-
         this.pause();
         this.video.currentTime = this.trimStart || 0;
         this.camera = { x: 0.5, y: 0.5, scale: 1 };
@@ -1290,7 +1297,7 @@ export class StudioEngine {
 
         let codecConfig = null;
         // Priority 1: Hardware acceleration with variable bitrate
-        for (const codec of (options.forceSoftware ? [] : candidateProfiles)) {
+        for (const codec of (options.forceSoftware || options.forceWebm ? [] : candidateProfiles)) {
             try {
                 const support = await VideoEncoder.isConfigSupported({
                     codec,
@@ -1311,7 +1318,7 @@ export class StudioEngine {
         }
 
         // Priority 2: Fallback to no-preference
-        if (!codecConfig && !options.forceSoftware) {
+        if (!codecConfig && !options.forceSoftware && !options.forceWebm) {
             for (const codec of candidateProfiles) {
                 try {
                     const support = await VideoEncoder.isConfigSupported({
@@ -1334,7 +1341,7 @@ export class StudioEngine {
         }
 
         // Priority 3: Fallback to software encoding
-        if (!codecConfig) {
+        if (!codecConfig && !options.forceWebm) {
             for (const codec of candidateProfiles) {
                 try {
                     const support = await VideoEncoder.isConfigSupported({
@@ -1356,9 +1363,30 @@ export class StudioEngine {
             }
         }
 
+        // Without an H.264 encoder (Chromium builds without proprietary codecs),
+        // stay frame-accurate with VP9/VP8 in WebM rather than real-time capture.
+        let container = 'mp4';
         if (!codecConfig) {
-            throw new Error(`No supported H.264 profile found for ${width}x${height} @ ${fps}fps.`);
+            for (const codec of WEBM_VIDEO_CODECS) {
+                try {
+                    const support = await VideoEncoder.isConfigSupported({
+                        codec, width, height, bitrate: targetBitrate, bitrateMode: 'variable', framerate: fps, latencyMode: 'quality',
+                    });
+                    if (support.supported) {
+                        codecConfig = support.config;
+                        container = 'webm';
+                        if (!options.forceWebm) this.lastExportWarning = 'this browser can’t encode H.264, so the video was saved as WebM';
+                        console.log('[Studio] H.264 unavailable; exporting WebM with', codec);
+                        break;
+                    }
+                } catch {}
+            }
         }
+
+        if (!codecConfig) {
+            throw new Error(`No supported video encoder found for ${width}x${height} @ ${fps}fps.`);
+        }
+        const audioCodec = container === 'webm' ? 'opus' : 'mp4a.40.2';
 
         console.log('[Studio] Exporting MP4 via WebCodecs:', width, 'x', height, '@', fps, 'fps,', (targetBitrate / 1_000_000).toFixed(1) + 'Mbps');
 
@@ -1370,7 +1398,8 @@ export class StudioEngine {
             try {
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
                 if (AudioCtx) {
-                    const tempCtx = new AudioCtx();
+                    // Opus only takes 48 kHz; decoding at that rate resamples for free.
+                    const tempCtx = container === 'webm' ? new AudioCtx({ sampleRate: 48000 }) : new AudioCtx();
                     try {
                         const loadBuf = async (src) => {
                             if (!src) return null;
@@ -1441,7 +1470,7 @@ export class StudioEngine {
                             const numChannels = Math.min(2, audioBuffer.numberOfChannels);
                             const sampleRate = audioBuffer.sampleRate;
                             const aacCheck = await AudioEncoder.isConfigSupported({
-                                codec: 'mp4a.40.2',
+                                codec: audioCodec,
                                 sampleRate,
                                 numberOfChannels: numChannels,
                                 bitrate: 192_000,
@@ -1459,7 +1488,7 @@ export class StudioEngine {
                                     error: (e) => console.warn('[Studio] Audio encoder notice:', e),
                                 });
                                 audioEncoder.configure({
-                                    codec: 'mp4a.40.2',
+                                    codec: audioCodec,
                                     sampleRate,
                                     numberOfChannels: numChannels,
                                     bitrate: 192_000,
@@ -1530,27 +1559,17 @@ export class StudioEngine {
             }
         }
 
-        const target = new ArrayBufferTarget();
-        const muxerOptions = {
-            target,
-            video: {
-                codec: 'avc',
-                width,
-                height,
-                frameRate: fps,
-            },
-            fastStart: 'in-memory',
-            firstTimestampBehavior: 'offset',
-        };
-
-        if (audioConfig && encodedAudioPackets.length > 0) {
-            muxerOptions.audio = audioConfig;
-        }
-
-        const muxer = new Muxer(muxerOptions);
+        const muxer = await createMuxer({
+            container,
+            width,
+            height,
+            fps,
+            videoCodec: codecConfig.codec,
+            audio: audioConfig && encodedAudioPackets.length > 0 ? audioConfig : null,
+        });
 
         // Pipe audio chunks into muxer
-        if (muxerOptions.audio && encodedAudioPackets.length > 0) {
+        if (audioConfig && encodedAudioPackets.length > 0) {
             for (const item of encodedAudioPackets) {
                 muxer.addAudioChunk(item.chunk, item.meta);
             }
@@ -1679,12 +1698,11 @@ export class StudioEngine {
                     await encoder.flush();
                     encoder.close();
 
-                    muxer.finalize();
+                    const outBlob = await muxer.finalize();
 
                     this.precomputedFrames = null;
-                    const mp4Blob = new Blob([target.buffer], { type: 'video/mp4' });
-                    console.log('[Studio] MP4 export complete:', (mp4Blob.size / 1024 / 1024).toFixed(1), 'MB');
-                    resolve(mp4Blob);
+                    console.log(`[Studio] ${container.toUpperCase()} export complete:`, (outBlob.size / 1024 / 1024).toFixed(1), 'MB');
+                    resolve(outBlob);
                 } catch (e) {
                     reject(e);
                 } finally {

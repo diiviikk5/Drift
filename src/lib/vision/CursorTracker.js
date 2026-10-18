@@ -28,7 +28,9 @@ const MAX_CLASS_SCORE = 0.32;   // (sd_in + sd_rim) / contrast
 const MAX_SPRITE_MAD = 16;      // learned sprite mean absolute difference
 const STILL_DIFF = 4;           // luma change that counts as "something moved"
 const LEARN_PATCHES = 10;       // patches over distinct backgrounds before learning
-const SWEEP_ROWS = 40;          // full-frame bootstrap rows per frame
+const SWEEP_ROWS = 40;
+const SEARCH_BUDGET_MS = 18;    // per frame for re-acquiring a lost pointer
+const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());          // full-frame bootstrap rows per frame
 
 function sortedProbeIndices(n, k) {
     const out = [];
@@ -178,6 +180,7 @@ export class CursorTracker {
         this.prevLast = null;
         this.lostFrames = 0;
         this.sweepRow = 0;
+        this.sweepRows = SWEEP_ROWS;
         this.learners = new Map(); // key -> { patches: [], positions: [] }
     }
 
@@ -201,7 +204,7 @@ export class CursorTracker {
      * Best match with hotspot inside [x0..x1] x [y0..y1] (clipped so templates fit).
      * @returns {{x, y, score, P}|null}
      */
-    _search(L, cands, x0, y0, x1, y1, best = null) {
+    _search(L, cands, x0, y0, x1, y1, best = null, deadline = Infinity) {
         const W = this.width, H = this.height;
         // Hotspots stay on the frame; the pointer body may hang off its edges.
         x0 = Math.max(0, x0); y0 = Math.max(0, y0);
@@ -212,12 +215,46 @@ export class CursorTracker {
             const ax = Math.max(x0, -b.x0), ay = Math.max(y0, -b.y0);
             const bx = Math.min(x1, W - 1 - b.x1), by = Math.min(y1, H - 1 - b.y1);
             for (let y = y0; y <= y1; y++) {
+                // Busy frames (everything moving) must not stall the recorder.
+                if ((y & 7) === 0 && now() > deadline) { this.overBudget = true; return best; }
                 const rowFits = y >= ay && y <= by;
                 for (let x = x0; x <= x1; x++) {
                     let s;
                     if (rowFits && x >= ax && x <= bx) s = this._score(L, P, x, y);
                     else s = P.sprite ? spriteScoreClipped(L, W, H, P.sprite, x, y) : classScoreClipped(L, W, H, P, x, y);
                     if (s < Infinity && (!best || s < best.score)) best = { x, y, score: s, P };
+                }
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Arrow-only search for the bootstrap sweep. Every arrow template (any
+     * scale from 1x to 3x, Windows or macOS) has rim at (0,3) and (0,8) and
+     * interior at (3,9) from the hotspot, so three pixel reads rule out almost
+     * every position before any template is scored.
+     */
+    _sweepSearch(L, cands, y0, y1, deadline) {
+        const W = this.width, H = this.height;
+        let best = null;
+        const yEnd = Math.min(y1, H - 10);
+        for (let y = y0; y <= yEnd; y++) {
+            if ((y & 3) === 0 && now() > deadline) { this.overBudget = true; return best; }
+            const row = y * W;
+            for (let x = 0; x < W - 4; x++) {
+                const p = row + x;
+                const r1 = L[p + 3 * W], r2 = L[p + 8 * W];
+                const dr = r1 - r2;
+                if (dr > 30 || dr < -30) continue;
+                const di = L[p + 9 * W + 3] - ((r1 + r2) >> 1);
+                if (di < 60 && di > -60) continue;
+                for (const P of cands) {
+                    const b = P.box;
+                    let sc;
+                    if (x + b.x1 < W && y + b.y1 < H && x + b.x0 >= 0 && y + b.y0 >= 0) sc = this._score(L, P, x, y);
+                    else sc = P.sprite ? spriteScoreClipped(L, W, H, P.sprite, x, y) : classScoreClipped(L, W, H, P, x, y);
+                    if (sc < Infinity && (!best || sc < best.score)) best = { x, y, score: sc, P };
                 }
             }
         }
@@ -287,6 +324,8 @@ export class CursorTracker {
             if (hit) method = 'track';
         }
 
+        const deadline = now() + SEARCH_BUDGET_MS;
+        this.overBudget = false;
         // 3a. Re-acquire in changed areas.
         if (!hit && changed.length) {
             const cands = this._candidates();
@@ -295,21 +334,27 @@ export class CursorTracker {
                 const area = (c.x1 - c.x0 + 1) * (c.y1 - c.y0 + 1);
                 if (area > budget) continue;
                 budget -= area;
-                const m = this._search(L, cands, c.x0, c.y0, c.x1, c.y1);
+                const m = this._search(L, cands, c.x0, c.y0, c.x1, c.y1, null, deadline);
                 if (m && (!hit || m.score < hit.score)) hit = m;
-                if (hit && hit.score < 0.12) break;
+                if ((hit && hit.score < 0.12) || this.overBudget) break;
             }
             if (hit) method = 'acquire';
         }
 
         // 3b. Bootstrap sweep while the pointer has never been seen.
-        if (!hit && !this.last) {
+        if (!hit && !this.last && !this.overBudget) {
             const y0 = this.sweepRow;
-            const y1 = Math.min(H - 1, y0 + SWEEP_ROWS - 1);
+            const y1 = Math.min(H - 1, y0 + this.sweepRows - 1);
             // Pointers start out as arrows; other shapes are found once it moves.
             if (!this._sweepSet) this._sweepSet = this.all.filter(P => P.tpl.shape === 'arrow');
-            hit = this._search(L, this._sweepSet, 0, y0, W - 1, y1);
-            this.sweepRow = y1 + 1 >= H ? 0 : y1 + 1;
+            hit = this._sweepSearch(L, this._sweepSet, y0, y1, deadline);
+            if (this.overBudget && !hit) {
+                // Busy picture: sweep a thinner band next time.
+                this.sweepRows = Math.max(4, this.sweepRows >> 1);
+            } else {
+                this.sweepRow = y1 + 1 >= H ? 0 : y1 + 1;
+                this.sweepRows = Math.min(SWEEP_ROWS * 2, Math.ceil(this.sweepRows * 1.25));
+            }
             if (hit) method = 'sweep';
         }
 
