@@ -25,6 +25,7 @@ import WebCockpit from '@/components/web/WebCockpit';
 import { WebRecorder, webSupport, telemetryToArea } from '@/lib/web/WebRecorder';
 import { openFloatingControls } from '@/lib/web/floatingControls';
 import { saveTake, listTakes, loadTake, deleteTake } from '@/lib/web/takeStore';
+import { analyzeVideoFile } from '@/lib/web/fileAnalysis';
 
 
 // The default synthetic pointer matches the system one.
@@ -1908,6 +1909,40 @@ export default function RecorderPage() {
         } catch (error) { setNotice(error.message); }
     };
 
+    // Imported screen recordings get the same analysis as web takes.
+    const analysisTokenRef = useRef(0);
+    const analyzeOpenedVideo = async (file) => {
+        if (typeof Worker === 'undefined' || typeof VideoDecoder === 'undefined') return;
+        const token = ++analysisTokenRef.current;
+        setNotice('Finding the pointer, clicks and typing in this video… 0%');
+        try {
+            const tele = await analyzeVideoFile(file, (p) => {
+                if (analysisTokenRef.current === token) setNotice(`Finding the pointer, clicks and typing in this video… ${Math.round(p * 100)}%`);
+            });
+            if (analysisTokenRef.current !== token) return;
+            const tracked = (tele.moves || []).some(m => !m.hidden && !m.scroll && !m.click);
+            if (!tracked) {
+                setNotice('No pointer found in this video. Add zooms by clicking or dragging on the preview.');
+                return;
+            }
+            savedSegmentsRef.current = null;
+            setRecordedMoves(tele.moves);
+            setRecordedClicks(tele.clicks || []);
+            setRecordedKeystrokes(tele.keystrokes || []);
+            setRecordedCaret(tele.caret || []);
+            setRecordedCursorShapes(tele.cursorShapes || []);
+            setPointerTrack(tele.pointer || null);
+            setEraseBakedCursor(true);
+            setShowCursor(true);
+            setCursorBakedIn(false);
+            setProjectRevision(r => r + 1);
+            const n = (tele.clicks || []).length;
+            setNotice(`Drift followed the pointer through this video${n ? ` and found ${n} ${n === 1 ? 'click' : 'clicks'}` : ''}. Zooms are planned automatically.`);
+        } catch (e) {
+            if (analysisTokenRef.current === token) setNotice(`Couldn't analyze this video (${e?.message || e}). You can still add zooms by hand.`);
+        }
+    };
+
     const openProject = async (event) => {
         const file = event.target.files?.[0];
         event.target.value = '';
@@ -2010,6 +2045,12 @@ export default function RecorderPage() {
             setViewMode('studio');
             setProjectRevision(revision => revision + 1);
             setNotice(`Opened ${file.name}`);
+            if (!file.name.toLowerCase().endsWith('.drift')) {
+                setPointerTrack(null);
+                analyzeOpenedVideo(file);
+            } else {
+                analysisTokenRef.current++;
+            }
         } catch (error) { setNotice(error.message); }
     };
 

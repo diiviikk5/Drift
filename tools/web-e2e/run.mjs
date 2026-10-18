@@ -176,6 +176,17 @@ try {
 } catch (e) {
     logs.push(`[e2e] reopen failed: ${e.message}`);
 }
+// An imported screen recording gets the same analysis.
+let imported = null;
+try {
+    await app.setInputFiles('input[type="file"]', path.join(OUT, 'recording.webm'));
+    await app.waitForSelector('text=Drift followed the pointer', { timeout: 120000 });
+    imported = await app.locator('[role="status"]').innerText();
+    await sleep(1500);
+    await app.screenshot({ path: path.join(OUT, '09-imported.png') });
+} catch (e) {
+    logs.push(`[e2e] import analysis failed: ${e.message}`);
+}
 // Landing page entry point.
 const landing = await ctx.newPage();
 await landing.goto(`http://localhost:${PORT}/`);
@@ -191,7 +202,7 @@ if (exported) {
     const probe = spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_name,width,height,r_frame_rate,duration', '-of', 'json', exported]);
     fs.writeFileSync(path.join(OUT, 'export-probe.json'), probe.stdout);
 }
-console.log(JSON.stringify({ take, truth: truth.clicks, offset, exported, reopened }, null, 2));
+console.log(JSON.stringify({ take, truth: truth.clicks, offset, exported, reopened, imported }, null, 2));
 await browser.close();
 cleanup();
 process.exit(0);

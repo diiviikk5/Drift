@@ -112,6 +112,48 @@ async function sync(blob, pointer) {
     }
 }
 
+/**
+ * Analyze a finished video file (an imported screen recording): every frame
+ * in order, at most ~30 per second, with the file's own timestamps.
+ */
+async function analyzeFile(blob) {
+    const { Input, BlobSource, ALL_FORMATS, VideoSampleSink } = await import('mediabunny');
+    const input = new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
+    try {
+        const track = await input.getPrimaryVideoTrack();
+        if (!track) throw new Error('no video track');
+        if (typeof track.canDecode === 'function' && !(await track.canDecode())) throw new Error(`can't decode ${track.codec || 'this video'}`);
+        const duration = await input.computeDuration().catch(() => 0);
+        setup(track.displayWidth, track.displayHeight);
+        const local = new ScreenAnalyzer({ width: size.width, height: size.height });
+        const sink = new VideoSampleSink(track);
+        let last = -Infinity;
+        let lastReport = 0;
+        for await (const sample of sink.samples()) {
+            try {
+                const t = sample.timestamp * 1000;
+                if (t - last < 30) continue;
+                last = t;
+                const frame = sample.toVideoFrame();
+                ctx.drawImage(frame, 0, 0, size.width, size.height);
+                frame.close();
+                local.push(ctx.getImageData(0, 0, size.width, size.height).data, t);
+                if (duration && t - lastReport > 500) {
+                    lastReport = t;
+                    self.postMessage({ type: 'progress', value: Math.min(1, t / 1000 / duration) });
+                }
+            } finally {
+                sample.close();
+            }
+        }
+        const out = local.finish();
+        out.stats = { ...out.stats, analysisSize: size, source: 'file' };
+        return out;
+    } finally {
+        input.dispose?.();
+    }
+}
+
 self.onmessage = (e) => {
     const m = e.data || {};
     switch (m.type) {
@@ -154,6 +196,12 @@ self.onmessage = (e) => {
             sync(m.blob, m.pointer).then(
                 (result) => self.postMessage({ type: 'synced', result }),
                 (err) => self.postMessage({ type: 'synced', result: null, error: String(err?.message || err) }),
+            );
+            break;
+        case 'analyze-file':
+            analyzeFile(m.blob).then(
+                (telemetry) => self.postMessage({ type: 'file-result', telemetry }),
+                (err) => self.postMessage({ type: 'file-result', telemetry: null, error: String(err?.message || err) }),
             );
             break;
         case 'close':
