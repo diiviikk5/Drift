@@ -326,7 +326,13 @@ export class ScreenAnalyzer {
         if (shift == null || !anyChange) return false;
         this.scrolls.push({ t: Math.round(t), shift });
         this.lastScrollAt = t;
-        if (this.cur) this.moves.push({ time: Math.round(t), x: this.cur.x / this.W, y: this.cur.y / this.H, scroll: shift });
+        if (this.cur) {
+            this.moves.push({
+                time: Math.round(t), x: this.cur.x / this.W, y: this.cur.y / this.H, scroll: shift,
+                // Scrolling with the pointer gone (hidden, off the capture) keeps it hidden.
+                ...(this.lostSince != null ? { hidden: true } : {}),
+            });
+        }
         return true;
     }
 
