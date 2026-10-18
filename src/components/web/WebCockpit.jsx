@@ -130,7 +130,7 @@ export default function WebCockpit({
         return createAudioLevelMeter(micStream, (lvl) => setAudioLevel(lvl));
     }, [micEnabled, micStream]);
 
-    const unsupported = support && !support.displayCapture;
+    const unsupported = support && (!support.displayCapture || support.mobile);
     const live = Boolean(stream && source);
     const resolution = source?.width
         ? captureArea

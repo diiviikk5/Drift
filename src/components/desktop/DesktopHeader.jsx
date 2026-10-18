@@ -74,7 +74,7 @@ export default function DesktopHeader({
             <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                     <img src="/brand/drift-mark.png" alt="" width={24} height={24} className="w-6 h-6 rounded-md" draggable={false} />
-                    <span className="font-semibold text-[15px] tracking-tight text-[var(--text-app)]">Drift</span>
+                    <span className="hidden sm:inline font-semibold text-[15px] tracking-tight text-[var(--text-app)]">Drift</span>
                 </div>
                 <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--pill-bg)] border border-[var(--border-app)]">
                     {tab('recorder', 'Record', Monitor)}
@@ -106,7 +106,7 @@ export default function DesktopHeader({
                 <div className="relative">
                     <HeaderButton onClick={() => setShowThemeMenu(v => !v)} active={showThemeMenu} title="Theme">
                         <span className="w-3 h-3 rounded-full border border-black/10" style={{ background: current.swatch[2] }} />
-                        <span>{current.label}</span>
+                        <span className="hidden md:inline">{current.label}</span>
                         <ChevronDown className="w-3.5 h-3.5 opacity-60" />
                     </HeaderButton>
                     {showThemeMenu && (
@@ -143,11 +143,11 @@ export default function DesktopHeader({
 
                 <HeaderButton onClick={onToggleTeleprompter} active={isTeleprompterOpen} title="Presenter script">
                     <FileText className="w-4 h-4" />
-                    <span>Script</span>
+                    <span className="hidden md:inline">Script</span>
                 </HeaderButton>
                 <HeaderButton onClick={onOpenHotkeys} title="Keyboard shortcuts">
                     <Keyboard className="w-4 h-4" />
-                    <span>Shortcuts</span>
+                    <span className="hidden md:inline">Shortcuts</span>
                 </HeaderButton>
             </div>
         </header>
