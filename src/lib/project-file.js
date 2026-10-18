@@ -1,17 +1,25 @@
 const MAGIC = 'DRIFT001';
 const MAX_MANIFEST_BYTES = 16 * 1024 * 1024;
 
-export async function encodeProject({ recording, webcam = null, ...state }) {
+// Separate audio tracks (system audio and microphone) follow the webcam.
+const EXTRA_TRACKS = ['systemAudio', 'micAudio'];
+
+export async function encodeProject({ recording, webcam = null, systemAudio = null, micAudio = null, ...state }) {
     if (!(recording instanceof Blob) || !recording.size) throw new Error('A recording is required.');
+    const extras = { systemAudio, micAudio };
+    const tracks = EXTRA_TRACKS
+        .filter(k => extras[k] instanceof Blob && extras[k].size > 0)
+        .map(k => ({ kind: k, size: extras[k].size, type: extras[k].type }));
     const manifest = new TextEncoder().encode(JSON.stringify({
         version: 1, state,
         recording: { size: recording.size, type: recording.type },
         webcam: webcam ? { size: webcam.size, type: webcam.type } : null,
+        ...(tracks.length ? { tracks } : {}),
     }));
     if (manifest.length > MAX_MANIFEST_BYTES) throw new Error('Project metadata is too large.');
     const length = new Uint8Array(4);
     new DataView(length.buffer).setUint32(0, manifest.length, true);
-    return new Blob([MAGIC, length, manifest, recording, ...(webcam ? [webcam] : [])], { type: 'application/x-drift-project' });
+    return new Blob([MAGIC, length, manifest, recording, ...(webcam ? [webcam] : []), ...tracks.map(t => extras[t.kind])], { type: 'application/x-drift-project' });
 }
 
 export async function decodeProject(file) {
@@ -23,9 +31,12 @@ export async function decodeProject(file) {
     if (length > MAX_MANIFEST_BYTES || length + 12 > file.size) throw new Error('Invalid project header.');
     const manifest = JSON.parse(await file.slice(12, 12 + length).text());
     if (manifest.version !== 1) throw new Error('Unsupported project version.');
-    const sizes = [manifest.recording?.size, manifest.webcam?.size ?? 0];
+    const tracks = Array.isArray(manifest.tracks) ? manifest.tracks.filter(t => EXTRA_TRACKS.includes(t?.kind)) : [];
+    if (Array.isArray(manifest.tracks) && tracks.length !== manifest.tracks.length) throw new Error('Invalid project tracks.');
+    const sizes = [manifest.recording?.size, manifest.webcam?.size ?? 0, ...tracks.map(t => t.size)];
+    const total = sizes.reduce((a, b) => a + (Number.isSafeInteger(b) ? b : NaN), 0);
     if (!sizes.every(size => Number.isSafeInteger(size) && size >= 0) || sizes[0] === 0 ||
-        12 + length + sizes[0] + sizes[1] !== file.size) throw new Error('Project media is incomplete.');
+        12 + length + total !== file.size) throw new Error('Project media is incomplete.');
     const state = manifest.state;
     if (!state || !Number.isFinite(state.duration) || state.duration <= 0) throw new Error('Invalid recording duration.');
     for (const field of ['focusSegments', 'clicks', 'moves', 'annotations', 'captions', 'keystrokes']) {
@@ -37,9 +48,15 @@ export async function decodeProject(file) {
         throw new Error('Invalid zoom track.');
     }
     const offset = 12 + length;
-    return {
+    const out = {
         ...state,
         recording: file.slice(offset, offset + sizes[0], manifest.recording.type),
-        webcam: sizes[1] ? file.slice(offset + sizes[0], file.size, manifest.webcam.type) : null,
+        webcam: sizes[1] ? file.slice(offset + sizes[0], offset + sizes[0] + sizes[1], manifest.webcam.type) : null,
     };
+    let at = offset + sizes[0] + sizes[1];
+    for (const t of tracks) {
+        out[t.kind] = file.slice(at, at + t.size, t.type);
+        at += t.size;
+    }
+    return out;
 }

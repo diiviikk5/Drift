@@ -31,3 +31,16 @@ test('foreign files and invalid timelines are rejected', async () => {
         focusSegments: [{ startTime: 3, endTime: 1, zoomScale: 2 }] });
     await assert.rejects(decodeProject(file), /Invalid zoom track/);
 });
+
+test('separate audio tracks and the pointer track survive a save', async () => {
+    const recording = new Blob(['screen'], { type: 'video/webm' });
+    const systemAudio = new Blob(['system'], { type: 'audio/webm' });
+    const micAudio = new Blob(['voice'], { type: 'audio/webm' });
+    const pointerTrack = { width: 1280, height: 720, raw: [{ t: 0, x: 4, y: 5, key: 'arrow-win@1' }], sprites: {} };
+    const restored = await decodeProject(await encodeProject({ recording, systemAudio, micAudio, duration: 5, pointerTrack }));
+    assert.equal(await restored.recording.text(), 'screen');
+    assert.equal(restored.webcam, null);
+    assert.equal(await restored.systemAudio.text(), 'system');
+    assert.equal(await restored.micAudio.text(), 'voice');
+    assert.deepEqual(restored.pointerTrack, pointerTrack);
+});

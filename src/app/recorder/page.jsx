@@ -21,6 +21,9 @@ import HotkeyModal from '@/components/desktop/HotkeyModal';
 import { normalizeHotkeys, formatAccelerator, matchesAccelerator, stripAppHotkeys } from '@/lib/hotkeys';
 import { getAppTheme } from '@/lib/ui/themes';
 import NotesTeleprompter from '@/components/desktop/NotesTeleprompter';
+import WebCockpit from '@/components/web/WebCockpit';
+import { WebRecorder, webSupport, telemetryToArea } from '@/lib/web/WebRecorder';
+import { openFloatingControls } from '@/lib/web/floatingControls';
 
 
 // The default synthetic pointer matches the system one.
@@ -113,6 +116,9 @@ export default function RecorderPage() {
     // video; a synthetic cursor on top of those shows two pointers.
     const [cursorBakedIn, setCursorBakedIn] = useState(false);
     const [cursorTheme, setCursorTheme] = useState(DEFAULT_CURSOR_THEME);
+    // Web recordings: where the real pointer was in each frame (to erase it).
+    const [pointerTrack, setPointerTrack] = useState(null);
+    const [eraseBakedCursor, setEraseBakedCursor] = useState(true);
     const [cursorScale, setCursorScale] = useState(1.0);
     const [splineSmoothing, setSplineSmoothing] = useState(true);
     const [systemAudioVolume, setSystemAudioVolume] = useState(1.0);
@@ -172,6 +178,17 @@ export default function RecorderPage() {
     const studioConfirmRef = useRef(0);
 
     const isDesktop = platform === 'tauri' || platform === 'electron';
+
+    // Drift on the web: capture through the browser, telemetry from the pixels.
+    const webRecorderRef = useRef(null);
+    const floatingRef = useRef(null);
+    const webTimerRef = useRef(null);
+    const [webSupportInfo, setWebSupportInfo] = useState(null);
+    const [webSource, setWebSource] = useState(null);
+    const [webStream, setWebStream] = useState(null);
+    const [webBusy, setWebBusy] = useState(false);
+    const [floatingControls, setFloatingControls] = useState(true);
+    const [webcamPreviewStream, setWebcamPreviewStream] = useState(null);
 
     useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
     useEffect(() => { hotkeysRef.current = hotkeys; }, [hotkeys]);
@@ -238,6 +255,7 @@ export default function RecorderPage() {
         setSelectedWebcamId(deviceId);
         if (webcamEnabled && engineRef.current) {
             await engineRef.current.enableWebcam(deviceId);
+            setWebcamPreviewStream(engineRef.current.webcamStream || null);
         }
     };
 
@@ -282,6 +300,11 @@ export default function RecorderPage() {
         } else {
             setPlatform('browser');
             setHookStatus('Web Browser');
+            setWebSupportInfo(webSupport());
+            try {
+                const saved = localStorage.getItem('drift_floating_controls');
+                if (saved !== null) setFloatingControls(saved === 'true');
+            } catch (e) {}
         }
     }, []);
 
@@ -432,6 +455,8 @@ export default function RecorderPage() {
                         micAudioUrl: nativeAudioTracks.micAudioUrl,
                         blurRegions,
                         sourceArea,
+                        pointerTrack,
+                        eraseBakedCursor,
                     }
                 );
                 studioRef.current.background = background;
@@ -501,6 +526,10 @@ export default function RecorderPage() {
             studioRef.current.drawFrame();
         }
     }, [showCursor, cursorScale, cursorTheme, captionsEnabled]);
+
+    useEffect(() => {
+        studioRef.current?.setEraseBakedCursor?.(eraseBakedCursor);
+    }, [eraseBakedCursor]);
 
     useEffect(() => {
         if (studioRef.current && studioRef.current.setAspectRatio) {
@@ -593,11 +622,13 @@ export default function RecorderPage() {
         if (!engineRef.current) return;
         if (webcamEnabled) {
             engineRef.current.disableWebcam();
+            setWebcamPreviewStream(null);
             setWebcamEnabled(false);
             setWebcamSettings(prev => ({ ...prev, enabled: false }));
         } else {
             const ok = await engineRef.current.enableWebcam(selectedWebcamId || null);
             if (ok) {
+                setWebcamPreviewStream(engineRef.current.webcamStream || null);
                 setWebcamEnabled(true);
                 setWebcamSettings(prev => ({ ...prev, enabled: true }));
                 loadMediaDevices();
@@ -834,7 +865,219 @@ export default function RecorderPage() {
         setActiveCountdown(0);
     };
 
+
+    // ─── Drift on the web ────────────────────────────────────────────────
+    const getWebRecorder = () => {
+        if (!webRecorderRef.current) {
+            const rec = new WebRecorder();
+            rec.onWarning = (msg) => setNotice(msg);
+            webRecorderRef.current = rec;
+        }
+        return webRecorderRef.current;
+    };
+
+    useEffect(() => () => {
+        webRecorderRef.current?.dispose();
+        floatingRef.current?.close();
+        if (webTimerRef.current) clearInterval(webTimerRef.current);
+    }, []);
+
+    const pickWebSource = async (preferSurface = 'monitor') => {
+        const rec = getWebRecorder();
+        try {
+            const info = await rec.pickSource({ preferSurface });
+            rec.onEnded = () => {
+                if (isRecordingRef.current) toggleRecordRef.current?.();
+                else {
+                    setWebSource(null);
+                    setWebStream(null);
+                    setCaptureArea(null);
+                }
+            };
+            setCaptureArea(null);
+            setWebSource(info);
+            setWebStream(rec.screenStream);
+            setHasActiveStream(true);
+            return true;
+        } catch (e) {
+            if (e?.name !== 'NotAllowedError' && e?.name !== 'AbortError') {
+                setNotice(`Couldn't start screen sharing: ${e?.message || e}`);
+            }
+            return false;
+        }
+    };
+
+    const stopWebSharing = () => {
+        webRecorderRef.current?.releaseScreen();
+        setWebSource(null);
+        setWebStream(null);
+        setCaptureArea(null);
+        setHasActiveStream(false);
+    };
+
+    const pickWebArea = async () => {
+        const rec = webRecorderRef.current;
+        if (!rec?.screenStream) return;
+        try {
+            const still = await rec.snapshot();
+            if (still) setAreaPicker({ imageUrl: still.url, width: still.width, height: still.height });
+        } catch (e) {
+            setNotice(`Couldn't capture a still to pick from: ${e?.message || e}`);
+        }
+    };
+
+    const formatClock = (sec) => `${Math.floor(sec / 60).toString().padStart(2, '0')}:${Math.floor(sec % 60).toString().padStart(2, '0')}`;
+
+    const startWebRecording = async () => {
+        const rec = getWebRecorder();
+        const engine = engineRef.current;
+        // Devices are released after each take; bring them back if they're on.
+        if (micEnabled && engine && !engine.micStream?.active) {
+            if (await engine.enableMic(selectedMicId || null)) setMicStream(engine.micStream);
+        }
+        if (webcamEnabled && engine && !engine.webcamStream?.active) {
+            if (await engine.enableWebcam(selectedWebcamId || null)) setWebcamPreviewStream(engine.webcamStream);
+        }
+        rec.setMicStream(micEnabled ? engine?.micStream || null : null);
+        rec.setWebcamStream(webcamEnabled ? engine?.webcamStream || null : null);
+        recordAreaRef.current = captureArea;
+        try {
+            await rec.start();
+        } catch (e) {
+            setNotice(`Recording start failed: ${e?.message || e}`);
+            floatingRef.current?.close();
+            floatingRef.current = null;
+            return;
+        }
+        setIsRecording(true);
+        setTimer('00:00');
+        floatingRef.current?.setRecording(true);
+        webTimerRef.current = setInterval(() => {
+            const text = formatClock(rec.elapsedMs() / 1000);
+            setTimer(text);
+            floatingRef.current?.setTime(text);
+        }, 250);
+    };
+
+    const stopWebRecording = async () => {
+        const rec = webRecorderRef.current;
+        if (!rec || webBusy) return;
+        setWebBusy(true);
+        if (webTimerRef.current) { clearInterval(webTimerRef.current); webTimerRef.current = null; }
+        floatingRef.current?.close();
+        floatingRef.current = null;
+        try {
+            const result = await rec.stop();
+            rec.releaseScreen();
+            setWebSource(null);
+            setWebStream(null);
+            setIsRecording(false);
+            setTimer('00:00');
+            setHasActiveStream(false);
+            if (!result.screen) throw new Error('The browser returned an empty recording');
+
+            const area = recordAreaRef.current;
+            const tele = telemetryToArea(result.telemetry, area) || null;
+            const moves = tele?.moves || [];
+            const tracked = moves.some(m => !m.hidden && !m.scroll && !m.click);
+
+            savedSegmentsRef.current = null;
+            setFocusSegments([]);
+            setBlurRegions([]);
+            setSelectedBlurId(null);
+            setRecordedBlob(result.screen);
+            setRecordedMoves(moves);
+            setRecordedClicks(tele?.clicks || []);
+            setRecordedKeystrokes(tele?.keystrokes || []);
+            setRecordedCaret(tele?.caret || []);
+            setRecordedCursorShapes(tele?.cursorShapes || []);
+            setPointerTrack(result.telemetry?.pointer || null);
+            setEraseBakedCursor(true);
+            setSourceArea(area || null);
+            setNativeAudioTracks({
+                systemAudioUrl: result.systemAudio ? URL.createObjectURL(result.systemAudio) : null,
+                micAudioUrl: result.micAudio ? URL.createObjectURL(result.micAudio) : null,
+            });
+            if (result.webcam) {
+                setRecordedWebcamBlob(result.webcam);
+                setWebcamSettings(prev => ({ ...prev, enabled: true }));
+            } else {
+                setRecordedWebcamBlob(null);
+            }
+            // With the pointer tracked, the recorded one is erased and Drift draws its own.
+            setShowCursor(tracked);
+            setCursorBakedIn(!tracked);
+            recDurationRef.current = result.durationMs / 1000;
+            if (!tracked && result.source?.surface !== 'browser') {
+                setNotice('Drift couldn’t find the pointer in this recording, so it keeps the recorded one. Zooms can still be added by clicking the preview.');
+            }
+            setViewMode('studio');
+        } catch (e) {
+            console.error('[Drift web] Stop failed:', e);
+            setNotice(`Recording failed: ${e?.message || e}`);
+            setIsRecording(false);
+        } finally {
+            setWebBusy(false);
+        }
+    };
+
+    const cancelWebCountdown = () => {
+        cancelCountdown();
+        floatingRef.current?.close();
+        floatingRef.current = null;
+    };
+
+    const toggleRecordWeb = async ({ fromHotkey = false } = {}) => {
+        if (isRecordingRef.current) {
+            await stopWebRecording();
+            return;
+        }
+        if (activeCountdown > 0) {
+            cancelWebCountdown();
+            return;
+        }
+        const rec = getWebRecorder();
+        // Floating controls must open inside the click, before anything awaits.
+        const wantsFloating = floatingControls && !fromHotkey && webSupportInfo?.documentPiP;
+        const hasStream = Boolean(rec.screenStream?.active);
+        const floatingPromise = wantsFloating && hasStream
+            ? openFloatingControls({
+                onStop: () => toggleRecordRef.current?.(),
+                onCancel: (reason) => {
+                    if (reason === 'closed' && isRecordingRef.current) return; // panel closed, keep recording
+                    if (!isRecordingRef.current) cancelWebCountdown();
+                },
+            })
+            : Promise.resolve(null);
+        if (!hasStream) {
+            const ok = await pickWebSource('monitor');
+            if (!ok) return;
+        }
+        floatingRef.current = await floatingPromise;
+        if (countdownSeconds > 0) {
+            setActiveCountdown(countdownSeconds);
+            floatingRef.current?.setCountdown(countdownSeconds);
+            let current = countdownSeconds;
+            countdownTimerRef.current = setInterval(() => {
+                current -= 1;
+                if (current <= 0) {
+                    clearInterval(countdownTimerRef.current);
+                    countdownTimerRef.current = null;
+                    setActiveCountdown(0);
+                    floatingRef.current?.setCountdown(0);
+                    startWebRecording();
+                } else {
+                    setActiveCountdown(current);
+                    floatingRef.current?.setCountdown(current);
+                }
+            }, 1000);
+        } else {
+            startWebRecording();
+        }
+    };
+
     const toggleRecord = async ({ fromHotkey = false } = {}) => {
+        if (platform === 'browser') return toggleRecordWeb({ fromHotkey });
         if (isRecordingRef.current) {
             if (drift.isTauri() && typeof drift.showOsCursor === 'function') {
                 drift.showOsCursor().catch(() => {});
@@ -1530,7 +1773,19 @@ export default function RecorderPage() {
     };
 
     const handleNewRecording = () => {
-        if (isRecording) {
+        if (webRecorderRef.current) {
+            webRecorderRef.current.dispose();
+            webRecorderRef.current = null;
+            if (webTimerRef.current) { clearInterval(webTimerRef.current); webTimerRef.current = null; }
+            floatingRef.current?.close();
+            floatingRef.current = null;
+            setWebSource(null);
+            setWebStream(null);
+            setCaptureArea(null);
+        }
+        if (isRecording && platform === 'browser') {
+            setIsRecording(false);
+        } else if (isRecording) {
             if (isNativeRecordingRef.current) {
                 drift.stopNativeSession().catch(() => {});
                 isNativeRecordingRef.current = false;
@@ -1554,6 +1809,8 @@ export default function RecorderPage() {
         setRecordedCaret([]);
         setRecordedCursorShapes([]);
         setRecordedMoves([]);
+        setRecordedKeystrokes([]);
+        setPointerTrack(null);
         setDuration(0);
         setCurrentTime(0);
         setViewMode('recorder');
@@ -1571,8 +1828,14 @@ export default function RecorderPage() {
                 const res = await fetch(webcamToSave);
                 webcamToSave = await res.blob();
             }
+            const toBlob = async (url) => {
+                if (!url) return null;
+                try { const r = await fetch(url); return r.ok ? await r.blob() : null; } catch { return null; }
+            };
+            const [systemAudio, micAudio] = await Promise.all([toBlob(nativeAudioTracks.systemAudioUrl), toBlob(nativeAudioTracks.micAudioUrl)]);
             const project = await encodeProject({
-                recording: blobToSave, webcam: webcamToSave, duration,
+                recording: blobToSave, webcam: webcamToSave, systemAudio, micAudio, duration,
+                pointerTrack, eraseBakedCursor,
                 clicks: recordedClicks, moves: recordedMoves, keystrokes: recordedKeystrokes, caret: recordedCaret, cursorShapes: recordedCursorShapes,
                 focusSegments: studioRef.current?.getFocusSegments() ?? focusSegments,
                 annotations, captions, captionsEnabled, background,
@@ -1641,6 +1904,12 @@ export default function RecorderPage() {
             setRecordedKeystrokes(project.keystrokes ?? []);
             setRecordedCaret(project.caret ?? []);
             setRecordedCursorShapes(project.cursorShapes ?? []);
+            setPointerTrack(project.pointerTrack ?? null);
+            setEraseBakedCursor(project.eraseBakedCursor !== false);
+            setNativeAudioTracks({
+                systemAudioUrl: project.systemAudio ? URL.createObjectURL(project.systemAudio) : null,
+                micAudioUrl: project.micAudio ? URL.createObjectURL(project.micAudio) : null,
+            });
             savedSegmentsRef.current = project.focusSegments ?? [];
             setFocusSegments(savedSegmentsRef.current);
             recDurationRef.current = project.duration;
@@ -1756,8 +2025,43 @@ export default function RecorderPage() {
             <div className="flex-1 min-h-0 flex flex-col relative overflow-hidden">
                 {viewMode === 'recorder' ? (
                     /* ═══ CAPTURE COCKPIT ═══ */
-                    <div className="flex-1 flex flex-col w-full overflow-y-auto px-8 py-8">
-                        {/* Centered Cockpit Card */}
+                    <div className="flex-1 flex flex-col w-full overflow-y-auto px-4 sm:px-8 py-8">
+                        {platform === 'browser' ? (
+                            <WebCockpit
+                                support={webSupportInfo}
+                                source={webSource}
+                                stream={webStream}
+                                onPickSource={pickWebSource}
+                                onStopSharing={stopWebSharing}
+                                captureArea={captureArea}
+                                onPickArea={pickWebArea}
+                                onClearArea={() => setCaptureArea(null)}
+                                isRecording={isRecording}
+                                onToggleRecord={() => toggleRecord()}
+                                timer={timer}
+                                micEnabled={micEnabled}
+                                micStream={micStream}
+                                onToggleMic={toggleMic}
+                                audioDevices={audioDevices}
+                                selectedMicId={selectedMicId}
+                                onSelectMic={handleSelectMic}
+                                webcamEnabled={webcamEnabled}
+                                webcamStream={webcamPreviewStream}
+                                onToggleWebcam={toggleWebcam}
+                                videoDevices={videoDevices}
+                                selectedWebcamId={selectedWebcamId}
+                                onSelectWebcam={handleSelectWebcam}
+                                countdownSeconds={countdownSeconds}
+                                onChangeCountdown={setCountdownSeconds}
+                                floatingControls={floatingControls}
+                                onToggleFloatingControls={(v) => {
+                                    setFloatingControls(v);
+                                    try { localStorage.setItem('drift_floating_controls', String(v)); } catch (e) {}
+                                }}
+                                hotkey={formatAccelerator(hotkeys.toggle_recording)}
+                                busy={webBusy}
+                            />
+                        ) : (
                         <CaptureCockpit
                             captureArea={captureArea}
                             onPickArea={handlePickArea}
@@ -1803,6 +2107,7 @@ export default function RecorderPage() {
                             isNativeSupported={isNativeSupported}
                             webcamStream={engineRef.current?.webcamStream || null}
                         />
+                        )}
                     </div>
                 ) : (
                     /* ═══ STUDIO MODE ═══ */
