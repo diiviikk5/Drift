@@ -353,6 +353,12 @@ export default function WebCockpit({
                 </button>
             </div>
 
+            {support?.documentPiP && floatingControls && source?.surface === 'monitor' && !isRecording && (
+                <p className="-mt-2 text-xs text-[var(--text-app-faint)]">
+                    The floating panel shows up in a full-screen recording. Drag it to another display, or turn it off and stop from this tab or the browser’s “Stop sharing” bar.
+                </p>
+            )}
+
             {!isRecording && recentTakes.length > 0 && (
                 <div className="rounded-xl border border-[var(--border-app)] bg-[var(--bg-card)] overflow-hidden">
                     <div className="flex items-center gap-2 px-3.5 h-10 border-b border-[var(--border-app)] text-[13px] font-medium text-[var(--text-app)]">
