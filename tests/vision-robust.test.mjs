@@ -82,3 +82,22 @@ test('pointer hidden while typing comes back somewhere else', () => {
     assert.ok(r.reacquiredAt != null && r.reacquiredAt <= 200, JSON.stringify(r));
     assert.ok(r.wrong <= 2, JSON.stringify(r));
 });
+
+test('a pointer-shaped picture on screen does not hold the tracker', () => {
+    // A web page shows an image of a pointer; the real pointer starts moving later.
+    const page = new Uint8ClampedArray(desktop);
+    paintCursorAA(page, W, H, BITMAPS.WINDOWS_ARROW, [0, 0], 200, 150, 1);
+    const tracker = new CursorTracker({ width: W, height: H });
+    let prev = null, onReal = 0, frames = 0;
+    for (let t = 0; t <= 4000; t += 33) {
+        const f = new Uint8ClampedArray(page);
+        const [x, y] = pathAt([[0, 900, 500], [1500, 900, 500], [3000, 600, 300], [4000, 640, 320]], t).map(Math.round);
+        // The real pointer only appears once it starts moving (it was off the capture).
+        if (t >= 1500) paintCursorAA(f, W, H, BITMAPS.WINDOWS_ARROW, [0, 0], x, y, 1);
+        const L = luma(f, W, H);
+        const r = tracker.update(L, prev, t, changed(prev, L));
+        prev = L;
+        if (t >= 2200) { frames++; if (r.found && Math.hypot(r.x - x, r.y - y) <= 2) onReal++; }
+    }
+    assert.ok(onReal / frames > 0.8, `${onReal}/${frames}`);
+});

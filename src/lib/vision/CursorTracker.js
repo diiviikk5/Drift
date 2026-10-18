@@ -287,6 +287,21 @@ export class CursorTracker {
         return best;
     }
 
+    /** A pointer that just moved (changed pixels where it is) in a changed area away from `last`. */
+    _movingElsewhere(L, prevL, changed, last) {
+        const deadline = now() + SEARCH_BUDGET_MS / 2;
+        const cands = this._candidates();
+        let best = null;
+        for (const c of changed) {
+            if (last.x >= c.x0 - 40 && last.x <= c.x1 + 40 && last.y >= c.y0 - 40 && last.y <= c.y1 + 40) continue;
+            if ((c.x1 - c.x0 + 1) * (c.y1 - c.y0 + 1) > 60_000) continue;
+            const m = this._search(L, cands, c.x0, c.y0, c.x1, c.y1, null, deadline);
+            if (m && m.score < 0.2 && this._changedAt(L, prevL, m.x, m.y, m.P) && (!best || m.score < best.score)) best = m;
+            if (this.overBudget) break;
+        }
+        return best;
+    }
+
     /** Did anything change under the pointer's footprint? */
     _changedAt(L, prevL, x, y, P) {
         if (!prevL) return true;
@@ -326,9 +341,21 @@ export class CursorTracker {
             const P = this._byKey(last.key);
             // 1. Still: nothing changed under it.
             if (P && this.lostFrames === 0 && !this._changedAt(L, prevL, last.x, last.y, P)) {
+                // Now and then, make sure the "pointer" that sits still isn't
+                // something static on screen while the real one moves elsewhere.
+                this._stillFrames = (this._stillFrames || 0) + 1;
+                if (this._stillFrames % 10 === 0 && changed.length && prevL) {
+                    const moved = this._movingElsewhere(L, prevL, changed, last);
+                    if (moved) {
+                        this._stillFrames = 0;
+                        this._remember(moved.x, moved.y, t, moved.P, 'acquire', L);
+                        return { found: true, x: moved.x, y: moved.y, shape: moved.P.tpl.shape, key: moved.P.key, score: moved.score, method: 'acquire' };
+                    }
+                }
                 this._remember(last.x, last.y, t, P, 'still', L);
                 return { found: true, x: last.x, y: last.y, shape: P.tpl.shape, key: P.key, score: last.score, method: 'still' };
             }
+            this._stillFrames = 0;
             // 2. Track around the predicted position.
             let vx = 0, vy = 0;
             const prev = this.prevLast;
