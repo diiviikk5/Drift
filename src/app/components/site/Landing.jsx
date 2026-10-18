@@ -12,6 +12,7 @@ import ProductHuntBadge from '../ProductHuntBadge';
 const DOWNLOAD_URL = '/downloads/Drift-Recorder_3.1.0_x64-setup.exe';
 const LEGACY_URL = '/downloads/Drift_2.0.0_x64-setup.exe';
 const REPO_URL = 'https://github.com/diiviikk5/Drift';
+const WEB_APP_URL = '/app';
 const PH_URL = 'https://www.producthunt.com/products/drift-6?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_campaign=badge-drift-6ef740e8-671a-4130-90b6-140b7784af27';
 const DEMO = { src: '/demo/drift-demo.mp4', poster: '/demo/drift-demo.jpg' };
 
@@ -30,6 +31,18 @@ function GitHubIcon() {
     return (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M12 .5C5.65.5.5 5.65.5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.4-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z" />
+        </svg>
+    );
+}
+
+function BrowserIcon() {
+    return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="16" rx="2.5" />
+            <path d="M3 9h18" />
+            <circle cx="6.5" cy="6.5" r="0.6" fill="currentColor" />
+            <circle cx="9" cy="6.5" r="0.6" fill="currentColor" />
+            <circle cx="12" cy="14.5" r="2.6" fill="currentColor" stroke="none" />
         </svg>
     );
 }
@@ -135,7 +148,8 @@ export default function Landing() {
                             <GitHubIcon />
                             <span>{stars != null ? stars : 'Star'}</span>
                         </a>
-                        <a className={`${s.btn} ${s.btnSm}`} href={DOWNLOAD_URL} download>Download</a>
+                        <a className={`${s.btn} ${s.btnPaper} ${s.btnSm}`} href={WEB_APP_URL}>Open web app</a>
+                        <a className={`${s.btn} ${s.btnSm} ${s.hideMd}`} href={DOWNLOAD_URL} download>Download</a>
                     </nav>
                 </div>
             </header>
@@ -146,6 +160,7 @@ export default function Landing() {
                     <Reveal y={10}>
                         <div className={s.chips}>
                             <span className={s.chip}><span className={s.chipDot} />Free for Windows</span>
+                            <span className={s.chip}>Runs in your browser</span>
                             <span className={s.chip}>Open source</span>
                             <span className={`${s.chip} ${s.hideMd}`}>No watermark</span>
                         </div>
@@ -195,16 +210,17 @@ export default function Landing() {
                                 <WindowsIcon />
                                 Download Drift Recorder
                             </a>
-                            <a className={`${s.btn} ${s.btnLg} ${s.btnPaper}`} href={REPO_URL} target="_blank" rel="noreferrer">
-                                <GitHubIcon />
-                                Star on GitHub{stars != null ? ` · ${stars}` : ''}
+                            <a className={`${s.btn} ${s.btnLg} ${s.btnPaper}`} href={WEB_APP_URL}>
+                                <BrowserIcon />
+                                Record in your browser
                             </a>
                             <a className={s.ph} href={PH_URL} target="_blank" rel="noreferrer" aria-label="Drift on Product Hunt">
                                 <ProductHuntBadge width={296} height={64} />
                             </a>
                         </div>
                         <p className={s.ctaNote}>
-                            Drift Recorder 3.0 · 4.4 MB · Windows 10 &amp; 11 · No account needed ·{' '}
+                            Drift Recorder 3.0 · 4.4 MB · Windows 10 &amp; 11 · No account needed · Or skip the install:
+                            Drift Web runs in Chrome, Edge, Firefox and Safari, with no extension ·{' '}
                             <a href={LEGACY_URL} download style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}>Legacy Drift 2.0</a>
                         </p>
                     </Reveal>
@@ -335,6 +351,10 @@ export default function Landing() {
                                         <a className={`${s.btn} ${s.finalBtn}`} href={DOWNLOAD_URL} download>
                                             <WindowsIcon />
                                             Download Drift Recorder
+                                        </a>
+                                        <a className={`${s.btn} ${s.finalBtn} ${s.btnPaper}`} href={WEB_APP_URL}>
+                                            <BrowserIcon />
+                                            Record in your browser
                                         </a>
                                     </div>
                                 </div>

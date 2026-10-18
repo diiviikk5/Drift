@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Monitor, Mic, Camera, Timer, Square, AppWindow, Crop, Globe, PictureInPicture2, Volume2, MousePointer2, AlertTriangle, X } from 'lucide-react';
+import { Monitor, Mic, Camera, Timer, Square, AppWindow, Crop, Globe, PictureInPicture2, Volume2, MousePointer2, AlertTriangle, X, History, Trash2, Film } from 'lucide-react';
 import { createAudioLevelMeter } from '@/lib/audio/audioMix';
 
 function Switch({ checked, onChange, label, disabled = false }) {
@@ -99,6 +99,9 @@ export default function WebCockpit({
     onToggleFloatingControls,
     hotkey,
     busy = false,
+    recentTakes = [],
+    onOpenTake,
+    onDeleteTake,
 }) {
     const videoRef = useRef(null);
     const camRef = useRef(null);
@@ -349,8 +352,50 @@ export default function WebCockpit({
                     )}
                 </button>
             </div>
+
+            {!isRecording && recentTakes.length > 0 && (
+                <div className="rounded-xl border border-[var(--border-app)] bg-[var(--bg-card)] overflow-hidden">
+                    <div className="flex items-center gap-2 px-3.5 h-10 border-b border-[var(--border-app)] text-[13px] font-medium text-[var(--text-app)]">
+                        <History className="w-3.5 h-3.5" />
+                        <span>Recent recordings</span>
+                        <span className="ml-auto text-xs font-normal text-[var(--text-app-faint)]">Kept in this browser only</span>
+                    </div>
+                    <div className="p-1">
+                        {recentTakes.map((t) => (
+                            <div key={t.id} className="flex items-center gap-2.5 px-2.5 h-10 rounded-lg hover:bg-[var(--bg-card-subtle)] group">
+                                <Film className="w-4 h-4 text-[var(--text-app-muted)] flex-shrink-0" />
+                                <button type="button" onClick={() => onOpenTake?.(t.id)} className="flex-1 min-w-0 text-left">
+                                    <span className="text-[13px] text-[var(--text-app)]">{formatWhen(t.createdAt)}</span>
+                                    <span className="text-xs text-[var(--text-app-faint)] ml-2">
+                                        {formatDuration(t.durationMs)} · {(t.size / 1024 / 1024).toFixed(1)} MB{t.surface ? ` · ${surfaceName(t.surface)}` : ''}
+                                    </span>
+                                </button>
+                                <button type="button" onClick={() => onOpenTake?.(t.id)} className="h-7 px-2.5 rounded-md text-xs font-medium text-[var(--text-app)] bg-[var(--bg-card-subtle)] border border-[var(--border-app)] hover:border-[var(--border-app-hover)]">
+                                    Edit
+                                </button>
+                                <button type="button" onClick={() => onDeleteTake?.(t.id)} aria-label="Delete recording" className="h-7 w-7 flex items-center justify-center rounded-md text-[var(--text-app-faint)] hover:text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100">
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
+}
+
+function formatDuration(ms = 0) {
+    const s = Math.round(ms / 1000);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function formatWhen(ts) {
+    const d = new Date(ts);
+    const today = new Date();
+    const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    if (d.toDateString() === today.toDateString()) return `Today, ${time}`;
+    return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;
 }
 
 /** Dim everything outside the chosen area in the preview (object-contain aware). */

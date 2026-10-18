@@ -154,6 +154,26 @@ try {
 } catch (e) {
     logs.push(`[e2e] export failed: ${e.message}`);
 }
+// The take is kept in the browser: reopen it from the cockpit.
+let reopened = false;
+try {
+    await app.getByRole('button', { name: 'Record', exact: true }).click();
+    await app.waitForSelector('text=Recent recordings', { timeout: 10000 });
+    await app.screenshot({ path: path.join(OUT, '06-recent.png') });
+    await app.getByRole('button', { name: 'Edit', exact: true }).last().click();
+    await app.waitForSelector('text=Aspect ratio', { timeout: 15000 });
+    await sleep(1500);
+    await app.screenshot({ path: path.join(OUT, '07-reopened.png') });
+    reopened = true;
+} catch (e) {
+    logs.push(`[e2e] reopen failed: ${e.message}`);
+}
+// Landing page entry point.
+const landing = await ctx.newPage();
+await landing.goto(`http://localhost:${PORT}/`);
+await landing.waitForSelector('text=Record in your browser');
+await landing.screenshot({ path: path.join(OUT, '08-landing.png') });
+
 fs.writeFileSync(path.join(OUT, 'console.log'), logs.join('\n'));
 // A few exported frames for review.
 if (exported) {
@@ -163,7 +183,7 @@ if (exported) {
     const probe = spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_name,width,height,r_frame_rate,duration', '-of', 'json', exported]);
     fs.writeFileSync(path.join(OUT, 'export-probe.json'), probe.stdout);
 }
-console.log(JSON.stringify({ take, truth: truth.clicks, offset, exported }, null, 2));
+console.log(JSON.stringify({ take, truth: truth.clicks, offset, exported, reopened }, null, 2));
 await browser.close();
 cleanup();
 process.exit(0);

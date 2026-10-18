@@ -24,6 +24,7 @@ import NotesTeleprompter from '@/components/desktop/NotesTeleprompter';
 import WebCockpit from '@/components/web/WebCockpit';
 import { WebRecorder, webSupport, telemetryToArea } from '@/lib/web/WebRecorder';
 import { openFloatingControls } from '@/lib/web/floatingControls';
+import { saveTake, listTakes, loadTake, deleteTake } from '@/lib/web/takeStore';
 
 
 // The default synthetic pointer matches the system one.
@@ -189,6 +190,7 @@ export default function RecorderPage() {
     const [webBusy, setWebBusy] = useState(false);
     const [floatingControls, setFloatingControls] = useState(true);
     const [webcamPreviewStream, setWebcamPreviewStream] = useState(null);
+    const [recentTakes, setRecentTakes] = useState([]);
 
     useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
     useEffect(() => { hotkeysRef.current = hotkeys; }, [hotkeys]);
@@ -959,6 +961,90 @@ export default function RecorderPage() {
         }, 250);
     };
 
+    const refreshRecentTakes = useCallback(() => {
+        listTakes().then(setRecentTakes).catch(() => setRecentTakes([]));
+    }, []);
+
+    useEffect(() => {
+        if (platform === 'browser') refreshRecentTakes();
+    }, [platform, refreshRecentTakes]);
+
+    /** Load a web take (just recorded, or kept in this browser) into the studio. */
+    const applyWebTake = async (result) => {
+        const area = result.area || null;
+        const tele = telemetryToArea(result.telemetry, area) || null;
+        const moves = tele?.moves || [];
+        const tracked = moves.some(m => !m.hidden && !m.scroll && !m.click);
+
+        savedSegmentsRef.current = null;
+        setFocusSegments([]);
+        setBlurRegions([]);
+        setSelectedBlurId(null);
+        setRecordedBlob(result.screen);
+        setRecordedMoves(moves);
+        setRecordedClicks(tele?.clicks || []);
+        setRecordedKeystrokes(tele?.keystrokes || []);
+        setRecordedCaret(tele?.caret || []);
+        setRecordedCursorShapes(tele?.cursorShapes || []);
+        setPointerTrack(result.telemetry?.pointer || null);
+        setEraseBakedCursor(true);
+        setSourceArea(area || null);
+        setNativeAudioTracks({
+            systemAudioUrl: result.systemAudio ? URL.createObjectURL(result.systemAudio) : null,
+            micAudioUrl: result.micAudio ? URL.createObjectURL(result.micAudio) : null,
+        });
+        if (result.webcam) {
+            setRecordedWebcamBlob(result.webcam);
+            setWebcamSettings(prev => ({ ...prev, enabled: true }));
+        } else {
+            setRecordedWebcamBlob(null);
+        }
+        // Summary of the last take (read by the browser E2E run).
+        window.__driftLastTake = {
+            durationMs: result.durationMs,
+            surface: result.source?.surface,
+            moves: moves.length,
+            clicks: (tele?.clicks || []).map(c => ({ time: c.time, x: c.x, y: c.y, confidence: c.confidence })),
+            keystrokes: (tele?.keystrokes || []).length,
+            caret: (tele?.caret || []).length,
+            scrolls: (result.telemetry?.scrolls || []).length,
+            shapes: (tele?.cursorShapes || []).map(c => c.shape),
+            sprites: Object.keys(result.telemetry?.pointer?.sprites || {}),
+            stats: result.telemetry?.stats || null,
+            audio: { system: Boolean(result.systemAudio), mic: Boolean(result.micAudio) },
+            webcam: Boolean(result.webcam),
+            screenBytes: result.screen?.size || 0,
+            screenUrl: URL.createObjectURL(result.screen),
+            raw: result.telemetry?.pointer?.raw || [],
+        };
+        // With the pointer tracked, the recorded one is erased and Drift draws its own.
+        setShowCursor(tracked);
+        setCursorBakedIn(!tracked);
+        recDurationRef.current = result.durationMs / 1000;
+        if (!tracked && result.source?.surface !== 'browser') {
+            setNotice('Drift couldn’t find the pointer in this recording, so it keeps the recorded one. Zooms can still be added by clicking the preview.');
+        }
+        setViewMode('studio');
+    };
+
+    const openRecentTake = async (id) => {
+        try {
+            const take = await loadTake(id);
+            if (!take?.screen) throw new Error('This recording is no longer available');
+            studioRef.current?.dispose();
+            studioRef.current = null;
+            await applyWebTake(take);
+            setProjectRevision(r => r + 1);
+        } catch (e) {
+            setNotice(`Couldn't open that recording: ${e?.message || e}`);
+        }
+    };
+
+    const removeRecentTake = async (id) => {
+        try { await deleteTake(id); } catch (e) {}
+        refreshRecentTakes();
+    };
+
     const stopWebRecording = async () => {
         const rec = webRecorderRef.current;
         if (!rec || webBusy) return;
@@ -976,60 +1062,11 @@ export default function RecorderPage() {
             setHasActiveStream(false);
             if (!result.screen) throw new Error('The browser returned an empty recording');
 
-            const area = recordAreaRef.current;
-            const tele = telemetryToArea(result.telemetry, area) || null;
-            const moves = tele?.moves || [];
-            const tracked = moves.some(m => !m.hidden && !m.scroll && !m.click);
-
-            savedSegmentsRef.current = null;
-            setFocusSegments([]);
-            setBlurRegions([]);
-            setSelectedBlurId(null);
-            setRecordedBlob(result.screen);
-            setRecordedMoves(moves);
-            setRecordedClicks(tele?.clicks || []);
-            setRecordedKeystrokes(tele?.keystrokes || []);
-            setRecordedCaret(tele?.caret || []);
-            setRecordedCursorShapes(tele?.cursorShapes || []);
-            setPointerTrack(result.telemetry?.pointer || null);
-            setEraseBakedCursor(true);
-            setSourceArea(area || null);
-            setNativeAudioTracks({
-                systemAudioUrl: result.systemAudio ? URL.createObjectURL(result.systemAudio) : null,
-                micAudioUrl: result.micAudio ? URL.createObjectURL(result.micAudio) : null,
-            });
-            if (result.webcam) {
-                setRecordedWebcamBlob(result.webcam);
-                setWebcamSettings(prev => ({ ...prev, enabled: true }));
-            } else {
-                setRecordedWebcamBlob(null);
-            }
-            // Summary of the last take (read by the browser E2E run).
-            window.__driftLastTake = {
-                durationMs: result.durationMs,
-                surface: result.source?.surface,
-                moves: moves.length,
-                clicks: (tele?.clicks || []).map(c => ({ time: c.time, x: c.x, y: c.y, confidence: c.confidence })),
-                keystrokes: (tele?.keystrokes || []).length,
-                caret: (tele?.caret || []).length,
-                scrolls: (result.telemetry?.scrolls || []).length,
-                shapes: (tele?.cursorShapes || []).map(c => c.shape),
-                sprites: Object.keys(result.telemetry?.pointer?.sprites || {}),
-                stats: result.telemetry?.stats || null,
-                audio: { system: Boolean(result.systemAudio), mic: Boolean(result.micAudio) },
-                webcam: Boolean(result.webcam),
-                screenBytes: result.screen?.size || 0,
-                screenUrl: URL.createObjectURL(result.screen),
-                raw: result.telemetry?.pointer?.raw || [],
-            };
-            // With the pointer tracked, the recorded one is erased and Drift draws its own.
-            setShowCursor(tracked);
-            setCursorBakedIn(!tracked);
-            recDurationRef.current = result.durationMs / 1000;
-            if (!tracked && result.source?.surface !== 'browser') {
-                setNotice('Drift couldn’t find the pointer in this recording, so it keeps the recorded one. Zooms can still be added by clicking the preview.');
-            }
-            setViewMode('studio');
+            await applyWebTake({ ...result, area: recordAreaRef.current });
+            // Keep the take in this browser until it's exported or saved.
+            saveTake({ ...result, area: recordAreaRef.current || null, surface: result.source?.surface || null })
+                .then(refreshRecentTakes)
+                .catch((e) => console.warn('[Drift web] Could not keep the take locally:', e));
         } catch (e) {
             console.error('[Drift web] Stop failed:', e);
             setNotice(`Recording failed: ${e?.message || e}`);
@@ -2080,6 +2117,9 @@ export default function RecorderPage() {
                                 }}
                                 hotkey={formatAccelerator(hotkeys.toggle_recording)}
                                 busy={webBusy}
+                                recentTakes={recentTakes}
+                                onOpenTake={openRecentTake}
+                                onDeleteTake={removeRecentTake}
                             />
                         ) : (
                         <CaptureCockpit
@@ -2297,6 +2337,9 @@ export default function RecorderPage() {
                             }}
                             showCursor={showCursor}
                             cursorBakedIn={cursorBakedIn}
+                            hasPointerTrack={Boolean(pointerTrack?.raw?.length)}
+                            eraseBakedCursor={eraseBakedCursor}
+                            onToggleEraseBakedCursor={setEraseBakedCursor}
                             onToggleCursor={() => {
                                 setShowCursor(prev => {
                                     const next = !prev;

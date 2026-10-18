@@ -34,6 +34,9 @@ export default function InspectorPanel({
     onChangeZoomLevel,
     showCursor,
     cursorBakedIn = false,
+    hasPointerTrack = false,
+    eraseBakedCursor = true,
+    onToggleEraseBakedCursor = null,
     onToggleCursor,
     cursorTheme = 'macos',
     onChangeCursorTheme,
@@ -550,6 +553,28 @@ export default function InspectorPanel({
                                     }`} />
                                 </button>
                             </div>
+
+                            {hasPointerTrack && (
+                                <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-[var(--bg-card-subtle)] border border-[var(--border-app)]">
+                                    <div className="min-w-0">
+                                        <div className="text-xs font-semibold text-[var(--text-app)]">Remove recorded pointer</div>
+                                        <div className="text-[11px] text-[var(--text-app-muted)]">
+                                            {eraseBakedCursor
+                                                ? 'The pointer your browser recorded is erased from every frame'
+                                                : 'The recorded pointer stays in the video'}
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => onToggleEraseBakedCursor?.(!eraseBakedCursor)}
+                                        role="switch"
+                                        aria-checked={eraseBakedCursor}
+                                        aria-label="Remove recorded pointer"
+                                        className={`w-9 h-5 flex-shrink-0 rounded-full transition-all relative ${eraseBakedCursor ? 'bg-[var(--accent-app)]' : 'bg-gray-600'}`}
+                                    >
+                                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${eraseBakedCursor ? 'left-[18px]' : 'left-0.5'}`} />
+                                    </button>
+                                </div>
+                            )}
 
                             {/* Cursor Themes */}
                             <div className="space-y-2">
