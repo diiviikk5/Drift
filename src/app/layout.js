@@ -469,8 +469,8 @@ export default function RootLayout({ children }) {
         <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM Information" />
         <link rel="alternate" type="text/plain" href="/llms-full.txt" title="LLM Extended Information" />
 
-        {/* AI Plugin Manifest for ChatGPT and similar AI agents */}
-        <link rel="manifest" href="/.well-known/ai-plugin.json" />
+        {/* AI plugin description for ChatGPT and similar agents (the web app manifest comes from app/manifest.js) */}
+        <link rel="alternate" type="application/json" href="/.well-known/ai-plugin.json" title="AI plugin manifest" />
 
         {/* Author attribution for knowledge graph */}
         <link rel="author" href="https://github.com/diiviikk5" />
@@ -478,7 +478,7 @@ export default function RootLayout({ children }) {
 
         {/* Favicon variations */}
         <link rel="icon" href="/icon.ico" sizes="any" />
-        <link rel="apple-touch-icon" href="/icon.ico" />
+        <link rel="apple-touch-icon" href="/app-icons/icon-192.png" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${jetBrainsMono.variable} antialiased`}
