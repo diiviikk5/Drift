@@ -1019,6 +1019,8 @@ export default function RecorderPage() {
                 audio: { system: Boolean(result.systemAudio), mic: Boolean(result.micAudio) },
                 webcam: Boolean(result.webcam),
                 screenBytes: result.screen?.size || 0,
+                screenUrl: URL.createObjectURL(result.screen),
+                raw: result.telemetry?.pointer?.raw || [],
             };
             // With the pointer tracked, the recorded one is erased and Drift draws its own.
             setShowCursor(tracked);

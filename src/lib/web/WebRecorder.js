@@ -15,6 +15,7 @@
  */
 
 import { fixWebmDuration } from '@fix-webm-duration/fix';
+import { shiftTelemetry } from '../vision/pointerSync.js';
 
 const VIDEO_MIMES = [
     'video/webm;codecs=vp9',
@@ -252,11 +253,13 @@ export class WebRecorder {
         this.worker = this.describe().pointerVisible ? this._startWorker() : null;
 
         const list = Object.values(this.recorders);
+        // The recorders take the next frame after start(); time from here.
+        // (Any remaining offset is measured on the file after stopping.)
+        this.startAbs = performance.timeOrigin + performance.now();
+        this.worker?.postMessage({ type: 'record', at: this.startAbs });
         for (const r of list) r.start();
         await this.recorders.screen.started;
-        this.startAbs = performance.timeOrigin + performance.now();
         this.recording = true;
-        this.worker?.postMessage({ type: 'record', at: this.startAbs });
         return this.startAbs;
     }
 
@@ -280,7 +283,19 @@ export class WebRecorder {
         const entries = Object.entries(this.recorders);
         const blobs = await Promise.all(entries.map(([, r]) => r.stop(durationMs)));
         const out = Object.fromEntries(entries.map(([k], i) => [k, blobs[i]]));
-        const telemetry = await telemetryPromise;
+        let telemetry = await telemetryPromise;
+        // Line the telemetry up with the file's own timeline.
+        if (telemetry?.pointer?.raw?.length && out.screen && this.worker) {
+            const result = await new Promise((resolve) => {
+                const timer = setTimeout(() => resolve(null), 8000);
+                this.worker.addEventListener('message', (e) => {
+                    if (e.data?.type === 'synced') { clearTimeout(timer); resolve(e.data.result); }
+                });
+                this.worker.postMessage({ type: 'sync', blob: out.screen, pointer: telemetry.pointer });
+            });
+            if (result && Math.abs(result.offset) <= 400) telemetry = shiftTelemetry(telemetry, result.offset);
+            if (telemetry) telemetry.stats = { ...telemetry.stats, sync: result };
+        }
         this._fallbackLoop?.();
         this._fallbackLoop = null;
         try { this.worker?.postMessage({ type: 'close' }); } catch {}

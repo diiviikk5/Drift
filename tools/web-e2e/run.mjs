@@ -119,6 +119,16 @@ await sleep(400);
 await app.evaluate(() => window.dispatchEvent(new CustomEvent('drift-hotkey', { detail: { action: 'toggle_recording', source: 'local' } })));
 await app.waitForFunction(() => window.__driftLastTake, null, { timeout: 30000 });
 const take = await app.evaluate(() => window.__driftLastTake);
+// Keep the raw recording and pointer track for offline checks.
+const b64 = await app.evaluate(async (url) => {
+    const buf = new Uint8Array(await (await fetch(url)).arrayBuffer());
+    let s = '';
+    for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+    return btoa(s);
+}, take.screenUrl);
+fs.writeFileSync(path.join(OUT, 'recording.webm'), Buffer.from(b64, 'base64'));
+fs.writeFileSync(path.join(OUT, 'pointer-raw.json'), JSON.stringify(take.raw));
+delete take.raw;
 const offset = recordedAt - sharedAt; // scene ms at the recording's start (approx.)
 fs.writeFileSync(path.join(OUT, 'take.json'), JSON.stringify({ take, truth: truth.clicks, offset }, null, 2));
 await sleep(2500);

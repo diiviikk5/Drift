@@ -9,6 +9,8 @@
  * posted one at a time (browsers without it).
  */
 import { ScreenAnalyzer } from '../vision/ScreenAnalyzer.js';
+import { estimateOffset, syncProbeTimes } from '../vision/pointerSync.js';
+import { lumaFromRGBA } from '../vision/ScreenAnalyzer.js';
 
 let canvas = null;
 let ctx = null;
@@ -70,6 +72,46 @@ async function readStream(readable) {
     }
 }
 
+/**
+ * Find the pointer again in a few frames of the recorded file and measure how
+ * far the telemetry clock is from the video's (see vision/pointerSync.js).
+ */
+async function sync(blob, pointer) {
+    if (!blob || !pointer?.raw?.length) return null;
+    const times = syncProbeTimes(pointer.raw);
+    if (times.length < 3) return null;
+    const { Input, BlobSource, ALL_FORMATS, VideoSampleSink } = await import('mediabunny');
+    const input = new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
+    try {
+        const track = await input.getPrimaryVideoTrack();
+        if (!track || (typeof track.canDecode === 'function' && !(await track.canDecode()))) return null;
+        const sink = new VideoSampleSink(track);
+        const w = pointer.width, h = pointer.height;
+        const c = new OffscreenCanvas(w, h);
+        const g = c.getContext('2d', { willReadFrequently: true, alpha: false });
+        const frames = [];
+        let lastTs = null;
+        for await (const sample of sink.samplesAtTimestamps(times.map(t => t / 1000))) {
+            if (!sample) continue;
+            try {
+                const t = sample.timestamp * 1000;
+                if (lastTs != null && Math.abs(t - lastTs) < 1) continue; // same frame twice
+                lastTs = t;
+                const frame = sample.toVideoFrame();
+                g.drawImage(frame, 0, 0, w, h);
+                frame.close();
+                const luma = lumaFromRGBA(g.getImageData(0, 0, w, h).data, new Uint8Array(w * h));
+                frames.push({ t, luma });
+            } finally {
+                sample.close();
+            }
+        }
+        return estimateOffset(frames, pointer);
+    } finally {
+        input.dispose?.();
+    }
+}
+
 self.onmessage = (e) => {
     const m = e.data || {};
     switch (m.type) {
@@ -108,6 +150,12 @@ self.onmessage = (e) => {
             analyzer = null;
             break;
         }
+        case 'sync':
+            sync(m.blob, m.pointer).then(
+                (result) => self.postMessage({ type: 'synced', result }),
+                (err) => self.postMessage({ type: 'synced', result: null, error: String(err?.message || err) }),
+            );
+            break;
         case 'close':
             try { reader?.cancel(); } catch {}
             self.close();
