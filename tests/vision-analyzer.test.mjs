@@ -133,3 +133,27 @@ test('recovered telemetry drives the auto-zoom planner', () => {
     const s = segs[0];
     assert.ok(Math.abs(s.targetX - 0.2) < 0.15 && Math.abs(s.targetY - 0.67) < 0.15, JSON.stringify(s));
 });
+
+test('a tooltip that appears while hovering and goes away on leaving is not a click', () => {
+    const tip = new Uint8ClampedArray(base);
+    fillRect(tip, W, H, 120, 510, 170, 30, [30, 30, 36]);
+    textBlock(tip, W, H, 128, 516, 150, 1, rng(5), [235, 235, 235], 18);
+    const path = [[0, 600, 200], [300, 600, 200], [900, 140, 487], [2400, 140, 487], [3000, 700, 300], [3600, 700, 300]];
+    const out = analyze((t) => {
+        const [x, y] = pathAt(path, t);
+        const resting = t > 1600 && t < 2420; // shows after a hover delay, hides as the pointer leaves
+        return { desktop: resting ? tip : base, cursor: { x, y } };
+    }, 3600);
+    assert.equal(out.clicks.length, 0, JSON.stringify(out.clicks));
+});
+
+test('a checkbox that stays ticked after the pointer leaves is a click', () => {
+    const ticked = new Uint8ClampedArray(base);
+    fillRect(ticked, W, H, 300, 432, 12, 12, [26, 115, 232]);
+    const path = [[0, 600, 200], [300, 600, 200], [900, 306, 438], [2000, 306, 438], [2600, 700, 300], [3400, 700, 300]];
+    const out = analyze((t) => {
+        const [x, y] = pathAt(path, t);
+        return { desktop: t >= 1400 ? ticked : base, cursor: { x, y } };
+    }, 3400);
+    assert.equal(out.clicks.length, 1, JSON.stringify(out.clicks));
+});

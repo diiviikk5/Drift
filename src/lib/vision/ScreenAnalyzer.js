@@ -37,6 +37,8 @@ const CLICK_GAP = 380;         // ms between inferred clicks
 const SETTLE_RADIUS = 4;       // px the pointer may drift and still be settled
 const TYPE_GAP = 1500;         // ms between glyphs of one typing stretch
 const KEY_THROTTLE = 110;      // ms, like the desktop recorder's typing samples
+const REVERT_WINDOW = 700;     // ms after the pointer leaves in which a hover effect undoes itself
+const REVERT_MAD = 6;          // mean luma difference that still counts as "back as it was"
 
 export function lumaFromRGBA(rgba, out) {
     const n = out.length;
@@ -125,7 +127,7 @@ export class ScreenAnalyzer {
         this.settle = null;     // {x, y, t}
         this.lastNearChange = -Infinity;
         this.lastClick = -Infinity;
-        this.pendingClicks = [];
+        this.pendingClicks = [];   // clicks waiting to see if their change was only a hover effect
 
         // Typing state
         this.typing = null;     // { events: [], confirmed }
@@ -175,10 +177,17 @@ export class ScreenAnalyzer {
         })));
         const before = this.cur;
         this._pointer(r, t);
+        if (this.pendingClicks.length) this._verifyClicks(L, t);
 
         if (prev) {
-            // Tiles the pointer itself touched (old and new spot) aren't content changes.
-            const content = comps.filter(c => !this._isPointerChange(c, before) && !this._isPointerChange(c, this.cur));
+            // Tiles the pointer itself touched (old and new spot) aren't content
+            // changes - but only if it moved: under a resting pointer, whatever
+            // changed is the page (a checkbox ticking right under the tip).
+            const cur = this.cur;
+            const moved = !before !== !cur || (before && cur && (before.x !== cur.x || before.y !== cur.y || before.key !== cur.key));
+            const content = moved
+                ? comps.filter(c => !this._isPointerChange(c, before) && !this._isPointerChange(c, cur))
+                : comps;
             const scrolled = this._scroll(L, t, content.length > 0);
             if (!scrolled) this._content(L, prev, content, t);
         }
@@ -381,14 +390,61 @@ export class ScreenAnalyzer {
                 const cause = near.filter(e => e.kind === 'glyph').map(e => e.b);
                 // A blinking caret appearing under the pointer is a click into a field.
                 const kind = global ? 'page' : near.some(e => e.kind === 'region') ? 'ui' : near.some(e => e.kind === 'blink') ? 'focus' : 'small';
-                this._maybeClick(t, kind, cause);
+                const click = this._maybeClick(t, kind, cause);
+                // Tooltips and hover highlights also appear next to a resting pointer;
+                // they undo themselves once it leaves. Keep the "before" to check.
+                if (click && kind !== 'page') {
+                    const box = near.reduce((b, e) => ({
+                        x0: Math.min(b.x0, e.c.x0), y0: Math.min(b.y0, e.c.y0), x1: Math.max(b.x1, e.c.x1), y1: Math.max(b.y1, e.c.y1),
+                    }), { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity });
+                    if (Number.isFinite(box.x0)) {
+                        this.pendingClicks.push({ click, box, before: this._crop(prev, box), at: { x: cur.x, y: cur.y }, leftAt: null, since: t });
+                    }
+                }
             }
             if (near.length) this.lastNearChange = t;
         }
     }
 
+    /** Downsampled luma of a box (every 2nd pixel), for before/after comparisons. */
+    _crop(L, b) {
+        const W = this.W;
+        const out = [];
+        for (let y = b.y0; y <= b.y1; y += 2) {
+            for (let x = b.x0; x <= b.x1; x += 2) out.push(L[y * W + x]);
+        }
+        return Uint8Array.from(out);
+    }
+
+    _verifyClicks(L, t) {
+        const cur = this.cur;
+        this.pendingClicks = this.pendingClicks.filter((p) => {
+            if (p.leftAt == null) {
+                const away = !cur || this.lostSince != null || Math.hypot(cur.x - p.at.x, cur.y - p.at.y) > SETTLE_RADIUS * 4;
+                if (away) {
+                    p.leftAt = t;
+                    // The "response" came just as the pointer set off: a hover-out
+                    // (tooltip closing, highlight fading), not a click.
+                    if (t - p.since < 160) {
+                        this.clicks = this.clicks.filter(c => c !== p.click);
+                        return false;
+                    }
+                } else return t - p.since < 8000; // still resting there; stop watching eventually
+            }
+            const now = this._crop(L, p.box);
+            let d = 0;
+            for (let i = 0; i < now.length; i++) d += Math.abs(now[i] - p.before[i]);
+            if (d / Math.max(1, now.length) < REVERT_MAD) {
+                // Back to how it was before the "click": it was only hover.
+                this.clicks = this.clicks.filter(c => c !== p.click);
+                return false;
+            }
+            return t - p.leftAt < REVERT_WINDOW;
+        });
+    }
+
     _maybeClick(t, kind, cause = []) {
-        if (t - this.lastClick < CLICK_GAP || !this.cur) return;
+        if (t - this.lastClick < CLICK_GAP || !this.cur) return null;
         const s = this.settle;
         // The click came a moment before the response it caused.
         const time = Math.max(s ? s.t + 40 : t - 120, t - 70);
@@ -404,6 +460,7 @@ export class ScreenAnalyzer {
         };
         this.clicks.push(click);
         this.lastClick = t;
+        return click;
     }
 
     _blink(b, t) {
