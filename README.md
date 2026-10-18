@@ -5,16 +5,22 @@
 A lightweight desktop app for screen recording with cinematic auto-zoom, webcam overlay, and timeline editing. Built with Tauri + Next.js.
 
 [![Website](https://img.shields.io/badge/Website-drift.dvkk.dev-blue)](https://drift.dvkk.dev)
-[![Download](https://img.shields.io/badge/Download-Windows%20Installer-green)](https://drift.dvkk.dev/downloads/Drift_2.0.0_x64-setup.exe)
+[![Download](https://img.shields.io/badge/Download-Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-green)](https://drift.dvkk.dev)
 [![Stars](https://img.shields.io/github/stars/diiviikk5/Drift?style=social)](https://github.com/diiviikk5/Drift)
 
 ---
 
 ## Download
 
-**[⬇ Download Drift v2.0 for Windows (21 MB)](https://drift.dvkk.dev/downloads/Drift_2.0.0_x64-setup.exe)**
+| System | Download | Notes |
+|--------|----------|-------|
+| **Windows** 10 & 11 | [Drift Recorder 3.1 (.exe, 4.4 MB)](https://drift.dvkk.dev/downloads/Drift-Recorder_3.1.0_x64-setup.exe) | Run the installer, launch from the Start Menu |
+| **macOS** 11+ (Apple Silicon & Intel) | [Drift Recorder 3.1 (.dmg)](https://github.com/diiviikk5/Drift/releases/download/v3.1.0/Drift-Recorder_3.1.0_mac-universal.dmg) | Beta. Not notarized yet: right-click the app > Open the first time, then allow Screen Recording |
+| **Linux** x86-64 | [AppImage](https://github.com/diiviikk5/Drift/releases/download/v3.1.0/Drift-Recorder_3.1.0_linux-x86_64.AppImage) · [.deb](https://github.com/diiviikk5/Drift/releases/download/v3.1.0/Drift-Recorder_3.1.0_linux-amd64.deb) | Beta. Records X11 sessions (pick "Xorg" at login on Wayland desktops); needs `ffmpeg` |
 
-Run the installer → takes ~10 seconds → launch from Start Menu. Done.
+Legacy [Drift 2.0 for Windows](https://drift.dvkk.dev/downloads/Drift_2.0.0_x64-setup.exe) stays available.
+
+On macOS and Linux, Drift records whole screens and areas; single-window capture, system audio and the keystroke overlay are Windows-only for now.
 
 ---
 
