@@ -117,15 +117,18 @@ export function inpaint(px, w, h, mask) {
  * @param {number} ox, oy patch origin in video px
  * @param {number} hx, hy hotspot in video px
  */
-export function stampMask(mask, w, h, points, k, ox, oy, hx, hy, grow = 2) {
+export function stampMask(mask, w, h, points, k, ox, oy, hx, hy, grow = 2, shadow = 0) {
     const g = Math.max(1, Math.round(grow * Math.max(1, k)));
     const cell = Math.max(1, Math.ceil(k));
+    // System pointers often cast a soft shadow down and to the right; it isn't
+    // part of the learned sprite (it changes with the backdrop), so cover it too.
+    const sh = Math.round(shadow * Math.max(1, k));
     for (const [dx, dy] of points) {
         const bx = Math.floor(hx + dx * k) - ox;
         const by = Math.floor(hy + dy * k) - oy;
-        for (let y = by - g; y < by + cell + g; y++) {
+        for (let y = by - g; y < by + cell + g + sh; y++) {
             if (y < 0 || y >= h) continue;
-            for (let x = bx - g; x < bx + cell + g; x++) {
+            for (let x = bx - g; x < bx + cell + g + sh; x++) {
                 if (x < 0 || x >= w) continue;
                 mask[y * w + x] = 1;
             }
@@ -183,7 +186,7 @@ export function createCursorEraser(pointer) {
                 const sprite = pointer.sprites[p.key];
                 if (!sprite) continue;
                 const b = boxes[p.key];
-                const pad = Math.ceil(4 * Math.max(1, k));
+                const pad = Math.ceil(6 * Math.max(1, k));
                 const hx = p.x * k, hy = p.y * k;
                 const ox = Math.max(0, Math.floor(hx + b.x0 * k) - pad);
                 const oy = Math.max(0, Math.floor(hy + b.y0 * k) - pad);
@@ -200,7 +203,7 @@ export function createCursorEraser(pointer) {
                 pctx.drawImage(work, ox, oy, pw, ph, 0, 0, pw, ph);
                 const img = pctx.getImageData(0, 0, pw, ph);
                 const mask = new Uint8Array(pw * ph);
-                stampMask(mask, pw, ph, sprite.points, k, ox, oy, hx, hy, sprite.learned ? 1.5 : 2.5);
+                stampMask(mask, pw, ph, sprite.points, k, ox, oy, hx, hy, sprite.learned ? 1.5 : 2.5, 2);
                 inpaint(img.data, pw, ph, mask);
                 pctx.putImageData(img, 0, 0);
                 wctx.drawImage(patch, 0, 0, pw, ph, ox, oy, pw, ph);
