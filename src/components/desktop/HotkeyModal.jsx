@@ -190,6 +190,12 @@ export default function HotkeyModal({
                     </div>
                 </div>
 
+                {!isDesktopApp && (
+                    <p className="pt-2 border-t border-[var(--border-app)] text-[11px] text-[var(--text-app-muted)]">
+                        In the browser, shortcuts work while the Drift tab is active. While you record other apps, stop from the floating controls or your browser&apos;s “Stop sharing” button.
+                    </p>
+                )}
+
                 {isDesktopApp && (
                     <div className="pt-2 border-t border-[var(--border-app)] space-y-1.5">
                         <p className="text-[11px] text-[var(--text-app-muted)] flex items-center gap-1.5">

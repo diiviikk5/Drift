@@ -305,6 +305,10 @@ export default function RecorderPage() {
             setHookStatus('Web Browser');
             setWebSupportInfo(webSupport());
             try {
+                const savedKeys = localStorage.getItem('drift_hotkeys');
+                if (savedKeys) setHotkeys(normalizeHotkeys(JSON.parse(savedKeys)));
+            } catch (e) {}
+            try {
                 const saved = localStorage.getItem('drift_floating_controls');
                 if (saved !== null) setFloatingControls(saved === 'true');
             } catch (e) {}
@@ -1826,6 +1830,8 @@ export default function RecorderPage() {
         if (platform === 'tauri') {
             await drift.setHotkeys(hk);
             await applyGlobalHotkeys(hk);
+        } else if (platform === 'browser') {
+            try { localStorage.setItem('drift_hotkeys', JSON.stringify(hk)); } catch (e) {}
         }
         setShowHotkeySettings(false);
     };
