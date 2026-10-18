@@ -34,6 +34,63 @@ function setup(width, height) {
     ctx = canvas.getContext('2d', { willReadFrequently: true, alpha: false });
 }
 
+// Video-range luma (16..235) to full range, so every path sees the same values.
+const RANGE = new Uint8Array(256);
+for (let i = 0; i < 256; i++) RANGE[i] = Math.max(0, Math.min(255, Math.round(((i - 16) * 255) / 219)));
+
+let lumaBuf = null;
+let rawBuf = null;
+
+/**
+ * Luma straight from a VideoFrame when it's analyzed at full size: the Y
+ * plane of YUV frames already is luma, RGB(A) frames are converted directly.
+ * Skips the canvas draw and the RGBA readback. Returns null if unsupported.
+ */
+async function frameLuma(frame) {
+    const fmt = frame.format;
+    const w = frame.codedWidth, h = frame.codedHeight;
+    if (!fmt || w !== size.width || h !== size.height || frame.displayWidth !== w || frame.displayHeight !== h) return null;
+    const yuv = fmt === 'I420' || fmt === 'I420A' || fmt === 'NV12' || fmt === 'I422' || fmt === 'I444';
+    const rgb = fmt === 'RGBA' || fmt === 'RGBX' || fmt === 'BGRA' || fmt === 'BGRX';
+    if (!yuv && !rgb) return null;
+    const bytes = frame.allocationSize();
+    if (!rawBuf || rawBuf.length < bytes) rawBuf = new Uint8Array(bytes);
+    const layout = await frame.copyTo(rawBuf);
+    if (!lumaBuf || lumaBuf.length !== w * h) lumaBuf = new Uint8Array(w * h);
+    const { offset, stride } = layout[0];
+    if (yuv) {
+        for (let y = 0; y < h; y++) {
+            const src = offset + y * stride, dst = y * w;
+            for (let x = 0; x < w; x++) lumaBuf[dst + x] = RANGE[rawBuf[src + x]];
+        }
+    } else {
+        const bgr = fmt === 'BGRA' || fmt === 'BGRX';
+        const rI = bgr ? 2 : 0, bI = bgr ? 0 : 2;
+        for (let y = 0; y < h; y++) {
+            let src = offset + y * stride;
+            const dst = y * w;
+            for (let x = 0; x < w; x++, src += 4) {
+                lumaBuf[dst + x] = (rawBuf[src + rI] * 77 + rawBuf[src + 1] * 150 + rawBuf[src + bI] * 29) >> 8;
+            }
+        }
+    }
+    return lumaBuf;
+}
+
+async function analyzeFrame(frame, t) {
+    if (!analyzer) analyzer = new ScreenAnalyzer({ width: size.width, height: size.height });
+    const t0 = performance.now();
+    let L = null;
+    try { L = await frameLuma(frame); } catch { L = null; }
+    if (L) {
+        analyzer.pushLuma(L, t);
+        busyMs += performance.now() - t0;
+        analyzed++;
+        return;
+    }
+    analyze(frame, t);
+}
+
 function analyze(image, t) {
     if (!analyzer) analyzer = new ScreenAnalyzer({ width: size.width, height: size.height });
     const t0 = performance.now();
@@ -61,7 +118,7 @@ async function readStream(readable) {
                 if (zeroTs != null) {
                     const w = frame.displayWidth, h = frame.displayHeight;
                     if (!size) setup(w, h);
-                    analyze(frame, (frame.timestamp - zeroTs) / 1000);
+                    await analyzeFrame(frame, (frame.timestamp - zeroTs) / 1000);
                 }
             }
         } catch (e) {
