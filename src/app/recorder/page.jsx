@@ -22,7 +22,7 @@ import { normalizeHotkeys, formatAccelerator, matchesAccelerator, stripAppHotkey
 import { getAppTheme } from '@/lib/ui/themes';
 import NotesTeleprompter from '@/components/desktop/NotesTeleprompter';
 import WebCockpit from '@/components/web/WebCockpit';
-import { WebRecorder, webSupport, telemetryToArea } from '@/lib/web/WebRecorder';
+import { WebRecorder, webSupport, telemetryToArea, suggestedTrim } from '@/lib/web/WebRecorder';
 import { openFloatingControls } from '@/lib/web/floatingControls';
 import { saveTake, listTakes, loadTake, deleteTake } from '@/lib/web/takeStore';
 import { analyzeVideoFile } from '@/lib/web/fileAnalysis';
@@ -100,6 +100,9 @@ export default function RecorderPage() {
     const [focusSegments, setFocusSegments] = useState([]);
     const [selectedSegmentId, setSelectedSegmentId] = useState(null);
     const recDurationRef = useRef(null);
+    // Trim to apply when the studio opens (a project's saved trim, or the
+    // moments a web take spent on Drift itself).
+    const initialTrimRef = useRef(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
@@ -502,12 +505,19 @@ export default function RecorderPage() {
                         }
                     };
                 }
+                const trim = initialTrimRef.current;
                 [40, 120, 300, 600].forEach(delay => {
                     setTimeout(() => {
                         if (studioRef.current) {
                             const d = recDurationRef.current || studioRef.current?.videoDuration || 10;
                             setDuration(d);
-                            setTrimEnd(d);
+                            const start = trim ? Math.max(0, Math.min(trim.start || 0, d - 0.5)) : 0;
+                            const end = trim?.end ? Math.max(start + 0.5, Math.min(d, trim.end)) : d;
+                            setTrimStart(start);
+                            setTrimEnd(end);
+                            studioRef.current.trimStart = start;
+                            studioRef.current.trimEnd = end;
+                            if (delay === 600) initialTrimRef.current = null;
                             setFocusSegments(studioRef.current.getFocusSegments() || []);
                             studioRef.current.drawFrame();
                         }
@@ -1033,8 +1043,12 @@ export default function RecorderPage() {
         setShowCursor(tracked);
         setCursorBakedIn(!tracked);
         recDurationRef.current = result.durationMs / 1000;
+        const trim = suggestedTrim(result.presence, result.durationMs, result.source?.surface);
+        initialTrimRef.current = trim;
         if (!tracked && result.source?.surface !== 'browser') {
             setNotice('Drift couldn’t find the pointer in this recording, so it keeps the recorded one. Zooms can still be added by clicking the preview.');
+        } else if (trim) {
+            setNotice('Trimmed the moments where Drift itself was on screen. Drag the trim handles to bring them back.');
         }
         setViewMode('studio');
     };
@@ -2057,6 +2071,7 @@ export default function RecorderPage() {
             setBlurRegions(Array.isArray(project.blurRegions) ? project.blurRegions : []);
             setSourceArea(project.sourceArea ?? null);
             setSelectedBlurId(null);
+            initialTrimRef.current = { start: project.trimStart ?? 0, end: project.trimEnd ?? project.duration };
             setTrimStart(project.trimStart ?? 0);
             setTrimEnd(project.trimEnd ?? project.duration);
             setViewMode('studio');

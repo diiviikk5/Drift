@@ -262,7 +262,33 @@ export class WebRecorder {
         for (const r of list) r.start();
         await this.recorders.screen.started;
         this.recording = true;
+        this._watchPresence();
         return this.startAbs;
+    }
+
+    /**
+     * When the Drift tab was in front during the take. A screen recording
+     * starts and ends with Drift on screen (you click Record, switch to your
+     * app, come back to stop); the studio trims those moments.
+     */
+    _watchPresence() {
+        const here = () => document.visibilityState === 'visible' && document.hasFocus();
+        this.presence = [{ t: 0, here: here() }];
+        const note = () => {
+            const h = here();
+            const last = this.presence[this.presence.length - 1];
+            if (last && last.here === h) return;
+            this.presence.push({ t: Math.round(this.elapsedMs()), here: h });
+        };
+        window.addEventListener('focus', note);
+        window.addEventListener('blur', note);
+        document.addEventListener('visibilitychange', note);
+        this._unwatchPresence = () => {
+            window.removeEventListener('focus', note);
+            window.removeEventListener('blur', note);
+            document.removeEventListener('visibilitychange', note);
+            this._unwatchPresence = null;
+        };
     }
 
     elapsedMs() {
@@ -272,6 +298,7 @@ export class WebRecorder {
     /** Stop and collect the recording: media blobs plus recovered telemetry. */
     async stop() {
         const durationMs = Math.max(100, this.elapsedMs());
+        this._unwatchPresence?.();
         this.recording = false;
         const telemetryPromise = this.worker
             ? new Promise((resolve) => {
@@ -311,6 +338,7 @@ export class WebRecorder {
             webcam: out.webcam || null,
             durationMs,
             telemetry,
+            presence: this.presence || [],
             source: this.describe(),
         };
     }
@@ -364,6 +392,23 @@ export class WebRecorder {
  * Telemetry recorded on the whole capture, moved into a recorded area's
  * coordinates (the video keeps the full frame; the studio shows the area).
  */
+export function suggestedTrim(presence = [], durationMs = 0, surface = null) {
+    if (surface !== 'monitor' || !presence.length || !durationMs) return null;
+    const EDGE = 8000;
+    let start = 0;
+    let end = durationMs;
+    // Started in Drift, then switched away early: start at the switch.
+    if (presence[0].here) {
+        const away = presence.find(p => !p.here);
+        if (away && away.t < EDGE) start = away.t + 250;
+    }
+    // Came back to Drift near the end to stop: end just before.
+    const last = presence[presence.length - 1];
+    if (last.here && last.t > 0 && durationMs - last.t < EDGE) end = last.t - 100;
+    if (end - start < 1000 || (start === 0 && end === durationMs)) return null;
+    return { start: start / 1000, end: end / 1000 };
+}
+
 export function telemetryToArea(t, area) {
     if (!t || !area) return t;
     const map = (list) => (list || []).map(p => {
