@@ -185,6 +185,7 @@ export default function RecorderPage() {
     const webRecorderRef = useRef(null);
     const floatingRef = useRef(null);
     const webTimerRef = useRef(null);
+    const webStoppingRef = useRef(false);
     const [webSupportInfo, setWebSupportInfo] = useState(null);
     const [webSource, setWebSource] = useState(null);
     const [webStream, setWebStream] = useState(null);
@@ -870,6 +871,11 @@ export default function RecorderPage() {
             countdownTimerRef.current = null;
         }
         setActiveCountdown(0);
+        // Web: the floating panel was opened for this countdown.
+        if (!isRecordingRef.current && floatingRef.current) {
+            floatingRef.current.close();
+            floatingRef.current = null;
+        }
     };
 
 
@@ -1005,6 +1011,7 @@ export default function RecorderPage() {
             setRecordedWebcamBlob(null);
         }
         // Summary of the last take (read by the browser E2E run).
+        if (window.__driftLastTake?.screenUrl) URL.revokeObjectURL(window.__driftLastTake.screenUrl);
         window.__driftLastTake = {
             durationMs: result.durationMs,
             surface: result.source?.surface,
@@ -1052,7 +1059,10 @@ export default function RecorderPage() {
 
     const stopWebRecording = async () => {
         const rec = webRecorderRef.current;
-        if (!rec || webBusy) return;
+        // Stop can come from several places at once (floating panel, the
+        // browser's "Stop sharing", the button): only the first one counts.
+        if (!rec || webStoppingRef.current) return;
+        webStoppingRef.current = true;
         setWebBusy(true);
         if (webTimerRef.current) { clearInterval(webTimerRef.current); webTimerRef.current = null; }
         floatingRef.current?.close();
@@ -1077,6 +1087,7 @@ export default function RecorderPage() {
             setNotice(`Recording failed: ${e?.message || e}`);
             setIsRecording(false);
         } finally {
+            webStoppingRef.current = false;
             setWebBusy(false);
         }
     };

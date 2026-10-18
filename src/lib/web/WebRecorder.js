@@ -192,7 +192,9 @@ export class WebRecorder {
         let streamed = false;
         if (typeof MediaStreamTrackProcessor !== 'undefined') {
             try {
-                const processor = new MediaStreamTrackProcessor({ track: track.clone(), maxBufferSize: 2 });
+                // A clone, so the analysis can't hold up the recording; stopped with the take.
+                this._analysisTrack = track.clone();
+                const processor = new MediaStreamTrackProcessor({ track: this._analysisTrack, maxBufferSize: 2 });
                 worker.postMessage({ type: 'stream', readable: processor.readable, width: s.width, height: s.height }, [processor.readable]);
                 streamed = true;
             } catch (e) {
@@ -298,6 +300,7 @@ export class WebRecorder {
         }
         this._fallbackLoop?.();
         this._fallbackLoop = null;
+        this._stopAnalysisTrack();
         try { this.worker?.postMessage({ type: 'close' }); } catch {}
         this.worker = null;
         this.recorders = {};
@@ -332,7 +335,13 @@ export class WebRecorder {
         return { url: URL.createObjectURL(blob), width: c.width, height: c.height };
     }
 
+    _stopAnalysisTrack() {
+        try { this._analysisTrack?.stop(); } catch {}
+        this._analysisTrack = null;
+    }
+
     releaseScreen() {
+        this._stopAnalysisTrack();
         this.screenStream?.getTracks().forEach(t => t.stop());
         this.screenStream = null;
         this.surface = null;
