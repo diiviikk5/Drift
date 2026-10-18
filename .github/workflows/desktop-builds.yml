@@ -57,6 +57,7 @@ jobs:
       - name: Build ffmpeg (arm64 + x86_64)
         if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
         run: |
+          brew install nasm
           bash scripts/build-ffmpeg-macos.sh arm64 "$RUNNER_TEMP/ff/arm64"
           bash scripts/build-ffmpeg-macos.sh x86_64 "$RUNNER_TEMP/ff/x86_64"
           mkdir -p src-tauri/binaries
