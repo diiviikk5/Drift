@@ -42,3 +42,8 @@ Drift is a high-performance, lightweight screen recording and post-production st
 ### 4. Post-Production Compositor & Export (`src/lib/StudioEngine.js`)
 - **Real-Time WYSIWYG Compositing**: Multi-aspect ratio framing (`16:9`, `9:16`, `1:1`, `4:3`, `4:5`, `21:9`), dynamic video blur backdrops, luxury gradient meshes, squircle rounding, and multi-tier drop shadows.
 - **Hardware-Accelerated MP4 Export**: Frame-by-frame encoding via `VideoEncoder` (WebCodecs AVC1/H.264) + `mp4-muxer` with fast-start web streaming optimization.
+
+### 5. Drift on the Web (`src/lib/web`, `src/lib/vision`)
+- Browser capture with `getDisplayMedia`; system audio, mic and webcam as separate tracks.
+- Pointer, clicks, typing, caret and scrolling are recovered from the captured frames in a worker (`ScreenAnalyzer`, `CursorTracker`), then synced to the recorded file's timeline (`pointerSync`).
+- The pointer baked into the capture is erased per frame (`cursorEraser`) so the studio's synthetic pointer is the only one. Details in [docs/WEB.md](docs/WEB.md).

@@ -16,6 +16,12 @@ export default function sitemap() {
             priority: 1,
         },
         {
+            url: `${baseUrl}/app`,
+            lastModified: now,
+            changeFrequency: 'weekly',
+            priority: 0.98,
+        },
+        {
             url: `${baseUrl}/recorder`,
             lastModified: now,
             changeFrequency: 'weekly',

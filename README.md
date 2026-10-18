@@ -16,6 +16,10 @@ A lightweight desktop app for screen recording with cinematic auto-zoom, webcam 
 
 Run the installer → takes ~10 seconds → launch from Start Menu. Done.
 
+### Or record in your browser
+
+**[Open Drift Web →](https://drift.dvkk.dev/app)** — the same recorder and studio, no install and no extension. Works in Chrome, Edge, Firefox and Safari on desktop. See [docs/WEB.md](docs/WEB.md) for how it follows your pointer, clicks and typing from the captured pixels.
+
 ---
 
 ## Documentation
@@ -23,6 +27,7 @@ Run the installer → takes ~10 seconds → launch from Start Menu. Done.
 - **[Architecture & Technical Design](ARCHITECTURE.md)** — Deep dive into the Tauri v2 core, spring physics, and WebCodecs pipeline.
 - **[Contributing Guide](CONTRIBUTING.md)** — Guidelines for local setup, code style, and submitting pull requests.
 - **[Keyboard Shortcuts](docs/SHORTCUTS.md)** — Global hotkeys and studio playback controls.
+- **[Drift on the Web](docs/WEB.md)** — How the browser version recovers pointer, clicks, typing and scrolling from the captured frames.
 
 ---
 

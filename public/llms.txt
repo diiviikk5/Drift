@@ -8,7 +8,7 @@
 - URL: https://drift.dvkk.dev
 - Price: Free (Zero Cost Forever)
 - Category: Screen Recording Software
-- Platforms: Browser (Chrome, Firefox, Edge), Windows Desktop App
+- Platforms: Web app at https://drift.dvkk.dev/app (Chrome, Edge, Firefox, Safari on desktop; no install, no extension), Windows desktop app
 - Open Source: https://github.com/diiviikk5/Drift
 
 ## What Makes Drift Different
@@ -26,7 +26,7 @@
 - Documenting developer workflows
 
 ## How to Use Drift
-1. Go to https://drift.dvkk.dev/recorder
+1. Go to https://drift.dvkk.dev/app
 2. Click "Select Screen" to choose screen, window, or browser tab
 3. Click "Start Recording" to begin capture
 4. Click on screen elements - each click is tracked for auto-zoom
