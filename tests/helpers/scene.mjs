@@ -100,3 +100,32 @@ export function renderFrame(desktop, W, H, cursor) {
     if (cursor) paintCursor(rgba, W, H, cursor.id || 'arrow-win', cursor.x, cursor.y, cursor);
     return rgba;
 }
+
+/**
+ * Pointer painted with anti-aliased edges (area coverage), like Windows'
+ * scaled pointers and macOS at non-integer scales.
+ */
+export function paintCursorAA(rgba, W, H, rows, hot, x, y, scale, inner = [255, 255, 255], rim = [0, 0, 0]) {
+    const h = rows.length, w = Math.max(...rows.map(r => r.length));
+    const cls = (bx, by) => (by < 0 || by >= h || bx < 0 || bx >= w) ? 0 : rows[by][bx] === 'W' ? 1 : rows[by][bx] === 'B' ? 2 : 0;
+    const ox = x - hot[0] * scale, oy = y - hot[1] * scale;
+    const SS = 4;
+    for (let py = Math.floor(oy); py < Math.ceil(oy + h * scale); py++) {
+        if (py < 0 || py >= H) continue;
+        for (let px = Math.floor(ox); px < Math.ceil(ox + w * scale); px++) {
+            if (px < 0 || px >= W) continue;
+            let r = 0, g = 0, b = 0, cov = 0;
+            for (let sy = 0; sy < SS; sy++) for (let sx = 0; sx < SS; sx++) {
+                const c = cls(Math.floor((px + (sx + 0.5) / SS - ox) / scale), Math.floor((py + (sy + 0.5) / SS - oy) / scale));
+                if (!c) continue;
+                const col = c === 1 ? inner : rim;
+                r += col[0]; g += col[1]; b += col[2]; cov++;
+            }
+            if (!cov) continue;
+            const a = cov / (SS * SS), i = (py * W + px) * 4;
+            rgba[i] = rgba[i] * (1 - a) + (r / cov) * a;
+            rgba[i + 1] = rgba[i + 1] * (1 - a) + (g / cov) * a;
+            rgba[i + 2] = rgba[i + 2] * (1 - a) + (b / cov) * a;
+        }
+    }
+}

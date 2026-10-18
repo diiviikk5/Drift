@@ -111,6 +111,9 @@ const IBEAM = [
     'BBB BBB',
 ];
 
+/** Raw bitmaps (tests and tools paint with them). */
+export const BITMAPS = Object.freeze({ WINDOWS_ARROW, MAC_ARROW, WINDOWS_HAND, IBEAM });
+
 export const BASE_SHAPES = Object.freeze({
     'arrow-win': { rows: WINDOWS_ARROW, hot: [0, 0], shape: 'arrow' },
     'arrow-mac': { rows: MAC_ARROW, hot: [0, 0], shape: 'arrow' },
@@ -143,7 +146,7 @@ function baseGrid(rows) {
  * @returns {{id, shape, scale, w, h, hotX, hotY, innerX: Int16Array, innerY: Int16Array, rimX: Int16Array, rimY: Int16Array}}
  *   pixel offsets relative to the hotspot
  */
-export function buildTemplate(id, scale = 1) {
+export function buildTemplate(id, scale = 1, phaseX = 0, phaseY = 0) {
     const base = BASE_SHAPES[id];
     if (!base) throw new Error(`unknown cursor template ${id}`);
     const { g, w, h } = baseGrid(base.rows);
@@ -157,10 +160,10 @@ export function buildTemplate(id, scale = 1) {
         for (let x = 0; x < W; x++) {
             let cIn = 0, cRim = 0;
             for (let sy = 0; sy < SS; sy++) {
-                const by = Math.floor((y + (sy + 0.5) / SS) / scale);
+                const by = Math.floor((y + (sy + 0.5) / SS - phaseY) / scale);
                 if (by < 0 || by >= h) continue;
                 for (let sx = 0; sx < SS; sx++) {
-                    const bx = Math.floor((x + (sx + 0.5) / SS) / scale);
+                    const bx = Math.floor((x + (sx + 0.5) / SS - phaseX) / scale);
                     if (bx < 0 || bx >= w) continue;
                     const c = g[by * w + bx];
                     if (c === 1) cIn++;
@@ -176,6 +179,7 @@ export function buildTemplate(id, scale = 1) {
         id,
         shape: base.shape,
         scale,
+        phase: [phaseX, phaseY],
         w: W,
         h: H,
         hotX,
@@ -189,17 +193,22 @@ export function buildTemplate(id, scale = 1) {
 
 const cache = new Map();
 /** All templates for the given ids and scales (memoized). */
-export function templateSet(ids = Object.keys(BASE_SHAPES), scales = SEARCH_SCALES) {
+export function templateSet(ids = Object.keys(BASE_SHAPES), scales = SEARCH_SCALES, phases = [[0, 0]]) {
     const out = [];
     for (const id of ids) {
         for (const s of scales) {
-            const key = `${id}@${s}`;
-            if (!cache.has(key)) cache.set(key, buildTemplate(id, s));
-            out.push(cache.get(key));
+            for (const [px, py] of phases) {
+                const key = `${id}@${s}~${px},${py}`;
+                if (!cache.has(key)) cache.set(key, buildTemplate(id, s, px, py));
+                out.push(cache.get(key));
+            }
         }
     }
     return out;
 }
+
+/** Half-pixel offsets: a resampled capture can put the pointer between pixels. */
+export const HALF_PHASES = Object.freeze([[0.5, 0], [0, 0.5], [0.5, 0.5]]);
 
 /**
  * Paint a template's base bitmap into an RGBA buffer (used by tests and the

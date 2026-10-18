@@ -19,7 +19,7 @@
  * mask the cursor eraser needs.
  */
 
-import { templateSet, SEARCH_SCALES } from './cursorTemplates.js';
+import { templateSet, SEARCH_SCALES, HALF_PHASES } from './cursorTemplates.js';
 
 const PROBES = 3;               // probe pixels per class for early rejection
 const PROBE_GAP = 40;           // probes must separate interior from rim by this much
@@ -61,6 +61,7 @@ function prepare(tpl, width) {
         pRim: sortedProbeIndices(rim.length, PROBES).map(i => rim[i]),
         box: { x0, y0, x1, y1 },
         sprite: null, // learned { off: Int32Array, val: Uint8Array, dx, dy }
+        strict: tpl.shape === 'text',
     };
 }
 
@@ -104,7 +105,8 @@ function classScore(L, W, P, px, py) {
     const sdIn = Math.sqrt(Math.max(0, ssIn / nI - mIn * mIn));
     const sdRim = Math.sqrt(Math.max(0, ssRim / nR - mRim * mRim));
     const score = (sdIn + sdRim) / contrast;
-    return score <= MAX_CLASS_SCORE ? score : Infinity;
+    // A thin I-beam looks like plenty of things in text; it has to be a clean match.
+    return score <= (P.strict ? MAX_CLASS_SCORE * 0.5 : MAX_CLASS_SCORE) ? score : Infinity;
 }
 
 /** Learned-sprite score (normalized like classScore), or Infinity. */
@@ -175,6 +177,8 @@ export class CursorTracker {
         this.width = width;
         this.height = height;
         this.all = templateSet(undefined, scales).map(t => prepare(t, width));
+        this.scales = scales;
+        this._phased = new Map(); // scale -> half-pixel variants (built when needed)
         this.locked = null;       // { scale, family: 'win' | 'mac' } once identified
         this.last = null;         // { x, y, t, key }
         this.prevLast = null;
@@ -196,8 +200,30 @@ export class CursorTracker {
         return this._lockedSet.list;
     }
 
+    /** Half-pixel-phase variants of the identified scale (same keys as the base ones). */
+    _phasedCandidates() {
+        if (!this.locked) return [];
+        const sc = this.locked.scale;
+        if (!this._phased.has(sc)) {
+            const list = templateSet(undefined, [sc], HALF_PHASES).map(t => {
+                const P = prepare(t, this.width);
+                P.key = `${t.id}@${t.scale}`;
+                P.base = this.all.find(B => B.key === P.key);
+                return P;
+            });
+            this._phased.set(sc, list);
+        }
+        return this._phased.get(sc).filter(P => P.tpl.shape !== 'arrow' || P.tpl.id.endsWith(this.locked.family));
+    }
+
     _score(L, P, x, y) {
-        return P.sprite ? spriteScore(L, this.width, P.sprite, x, y) : classScore(L, this.width, P, x, y);
+        // The learned sprite is the sharpest test, but a resampled capture
+        // (scaled, sub-pixel phase) can blur it; the class test still holds then.
+        if (P.sprite) {
+            const s = spriteScore(L, this.width, P.sprite, x, y);
+            if (s < Infinity) return s;
+        }
+        return classScore(L, this.width, P, x, y);
     }
 
     /**
@@ -221,7 +247,7 @@ export class CursorTracker {
                 for (let x = x0; x <= x1; x++) {
                     let s;
                     if (rowFits && x >= ax && x <= bx) s = this._score(L, P, x, y);
-                    else s = P.sprite ? spriteScoreClipped(L, W, H, P.sprite, x, y) : classScoreClipped(L, W, H, P, x, y);
+                    else s = Math.min(P.sprite ? spriteScoreClipped(L, W, H, P.sprite, x, y) : Infinity, classScoreClipped(L, W, H, P, x, y));
                     if (s < Infinity && (!best || s < best.score)) best = { x, y, score: s, P };
                 }
             }
@@ -253,7 +279,7 @@ export class CursorTracker {
                     const b = P.box;
                     let sc;
                     if (x + b.x1 < W && y + b.y1 < H && x + b.x0 >= 0 && y + b.y0 >= 0) sc = this._score(L, P, x, y);
-                    else sc = P.sprite ? spriteScoreClipped(L, W, H, P.sprite, x, y) : classScoreClipped(L, W, H, P, x, y);
+                    else sc = Math.min(P.sprite ? spriteScoreClipped(L, W, H, P.sprite, x, y) : Infinity, classScoreClipped(L, W, H, P, x, y));
                     if (sc < Infinity && (!best || sc < best.score)) best = { x, y, score: sc, P };
                 }
             }
@@ -321,6 +347,12 @@ export class CursorTracker {
             // After a few misses the pointer is hidden or off the capture; it can
             // only come back through a change, so stop sweeping the old area.
             if (!hit && this.lostFrames <= 3) hit = this._search(L, cands, Math.min(px, last.x) - r, Math.min(py, last.y) - r, Math.max(px, last.x) + r, Math.max(py, last.y) + r);
+            // Between pixels (a resampled capture): try the half-pixel variants.
+            if (!hit && this.lostFrames <= 3) {
+                const phased = this._phasedCandidates();
+                hit = this._search(L, phased, Math.min(px, last.x) - r, Math.min(py, last.y) - r, Math.max(px, last.x) + r, Math.max(py, last.y) + r);
+                if (hit) { hit.P = hit.P.base || hit.P; hit.phased = true; }
+            }
             if (hit) method = 'track';
         }
 
@@ -358,6 +390,13 @@ export class CursorTracker {
             if (hit) method = 'sweep';
         }
 
+        // A pointer that moved changed the pixels where it arrived; a match on
+        // content that didn't change this frame is the page, not the pointer.
+        if (hit && prevL && method !== 'sweep' && (!last || hit.x !== last.x || hit.y !== last.y)
+            && !this._changedAt(L, prevL, hit.x, hit.y, hit.P)) {
+            hit = null;
+        }
+
         if (!hit) {
             this.lostFrames++;
             if (this.lostFrames > 45) { this.last = null; this.prevLast = null; }
@@ -371,7 +410,8 @@ export class CursorTracker {
         } else if (hit.P.tpl.shape === 'arrow') {
             this.locked.family = hit.P.tpl.id.endsWith('mac') ? 'mac' : 'win';
         }
-        this._remember(hit.x, hit.y, t, hit.P, method, L);
+        // Between-pixel sightings would blur the learned sprite; learn from whole-pixel ones.
+        this._remember(hit.x, hit.y, t, hit.P, method, hit.phased ? null : L);
         return { found: true, x: hit.x, y: hit.y, shape: hit.P.tpl.shape, key: hit.P.key, score: hit.score, method };
     }
 
@@ -379,7 +419,7 @@ export class CursorTracker {
         if (method !== 'still') {
             this.prevLast = this.last;
             this.last = { x, y, t, key: P.key, score: this.last?.score };
-            if (!P.sprite) this._learn(L, P, x, y);
+            if (!P.sprite && L) this._learn(L, P, x, y);
         } else {
             // Holding still: velocity decays to zero.
             this.prevLast = { ...this.last, t: this.last.t };
