@@ -70,6 +70,10 @@ const browser = await chromium.launch({
 });
 const ctx = await browser.newContext({ viewport: { width: 1600, height: 900 }, acceptDownloads: true });
 // Screen sharing here is the file-backed capture device presented as a monitor.
+if (process.env.FALLBACK) {
+    // Exercise the path browsers without track processors take (Firefox, Safari).
+    await ctx.addInitScript(() => { delete window.MediaStreamTrackProcessor; });
+}
 await ctx.addInitScript(() => {
     const md = navigator.mediaDevices;
     md.getDisplayMedia = async () => {
@@ -105,6 +109,10 @@ await app.click('button:has-text("Share screen")');
 const sharedAt = Date.now();
 await app.waitForSelector('text=Live preview', { timeout: 15000 });
 await sleep(500);
+// Microphone and camera (Chrome's fake devices) as separate tracks.
+await app.click('button[aria-label="Microphone"]');
+await app.click('button[aria-label="Camera"]');
+await sleep(1200);
 await app.screenshot({ path: path.join(OUT, '02-preview.png') });
 await app.click('button:has-text("Start recording")');
 await app.waitForSelector('text=Stop recording', { timeout: 10000 });
