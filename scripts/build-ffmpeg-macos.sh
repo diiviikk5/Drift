@@ -30,7 +30,7 @@ if [ "$ARCH" != "$(uname -m)" ]; then
 fi
 
 ./configure \
-    --arch="$ARCH" "${CROSS[@]}" \
+    --arch="$ARCH" ${CROSS[@]+"${CROSS[@]}"} \
     --cc="clang -arch $ARCH" \
     --extra-cflags="-mmacosx-version-min=$MIN_MACOS" \
     --extra-ldflags="-arch $ARCH -mmacosx-version-min=$MIN_MACOS" \
