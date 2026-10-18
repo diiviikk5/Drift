@@ -1,0 +1,164 @@
+name: Desktop builds (macOS, Linux)
+
+# Builds Drift Recorder for macOS (universal .dmg) and Linux (.AppImage, .deb).
+# Run it by hand with "publish" set to attach the files to the GitHub release
+# for the version in src-tauri/tauri.conf.json (the website links there).
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Attach the builds to the GitHub release v<version>
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths:
+      - 'src-tauri/**'
+      - 'src/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/desktop-builds.yml'
+
+concurrency:
+  group: desktop-builds-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Cache ffmpeg
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/binaries
+          key: drift-ffmpeg-macos-${{ hashFiles('scripts/build-ffmpeg-macos.sh') }}
+
+      - name: Build ffmpeg (arm64 + x86_64)
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: |
+          bash scripts/build-ffmpeg-macos.sh arm64 "$RUNNER_TEMP/ff/arm64"
+          bash scripts/build-ffmpeg-macos.sh x86_64 "$RUNNER_TEMP/ff/x86_64"
+          mkdir -p src-tauri/binaries
+          cp "$RUNNER_TEMP/ff/arm64" src-tauri/binaries/drift-ffmpeg-aarch64-apple-darwin
+          cp "$RUNNER_TEMP/ff/x86_64" src-tauri/binaries/drift-ffmpeg-x86_64-apple-darwin
+          lipo -create "$RUNNER_TEMP/ff/arm64" "$RUNNER_TEMP/ff/x86_64" \
+            -output src-tauri/binaries/drift-ffmpeg-universal-apple-darwin
+
+      - name: Check ffmpeg
+        run: |
+          FF=src-tauri/binaries/drift-ffmpeg-aarch64-apple-darwin
+          ls -la src-tauri/binaries
+          "$FF" -hide_banner -devices | grep avfoundation
+          "$FF" -hide_banner -encoders | grep h264_videotoolbox
+          lipo -info src-tauri/binaries/drift-ffmpeg-universal-apple-darwin
+
+      - run: npm ci
+
+      - name: Build app
+        run: npx tauri build --target universal-apple-darwin --bundles app,dmg
+
+      - name: Collect
+        run: |
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          mkdir -p dist-desktop
+          cp src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg "dist-desktop/Drift-Recorder_${VERSION}_mac-universal.dmg"
+          APP=$(ls -d src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app)
+          ls -la "$APP/Contents/MacOS"
+          lipo -info "$APP/Contents/MacOS/drift-ffmpeg"
+          codesign -dv "$APP" 2>&1 | head -5
+          ls -la dist-desktop
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: drift-macos
+          path: dist-desktop/*
+
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev \
+            libssl-dev patchelf libfuse2 file \
+            libasound2-dev libx11-dev libxtst-dev libxi-dev libevdev-dev \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav
+
+      - run: npm ci
+
+      - name: Build app
+        run: npx tauri build --bundles appimage,deb
+
+      - name: Collect
+        run: |
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          mkdir -p dist-desktop
+          cp src-tauri/target/release/bundle/appimage/*.AppImage "dist-desktop/Drift-Recorder_${VERSION}_linux-x86_64.AppImage"
+          cp src-tauri/target/release/bundle/deb/*.deb "dist-desktop/Drift-Recorder_${VERSION}_linux-amd64.deb"
+          dpkg-deb -I dist-desktop/*.deb | grep -i depends
+          ls -la dist-desktop
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: drift-linux
+          path: dist-desktop/*
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
+    needs: [macos, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist-desktop
+          merge-multiple: true
+
+      - name: Attach to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          TAG="v$VERSION"
+          ls -la dist-desktop
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "Drift Recorder $VERSION" \
+              --notes "Drift Recorder $VERSION for Windows, macOS and Linux. Downloads: https://drift.dvkk.dev"
+          fi
+          gh release upload "$TAG" dist-desktop/* --clobber

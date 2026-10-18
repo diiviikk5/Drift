@@ -322,6 +322,10 @@ pub struct NativeSessionManager {
     pub scroll_track: Arc<Mutex<Vec<(std::time::Instant, f32)>>>,
     #[cfg(windows)]
     capture_control: Arc<Mutex<Option<CaptureControl<ScreenRecorderHandler, Box<dyn std::error::Error + Send + Sync>>>>>,
+    #[cfg(not(windows))]
+    ffmpeg: Arc<Mutex<Option<crate::commands::ffmpeg_capture::FfmpegCapture>>>,
+    /// Telemetry units -> video pixels (macOS reports points: the display scale).
+    pub pointer_scale: Arc<Mutex<f64>>,
     audio_stop_sender: Arc<Mutex<Option<std::sync::mpsc::Sender<()>>>>,
     audio_thread: Arc<Mutex<Option<std::thread::JoinHandle<()>>>>,
     /// When each audio stream's first sample was captured (for A/V alignment).
@@ -349,6 +353,9 @@ impl Default for NativeSessionManager {
             scroll_track: Arc::new(Mutex::new(Vec::new())),
             #[cfg(windows)]
             capture_control: Arc::new(Mutex::new(None)),
+            #[cfg(not(windows))]
+            ffmpeg: Arc::new(Mutex::new(None)),
+            pointer_scale: Arc::new(Mutex::new(1.0)),
             audio_stop_sender: Arc::new(Mutex::new(None)),
             audio_thread: Arc::new(Mutex::new(None)),
             system_audio_started: Arc::new(Mutex::new(None)),
@@ -367,7 +374,26 @@ pub fn is_native_capture_supported() -> bool {
     }
     #[cfg(not(windows))]
     {
-        false
+        // ffmpeg-backed capture; problems (permission, Wayland, no ffmpeg) are
+        // reported when recording starts.
+        true
+    }
+}
+
+/// Whether single windows can be recorded natively (Windows only for now).
+#[command]
+pub fn is_native_window_capture_supported() -> bool {
+    cfg!(windows)
+}
+
+fn capture_running(state: &NativeSessionManager) -> bool {
+    #[cfg(windows)]
+    {
+        state.capture_control.lock().is_some()
+    }
+    #[cfg(not(windows))]
+    {
+        state.ffmpeg.lock().is_some()
     }
 }
 
@@ -379,7 +405,7 @@ pub async fn start_native_session(
     let state = app.state::<NativeSessionManager>();
     if state.is_recording.load(Ordering::Relaxed) {
         // If capture_control is already gone or empty, recover from stale state cleanly
-        let is_running = state.capture_control.lock().is_some();
+        let is_running = capture_running(&state);
         if is_running {
             return Err("A native recording session is already active".to_string());
         } else {
@@ -391,14 +417,10 @@ pub async fn start_native_session(
         }
     }
 
-    #[cfg(not(windows))]
     {
-        let _ = config;
-        return Err("Native screen capture is currently only supported on Windows".to_string());
-    }
-
-    #[cfg(windows)]
-    {
+        #[cfg(not(windows))]
+        let ffmpeg = crate::commands::ffmpeg_capture::prepare()?;
+        #[cfg(windows)]
         if !GraphicsCaptureApi::is_supported().unwrap_or(false) {
             return Err("Windows Graphics Capture is not supported on this Windows version (requires Windows 10 1903+)".to_string());
         }
@@ -420,11 +442,14 @@ pub async fn start_native_session(
         let mic_audio_path = base_dir.join("microphone.wav");
 
         // 2. Resolve the capture target: a single window or a monitor
+        #[cfg(windows)]
         enum Target {
             Monitor(Monitor),
             Window(windows_capture::window::Window, isize),
         }
+        #[cfg(windows)]
         let window_hwnd = config.window_id.as_deref().and_then(parse_window_id);
+        #[cfg(windows)]
         let (target, natural_w, natural_h, origin) = if let Some(hwnd) = window_hwnd {
             let (x, y, w, h) = window_frame_bounds(hwnd)
                 .ok_or_else(|| "The selected window is no longer available - pick it again".to_string())?;
@@ -449,6 +474,25 @@ pub async fn start_native_session(
                 .unwrap_or((0, 0));
             (Target::Monitor(monitor), w, h, origin)
         };
+        #[cfg(windows)]
+        {
+            *state.pointer_scale.lock() = 1.0;
+        }
+
+        #[cfg(not(windows))]
+        let (display, display_index) = {
+            let displays = crate::commands::display::displays();
+            let index = if config.monitor_index < displays.len() { config.monitor_index } else { 0 };
+            let d = displays.get(index).cloned().ok_or_else(|| "No display monitors detected for capture".to_string())?;
+            (d, index)
+        };
+        #[cfg(not(windows))]
+        let (natural_w, natural_h, origin) = {
+            // Pointer telemetry on macOS is in points; its origin is too.
+            let k = if cfg!(target_os = "macos") { display.scale.max(1.0) } else { 1.0 };
+            *state.pointer_scale.lock() = k;
+            (display.width, display.height, ((display.x as f64 / k).round() as i32, (display.y as f64 / k).round() as i32))
+        };
 
         let mut width = config.width.unwrap_or(natural_w);
         let mut height = config.height.unwrap_or(natural_h);
@@ -460,6 +504,7 @@ pub async fn start_native_session(
         *state.target_geometry.lock() = (width, height, fps);
         *state.monitor_origin.lock() = origin;
         *state.origin_track.lock() = vec![(std::time::Instant::now(), origin.0, origin.1)];
+        #[cfg(windows)]
         if let Target::Window(_, hwnd) = &target {
             // Follow the window if it is dragged while recording.
             let hwnd = *hwnd;
@@ -486,7 +531,8 @@ pub async fn start_native_session(
         state.is_recording.store(true, Ordering::Relaxed);
 
         // 3. Start audio capture in a background thread to keep cpal::Stream safely inside thread
-        let with_system_audio = config.with_system_audio.unwrap_or(true);
+        // System audio is WASAPI loopback, which only exists on Windows.
+        let with_system_audio = cfg!(windows) && config.with_system_audio.unwrap_or(true);
         let with_mic = config.with_mic.unwrap_or(false);
 
         let (audio_stop_tx, audio_stop_rx) = std::sync::mpsc::channel::<()>();
@@ -627,6 +673,8 @@ pub async fn start_native_session(
         crate::commands::cursor_shape::spawn_shape_sampler(state.is_recording.clone(), state.shape_track.clone());
 
         // 5. Configure and launch windows-capture free-threaded
+        #[cfg(windows)]
+        {
         let cursor_setting = if without_cursor {
             CursorCaptureSettings::WithoutCursor
         } else {
@@ -688,6 +736,38 @@ pub async fn start_native_session(
 
         *state.capture_control.lock() = Some(control);
         log::info!("[NativeRecorder] Recording {} at {}x{}@{} (cursor hidden: {})", target_label, width, height, fps, without_cursor);
+        }
+
+        // 5. macOS / Linux: ffmpeg reads the display
+        #[cfg(not(windows))]
+        {
+            *state.start_time.lock() = Some(std::time::Instant::now());
+            match crate::commands::ffmpeg_capture::start(
+                &ffmpeg,
+                &display,
+                display_index,
+                fps,
+                width,
+                height,
+                !without_cursor,
+                &screen_video_path,
+                state.frame_counter.clone(),
+                state.first_frame_at.clone(),
+            ) {
+                Ok(cap) => *state.ffmpeg.lock() = Some(cap),
+                Err(e) => {
+                    log::error!("[NativeRecorder] {}", e);
+                    state.is_recording.store(false, Ordering::Relaxed);
+                    *state.start_time.lock() = None;
+                    let _ = crate::commands::input::stop_session_telemetry(app.state::<crate::commands::input::InputListenerState>());
+                    if let Some(stop_tx) = state.audio_stop_sender.lock().take() {
+                        let _ = stop_tx.send(());
+                    }
+                    return Err(e);
+                }
+            }
+            log::info!("[NativeRecorder] Recording display {} at {}x{}@{} via ffmpeg", display_index, width, height, fps);
+        }
 
         Ok(session_uuid)
     }
@@ -710,6 +790,13 @@ pub async fn stop_native_session(app: AppHandle) -> Result<NativeSessionResult, 
             if let Err(e) = control.stop() {
                 log::warn!("Notice when stopping windows-capture control: {:?}", e);
             }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let cap = state.ffmpeg.lock().take();
+        if let Some(cap) = cap {
+            crate::commands::ffmpeg_capture::stop(cap);
         }
     }
 
@@ -806,6 +893,10 @@ pub async fn stop_native_session(app: AppHandle) -> Result<NativeSessionResult, 
             }
         }
         crate::commands::input::rebase_session(&input_state, offset, origin_at);
+        let k = *state.pointer_scale.lock();
+        if (k - 1.0).abs() > 1e-6 {
+            crate::commands::input::scale_session(&input_state, k);
+        }
 
         // Caret samples onto the video timeline, local to the recorded target.
         let samples: Vec<crate::commands::caret::CaretSample> = std::mem::take(&mut *state.caret_track.lock())

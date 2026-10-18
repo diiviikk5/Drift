@@ -7,7 +7,7 @@ use std::process::{Command, Stdio};
 use tauri::{command, AppHandle, Emitter};
 
 /// A command that never flashes a console window on Windows.
-fn quiet_command(program: impl AsRef<std::ffi::OsStr>) -> Command {
+pub(crate) fn quiet_command(program: impl AsRef<std::ffi::OsStr>) -> Command {
     let mut cmd = Command::new(program);
     #[cfg(windows)]
     {
@@ -24,23 +24,26 @@ struct EncoderConfig {
     extra_args: Vec<String>,
 }
 
-fn find_ffmpeg() -> Result<PathBuf, String> {
+pub(crate) fn find_ffmpeg() -> Result<PathBuf, String> {
+    let exe = format!("ffmpeg{}", std::env::consts::EXE_SUFFIX);
     let mut candidates: Vec<PathBuf> = Vec::new();
 
-    // 1. AppData Local Drift bin
-    if let Some(local_dir) = dirs_next::data_local_dir() {
-        candidates.push(local_dir.join("Drift").join("bin").join("ffmpeg.exe"));
-    }
-
-    // 2. Next to running drift.exe
+    // 1. Next to the running app (macOS bundles a small ffmpeg as drift-ffmpeg)
     if let Ok(exe_path) = std::env::current_exe() {
         if let Some(parent) = exe_path.parent() {
-            candidates.push(parent.join("ffmpeg.exe"));
-            candidates.push(parent.join("bin").join("ffmpeg.exe"));
+            candidates.push(parent.join(format!("drift-ffmpeg{}", std::env::consts::EXE_SUFFIX)));
+            candidates.push(parent.join(&exe));
+            candidates.push(parent.join("bin").join(&exe));
         }
     }
 
+    // 2. AppData Local Drift bin
+    if let Some(local_dir) = dirs_next::data_local_dir() {
+        candidates.push(local_dir.join("Drift").join("bin").join(&exe));
+    }
+
     // 3. User profile and VS Code extensions
+    #[cfg(windows)]
     if let Ok(user_profile) = std::env::var("USERPROFILE") {
         let profile_dir = PathBuf::from(&user_profile);
         candidates.push(profile_dir.join(r".vscode\extensions\kilocode.kilo-code-7.5.15-win32-x64\bin\ffmpeg.exe"));
@@ -48,16 +51,26 @@ fn find_ffmpeg() -> Result<PathBuf, String> {
         candidates.push(profile_dir.join(r"AppData\Local\Programs\ffmpeg\bin\ffmpeg.exe"));
     }
 
-    // 4. Standard system locations
-    candidates.push(PathBuf::from("ffmpeg"));
-    candidates.push(PathBuf::from("ffmpeg.exe"));
-    candidates.push(PathBuf::from(r"C:\ffmpeg\bin\ffmpeg.exe"));
-    candidates.push(PathBuf::from(r"C:\Program Files\ffmpeg\bin\ffmpeg.exe"));
+    // 4. Standard system locations (apps started from the Dock/launcher get a minimal PATH)
+    #[cfg(windows)]
+    {
+        candidates.push(PathBuf::from(r"C:\ffmpeg\bin\ffmpeg.exe"));
+        candidates.push(PathBuf::from(r"C:\Program Files\ffmpeg\bin\ffmpeg.exe"));
+    }
+    #[cfg(not(windows))]
+    {
+        candidates.push(PathBuf::from("/opt/homebrew/bin/ffmpeg"));
+        candidates.push(PathBuf::from("/usr/local/bin/ffmpeg"));
+        candidates.push(PathBuf::from("/usr/bin/ffmpeg"));
+    }
+    candidates.push(PathBuf::from(&exe));
 
     for loc in &candidates {
         if loc.is_file() {
             return Ok(loc.clone());
         }
+    }
+    for loc in &candidates {
         if let Ok(output) = quiet_command(loc).arg("-version").output() {
             if output.status.success() {
                 return Ok(loc.clone());
@@ -65,11 +78,22 @@ fn find_ffmpeg() -> Result<PathBuf, String> {
         }
     }
 
-    Err("ffmpeg not found. Please install ffmpeg or place ffmpeg.exe in %LOCALAPPDATA%\\Drift\\bin.".to_string())
+    Err(if cfg!(windows) {
+        "ffmpeg not found. Please install ffmpeg or place ffmpeg.exe in %LOCALAPPDATA%\\Drift\\bin.".to_string()
+    } else {
+        "ffmpeg not found. Install it (macOS: brew install ffmpeg, Linux: sudo apt install ffmpeg) and restart Drift.".to_string()
+    })
 }
 
-/// Detect available hardware encoder, fallback to libx264
 fn detect_encoder(ffmpeg: &PathBuf, use_hw: bool) -> EncoderConfig {
+    // Every Mac has VideoToolbox; Drift's bundled macOS ffmpeg has no libx264.
+    if cfg!(target_os = "macos") {
+        let _ = (ffmpeg, use_hw);
+        return EncoderConfig {
+            codec: "h264_videotoolbox".to_string(),
+            extra_args: vec!["-b:v".to_string(), "16M".to_string()],
+        };
+    }
     if !use_hw {
         return EncoderConfig {
             codec: "libx264".to_string(),

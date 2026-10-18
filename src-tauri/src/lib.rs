@@ -27,6 +27,7 @@ pub fn run() {
         .setup(|app| {
             use tauri::Manager;
             log::info!("Drift setup starting...");
+            let _ = commands::display::APP.set(app.handle().clone());
             #[cfg(target_os = "windows")]
             {
                 use windows_sys::Win32::UI::WindowsAndMessaging::ShowCursor;
@@ -72,6 +73,7 @@ pub fn run() {
             commands::native_recorder::get_native_session_status,
             commands::native_recorder::is_native_capture_supported,
             commands::native_recorder::list_capture_windows,
+            commands::native_recorder::is_native_window_capture_supported,
             commands::area::enter_area_picker,
             commands::area::exit_area_picker,
         ]);

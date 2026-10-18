@@ -1,0 +1,10 @@
+{
+  "bundle": {
+    "targets": ["app", "dmg"],
+    "externalBin": ["binaries/drift-ffmpeg"],
+    "macOS": {
+      "signingIdentity": "-",
+      "minimumSystemVersion": "11.0"
+    }
+  }
+}

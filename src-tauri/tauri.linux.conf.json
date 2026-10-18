@@ -1,0 +1,13 @@
+{
+  "bundle": {
+    "targets": ["appimage", "deb"],
+    "linux": {
+      "deb": {
+        "depends": ["ffmpeg", "gstreamer1.0-libav", "gstreamer1.0-plugins-good"]
+      },
+      "appimage": {
+        "bundleMediaFramework": true
+      }
+    }
+  }
+}

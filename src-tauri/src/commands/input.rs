@@ -183,6 +183,10 @@ fn is_special_key(key: &Key) -> bool {
 
 static LISTENER_SPAWNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
+/// Last pointer position from move events; button events carry none outside Windows.
+#[cfg(not(target_os = "windows"))]
+static LAST_POINTER: Mutex<(f64, f64)> = parking_lot::const_mutex((0.0, 0.0));
+
 /// Start listening for global mouse and keyboard events
 #[tauri::command]
 pub fn start_global_listener(app: AppHandle) {
@@ -215,6 +219,15 @@ pub fn start_global_listener(app: AppHandle) {
     let active_meta = state.active_meta.clone();
     let app_handle = app.clone();
 
+    // macOS: rdev's key handling crashes off the main thread on macOS 14+ and
+    // needs Accessibility access, so the pointer is polled instead (no keys).
+    #[cfg(target_os = "macos")]
+    {
+        let _ = (session_keystrokes, active_ctrl, active_shift, active_alt, active_meta);
+        mac_pointer::spawn(app_handle, is_listening, is_recording, recording_start, session_samples);
+    }
+
+    #[cfg(not(target_os = "macos"))]
     thread::spawn(move || {
         let listener_start = std::time::Instant::now();
         // Throttles run on the listener's own monotonic clock. Session timestamps
@@ -229,6 +242,10 @@ pub fn start_global_listener(app: AppHandle) {
         listen(move |event: Event| {
             if !*is_listening.lock() {
                 return;
+            }
+            #[cfg(not(target_os = "windows"))]
+            if let EventType::MouseMove { x, y } = event.event_type {
+                *LAST_POINTER.lock() = (x, y);
             }
 
             let rec_start = *recording_start.lock();
@@ -445,6 +462,14 @@ pub fn rebase_session(state: &InputListenerState, offset_ms: f64, origin_at: imp
     keys.retain(|k| k.time >= -0.25);
 }
 
+/// Scale buffered pointer positions (macOS reports points; the video is in pixels).
+pub fn scale_session(state: &InputListenerState, k: f64) {
+    for s in state.session_samples.lock().iter_mut() {
+        s.x *= k;
+        s.y *= k;
+    }
+}
+
 /// Retrieve the high-frequency telemetry buffer recorded during the session
 #[tauri::command]
 pub fn get_session_telemetry(state: tauri::State<'_, InputListenerState>) -> Vec<CursorSample> {
@@ -529,10 +554,114 @@ fn get_mouse_position(event: &Event) -> Option<(f64, f64)> {
             }
             #[cfg(not(target_os = "windows"))]
             {
-                None
+                Some(*LAST_POINTER.lock())
             }
         }
         EventType::MouseMove { x, y } => Some((x, y)),
         _ => None,
+    }
+}
+
+/// macOS pointer telemetry: polls the pointer location and button state, which
+/// needs no permission (an event tap would need Accessibility access).
+#[cfg(target_os = "macos")]
+mod mac_pointer {
+    use super::{CursorSample, GlobalClickEvent, GlobalMoveEvent};
+    use parking_lot::Mutex;
+    use std::ffi::c_void;
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
+    use tauri::{AppHandle, Emitter};
+
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    struct CGPoint {
+        x: f64,
+        y: f64,
+    }
+
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        fn CGEventCreate(source: *const c_void) -> *mut c_void;
+        fn CGEventGetLocation(event: *mut c_void) -> CGPoint;
+        fn CGEventSourceButtonState(state_id: i32, button: u32) -> bool;
+    }
+
+    #[link(name = "CoreFoundation", kind = "framework")]
+    extern "C" {
+        fn CFRelease(cf: *const c_void);
+    }
+
+    /// kCGEventSourceStateCombinedSessionState
+    const COMBINED_SESSION: i32 = 0;
+
+    fn location() -> Option<(f64, f64)> {
+        unsafe {
+            let event = CGEventCreate(std::ptr::null());
+            if event.is_null() {
+                return None;
+            }
+            let p = CGEventGetLocation(event);
+            CFRelease(event);
+            Some((p.x, p.y))
+        }
+    }
+
+    pub fn spawn(
+        app: AppHandle,
+        is_listening: Arc<Mutex<bool>>,
+        is_recording: Arc<Mutex<bool>>,
+        recording_start: Arc<Mutex<Option<Instant>>>,
+        session_samples: Arc<Mutex<Vec<CursorSample>>>,
+    ) {
+        std::thread::spawn(move || {
+            let listener_start = Instant::now();
+            let mut last_pos = (f64::NAN, f64::NAN);
+            let mut last_move_emit = f64::NEG_INFINITY;
+            let mut down = [false; 3];
+            loop {
+                if !*is_listening.lock() {
+                    std::thread::sleep(Duration::from_millis(50));
+                    continue;
+                }
+                let now = listener_start.elapsed().as_secs_f64() * 1000.0;
+                let (elapsed, is_rec) = match (*is_recording.lock(), *recording_start.lock()) {
+                    (true, Some(start)) => (start.elapsed().as_secs_f64() * 1000.0, true),
+                    _ => (now, false),
+                };
+                if let Some((x, y)) = location() {
+                    if (x, y) != last_pos {
+                        last_pos = (x, y);
+                        if is_rec {
+                            session_samples.lock().push(CursorSample { t: elapsed, x, y, click: None, scroll: None });
+                        }
+                        if now - last_move_emit > 16.0 {
+                            last_move_emit = now;
+                            let _ = app.emit("global-mouse-move", &GlobalMoveEvent { x, y, time: elapsed });
+                        }
+                    }
+                    for (i, name) in ["left", "right", "middle"].iter().enumerate() {
+                        let pressed = unsafe { CGEventSourceButtonState(COMBINED_SESSION, i as u32) };
+                        if pressed && !down[i] {
+                            if is_rec {
+                                session_samples.lock().push(CursorSample {
+                                    t: elapsed,
+                                    x,
+                                    y,
+                                    click: Some(name.to_string()),
+                                    scroll: None,
+                                });
+                            }
+                            let _ = app.emit(
+                                "global-click",
+                                &GlobalClickEvent { x, y, time: elapsed, button: name.to_string() },
+                            );
+                        }
+                        down[i] = pressed;
+                    }
+                }
+                std::thread::sleep(Duration::from_millis(if is_rec { 4 } else { 8 }));
+            }
+        });
     }
 }

@@ -50,6 +50,7 @@ export default function RecorderPage() {
     const nativeWebcamRecorderRef = useRef(null);
     const nativeWebcamChunksRef = useRef([]);
     const [isNativeSupported, setIsNativeSupported] = useState(false);
+    const [canCaptureWindows, setCanCaptureWindows] = useState(true);
     const [nativeAudioTracks, setNativeAudioTracks] = useState({ systemAudioUrl: null, micAudioUrl: null });
     const [autoZoomOnClicks, setAutoZoomOnClicks] = useState(true);
     const [zoomFrequency, setZoomFrequency] = useState('minimal');
@@ -264,6 +265,7 @@ export default function RecorderPage() {
             }).catch(() => {
                 setIsNativeSupported(false);
             });
+            drift.isNativeWindowCaptureSupported().then(ok => setCanCaptureWindows(Boolean(ok))).catch(() => {});
             drift.getHotkeys().then(saved => {
                 const hk = normalizeHotkeys(saved);
                 setHotkeys(hk);
@@ -1801,6 +1803,7 @@ export default function RecorderPage() {
                             hasActiveStream={hasActiveStream || isRecording}
                             onStartPreview={handleStartPreview}
                             isNativeSupported={isNativeSupported}
+                            windowCaptureSupported={canCaptureWindows}
                             webcamStream={engineRef.current?.webcamStream || null}
                         />
                     </div>

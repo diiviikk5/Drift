@@ -90,6 +90,7 @@ export default function CaptureCockpit({
     autoMinimize = true,
     onToggleAutoMinimize = null,
     isNativeSupported = false,
+    windowCaptureSupported = true,
     captureArea = null,
     onPickArea = null,
     onClearArea = null,
@@ -137,6 +138,9 @@ export default function CaptureCockpit({
         onPickArea && onPickArea();
     };
     const canPickArea = isNativeSupported && Boolean(onPickArea);
+    // macOS / Linux record screens natively but not single windows yet.
+    const showWindow = !isNativeSupported || windowCaptureSupported;
+    const sourceCount = 1 + (canPickArea ? 1 : 0) + (showWindow ? 1 : 0);
 
     const sourceButton = (active, onClick, Icon, label) => (
         <button
@@ -163,10 +167,10 @@ export default function CaptureCockpit({
                         Clicks, typing and scrolling are tracked so Drift can zoom and edit for you.
                     </p>
                 </div>
-                <div className={`grid ${canPickArea ? 'grid-cols-3 w-80' : 'grid-cols-2 w-56'} gap-0.5 p-0.5 rounded-lg bg-[var(--pill-bg)] border border-[var(--border-app)] flex-shrink-0`}>
+                <div className={`grid ${sourceCount === 3 ? 'grid-cols-3 w-80' : sourceCount === 2 ? 'grid-cols-2 w-56' : 'grid-cols-1 w-28'} gap-0.5 p-0.5 rounded-lg bg-[var(--pill-bg)] border border-[var(--border-app)] flex-shrink-0`}>
                     {sourceButton(!isWindowMode && !isAreaMode, selectScreen, Monitor, 'Screen')}
                     {canPickArea && sourceButton(isAreaMode, selectArea, Crop, 'Area')}
-                    {sourceButton(isWindowMode, useNativeWindows ? onSelectWindowMode : onSelectBrowserSource, AppWindow, 'Window')}
+                    {showWindow && sourceButton(isWindowMode, useNativeWindows ? onSelectWindowMode : onSelectBrowserSource, AppWindow, 'Window')}
                 </div>
             </div>
 

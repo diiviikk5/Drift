@@ -540,6 +540,20 @@ export async function isNativeCaptureSupported() {
 }
 
 /**
+ * Whether single windows can be recorded natively (Windows only for now)
+ */
+export async function isNativeWindowCaptureSupported() {
+    if (!isTauri()) return false;
+    try {
+        const api = await getTauriApi();
+        return await api.invoke('is_native_window_capture_supported');
+    } catch {
+        // Older builds without the command only ever ran on Windows.
+        return true;
+    }
+}
+
+/**
  * Windows that can be recorded natively: [{ id: 'window:<hwnd>', title, process, width, height }]
  */
 export async function listCaptureWindows() {
@@ -649,6 +663,7 @@ export const drift = {
     isNativeCaptureSupported,
     startNativeSession,
     listCaptureWindows,
+    isNativeWindowCaptureSupported,
     stopNativeSession,
     getNativeSessionStatus,
     resolveAssetUrl,

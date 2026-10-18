@@ -1,9 +1,16 @@
-//! Displays and display thumbnails via Win32.
+//! Displays and display thumbnails.
 //!
-//! Monitors are listed with EnumDisplayMonitors, the same order the capture
-//! backend (Windows Graphics Capture) uses, so an index means the same screen
-//! everywhere. Thumbnails are scaled down by GDI while copying, so a preview
-//! never reads a full-resolution frame.
+//! Windows: monitors are listed with EnumDisplayMonitors, the same order the
+//! capture backend (Windows Graphics Capture) uses, so an index means the same
+//! screen everywhere. Thumbnails are scaled down by GDI while copying, so a
+//! preview never reads a full-resolution frame.
+//!
+//! macOS / Linux: monitors come from the windowing layer (same order as
+//! AVFoundation's screens on macOS) and thumbnails are grabbed with ffmpeg.
+
+/// The app, for listing monitors outside Windows (set during setup).
+#[allow(dead_code)]
+pub static APP: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
 
 #[derive(Debug, Clone)]
 pub struct DisplayInfo {
@@ -12,6 +19,9 @@ pub struct DisplayInfo {
     pub width: u32,
     pub height: u32,
     pub primary: bool,
+    /// Physical pixels per logical point (macOS Retina: 2.0; elsewhere 1.0).
+    #[allow(dead_code)]
+    pub scale: f64,
 }
 
 #[cfg(windows)]
@@ -31,6 +41,7 @@ pub fn displays() -> Vec<DisplayInfo> {
                 width: (r.right - r.left).max(0) as u32,
                 height: (r.bottom - r.top).max(0) as u32,
                 primary: (info.dwFlags & 1) != 0, // MONITORINFOF_PRIMARY
+                scale: 1.0,
             });
         }
         BOOL(1)
@@ -45,7 +56,23 @@ pub fn displays() -> Vec<DisplayInfo> {
 
 #[cfg(not(windows))]
 pub fn displays() -> Vec<DisplayInfo> {
-    Vec::new()
+    let Some(app) = APP.get() else { return Vec::new() };
+    let primary = app.primary_monitor().ok().flatten().map(|m| (m.position().x, m.position().y));
+    app.available_monitors()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|m| {
+            let (p, s) = (m.position(), m.size());
+            DisplayInfo {
+                x: p.x,
+                y: p.y,
+                width: s.width,
+                height: s.height,
+                primary: primary == Some((p.x, p.y)),
+                scale: m.scale_factor(),
+            }
+        })
+        .collect()
 }
 
 /// RGBA pixels of a display, scaled to fit within `max_width` (keeps aspect).
@@ -109,6 +136,10 @@ pub fn thumbnail(display: &DisplayInfo, max_width: u32) -> Result<(u32, u32, Vec
 }
 
 #[cfg(not(windows))]
-pub fn thumbnail(_display: &DisplayInfo, _max_width: u32) -> Result<(u32, u32, Vec<u8>), String> {
-    Err("Display thumbnails are only available on Windows".into())
+pub fn thumbnail(display: &DisplayInfo, max_width: u32) -> Result<(u32, u32, Vec<u8>), String> {
+    let index = displays()
+        .iter()
+        .position(|d| d.x == display.x && d.y == display.y)
+        .unwrap_or(0);
+    crate::commands::ffmpeg_capture::screenshot(display, index, max_width)
 }
