@@ -65,9 +65,10 @@ pub fn setup(app: &App) -> tauri::Result<()> {
     let handle = app.handle();
     let toggle = MenuItem::with_id(handle, "toggle_recording", "Start recording", true, None::<&str>)?;
     let open = MenuItem::with_id(handle, "open", "Open Drift", true, None::<&str>)?;
+    let updates = MenuItem::with_id(handle, "check_updates", "Check for updates", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(handle)?;
     let quit = MenuItem::with_id(handle, "quit", "Quit Drift", true, None::<&str>)?;
-    let menu = Menu::with_items(handle, &[&toggle, &open, &sep, &quit])?;
+    let menu = Menu::with_items(handle, &[&toggle, &open, &updates, &sep, &quit])?;
 
     // The compact Drift mark (the full logo's wordmark is illegible at tray size).
     let idle_icon = Image::from_bytes(include_bytes!("../icons/tray.png"))?.to_owned();
@@ -83,6 +84,11 @@ pub fn setup(app: &App) -> tauri::Result<()> {
                 let _ = app.emit_to("main", "drift-hotkey", serde_json::json!({ "action": "toggle_recording", "source": "tray" }));
             }
             "open" => show_main(app),
+            "check_updates" => {
+                // The window checks and shows the result (it owns the update banner).
+                show_main(app);
+                let _ = app.emit_to("main", "drift-check-updates", ());
+            }
             "quit" => {
                 if let Some(state) = app.try_state::<TrayState<tauri::Wry>>() {
                     state.quitting.store(true, Ordering::Relaxed);

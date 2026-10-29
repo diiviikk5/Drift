@@ -10,6 +10,7 @@ import { BACKGROUNDS, DEFAULT_BACKGROUND } from '@/lib/rendering/backgrounds';
 
 // Modular Shadcn Desktop Components
 import DesktopHeader from '@/components/desktop/DesktopHeader';
+import UpdateBanner from '@/components/desktop/UpdateBanner';
 import CaptureCockpit from '@/components/desktop/CaptureCockpit';
 import CountdownOverlay from '@/components/desktop/CountdownOverlay';
 import StudioTimeline from '@/components/desktop/StudioTimeline';
@@ -1753,6 +1754,7 @@ export default function RecorderPage() {
             />
 
             <input ref={projectInputRef} type="file" accept=".drift,video/*" onChange={openProject} className="hidden" />
+            <UpdateBanner busy={isRecording} onNotice={setNotice} />
             {notice && <div role="status" className="flex items-center justify-between px-5 py-2 text-sm border-b border-[var(--border-app)]">
                 <span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss notification">Dismiss</button>
             </div>}

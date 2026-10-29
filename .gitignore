@@ -43,3 +43,6 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# Signed release builds (scripts/release-windows.mjs)
+/dist-release/

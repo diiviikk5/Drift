@@ -540,6 +540,44 @@ export async function isNativeCaptureSupported() {
 }
 
 /**
+ * Ask GitHub whether a newer Drift is out (desktop only). Resolves to the
+ * update (version, notes, download) or null when up to date / unavailable.
+ */
+export async function checkForUpdate() {
+    if (!isTauri()) return null;
+    try {
+        const { check } = await import('@tauri-apps/plugin-updater');
+        return await check();
+    } catch (e) {
+        console.warn('[drift] Update check failed:', e);
+        return null;
+    }
+}
+
+/**
+ * Download and install an update from checkForUpdate(), then restart Drift.
+ * `onProgress(fraction)` gets 0..1 (or null while the size is unknown).
+ */
+export async function installUpdate(update, onProgress) {
+    let total = 0;
+    let done = 0;
+    await update.downloadAndInstall((event) => {
+        if (event.event === 'Started') {
+            total = event.data?.contentLength || 0;
+            onProgress?.(total ? 0 : null);
+        } else if (event.event === 'Progressed') {
+            done += event.data?.chunkLength || 0;
+            onProgress?.(total ? Math.min(1, done / total) : null);
+        } else if (event.event === 'Finished') {
+            onProgress?.(1);
+        }
+    });
+    // Windows closes Drift to run the installer; elsewhere restart into the new version.
+    const { relaunch } = await import('@tauri-apps/plugin-process');
+    await relaunch();
+}
+
+/**
  * Whether single windows can be recorded natively (Windows only for now)
  */
 export async function isNativeWindowCaptureSupported() {

@@ -20,16 +20,32 @@
     {
       "identifier": "fs:scope",
       "allow": [
-        { "path": "$VIDEO/**" },
-        { "path": "$TEMP/**" },
-        { "path": "$DOWNLOAD/**" },
-        { "path": "$HOME/**" },
-        { "path": "$DESKTOP/**" },
-        { "path": "$DOCUMENT/**" },
-        { "path": "**" }
+        {
+          "path": "$VIDEO/**"
+        },
+        {
+          "path": "$TEMP/**"
+        },
+        {
+          "path": "$DOWNLOAD/**"
+        },
+        {
+          "path": "$HOME/**"
+        },
+        {
+          "path": "$DESKTOP/**"
+        },
+        {
+          "path": "$DOCUMENT/**"
+        },
+        {
+          "path": "**"
+        }
       ]
     },
     "shell:default",
-    "process:default"
+    "process:default",
+    "updater:default",
+    "process:allow-restart"
   ]
 }
