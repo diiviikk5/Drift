@@ -458,3 +458,9 @@
     .marqueeTrack, .bob, .bobB, .caret { animation: none; }
     .btn, .feature, .layerItem { transition: none; }
 }
+
+/* ---------- support (Dodo Payments) ---------- */
+.support { display: flex; align-items: center; justify-content: space-between; gap: 28px; flex-wrap: wrap; padding: 34px 38px; background: var(--card); border: var(--bw) solid var(--line); border-radius: 22px; box-shadow: var(--ex6); }
+.supportTitle { font-size: clamp(28px, 3.4vw, 40px); font-weight: 900; letter-spacing: -0.04em; line-height: 1; }
+.supportText { margin-top: 10px; max-width: 520px; font-size: 17px; line-height: 1.5; color: var(--muted); font-weight: 500; }
+.supportBtns { display: flex; gap: 14px; flex-wrap: wrap; }

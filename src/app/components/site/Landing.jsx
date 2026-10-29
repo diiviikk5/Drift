@@ -31,6 +31,9 @@ function useVisitorOs() {
 }
 const LEGACY_URL = '/downloads/Drift_2.0.0_x64-setup.exe';
 const REPO_URL = 'https://github.com/diiviikk5/Drift';
+// Dodo Payments checkout. Sponsor and Support share one product for now; give either its own link here.
+const SPONSOR_URL = 'https://checkout.dodopayments.com/buy/pdt_0Nqn39orKzYwAaPYyimd1?quantity=1';
+const SUPPORT_URL = 'https://checkout.dodopayments.com/buy/pdt_0Nqn39orKzYwAaPYyimd1?quantity=1';
 const PH_URL = 'https://www.producthunt.com/products/drift-6?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_campaign=badge-drift-6ef740e8-671a-4130-90b6-140b7784af27';
 const DEMO = { src: '/demo/drift-demo.mp4', poster: '/demo/drift-demo.jpg' };
 
@@ -95,6 +98,14 @@ function OtherDownloads({ os }) {
             ))}
             {os === 'linux' && <> · <a href={DEB_URL} download style={link}>Ubuntu/Debian .deb</a></>}
         </>
+    );
+}
+
+function HeartIcon() {
+    return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="#ff3d6e" aria-hidden="true">
+            <path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 2.9 4.5 6.6 4.5c2.1 0 3.6 1.2 4.4 2.5.8-1.3 2.3-2.5 4.4-2.5 3.7 0 5.7 3.9 4.2 7.3C19.5 16.4 12 21 12 21Z" />
+        </svg>
     );
 }
 
@@ -190,6 +201,10 @@ export default function Landing() {
                         <button type="button" className={`${s.btn} ${s.btnPaper} ${s.btnSm} ${s.iconBtn}`} onClick={toggleTheme} aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}>
                             <ThemeIcon dark={dark} />
                         </button>
+                        <a className={`${s.btn} ${s.btnPaper} ${s.btnSm} ${s.hideMd}`} href={SPONSOR_URL} target="_blank" rel="noreferrer">
+                            <HeartIcon />
+                            <span>Sponsor</span>
+                        </a>
                         <a className={`${s.btn} ${s.btnPaper} ${s.btnSm} ${s.hideMd}`} href={REPO_URL} target="_blank" rel="noreferrer">
                             <GitHubIcon />
                             <span>{stars != null ? stars : 'Star'}</span>
@@ -406,6 +421,30 @@ export default function Landing() {
                         </Reveal>
                     </div>
                 </section>
+                {/* ---------- support ---------- */}
+                <section className={s.section} style={{ paddingTop: 0 }}>
+                    <div className={s.container}>
+                        <Reveal>
+                            <div className={s.support}>
+                                <div>
+                                    <h3 className={s.supportTitle}>Keep Drift free</h3>
+                                    <p className={s.supportText}>
+                                        Drift is free, open source and has no watermark. If it saves you an edit, chip in so it can keep shipping.
+                                    </p>
+                                </div>
+                                <div className={s.supportBtns}>
+                                    <a className={`${s.btn} ${s.btnLg}`} href={SPONSOR_URL} target="_blank" rel="noreferrer">
+                                        <HeartIcon />
+                                        Sponsor Drift
+                                    </a>
+                                    <a className={`${s.btn} ${s.btnLg} ${s.btnPaper}`} href={SUPPORT_URL} target="_blank" rel="noreferrer">
+                                        Support
+                                    </a>
+                                </div>
+                            </div>
+                        </Reveal>
+                    </div>
+                </section>
             </main>
 
             <footer className={s.footer}>
@@ -419,6 +458,7 @@ export default function Landing() {
                         <a className={s.navLink} href={`${REPO_URL}/issues`} target="_blank" rel="noreferrer">Report a bug</a>
                         <a className={s.navLink} href="https://x.com/divikkk1" target="_blank" rel="noreferrer">X / @divikkk1</a>
                         <a className={s.navLink} href={PH_URL} target="_blank" rel="noreferrer">Product Hunt</a>
+                        <a className={s.navLink} href={SUPPORT_URL} target="_blank" rel="noreferrer">Support Drift</a>
                     </div>
                     <span className={s.footerNote}>Made by Divik. Recorded with Drift.</span>
                 </div>
