@@ -76,7 +76,7 @@ export default function UpdateBanner({ busy = false, onNotice }) {
                 <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-semibold leading-tight">Drift {update.version} is ready</div>
                     <div className="text-xs text-[var(--text-app-muted)] mt-0.5 line-clamp-2">
-                        {error || (installing ? (pct == null ? 'Downloading…' : `Downloading… ${pct}%`) : (update.body?.split('\n').find(Boolean) || 'A new version of Drift is available.'))}
+                        {error || (installing ? (!pct ? 'Downloading…' : pct >= 100 ? 'Installing… Drift will restart.' : `Downloading… ${pct}%`) : (update.body?.split('\n').find(Boolean) || 'A new version of Drift is available.'))}
                     </div>
                 </div>
                 {!installing && (
@@ -85,7 +85,7 @@ export default function UpdateBanner({ busy = false, onNotice }) {
                     </button>
                 )}
             </div>
-            {installing && pct != null && (
+            {installing && pct > 0 && (
                 <div className="mt-3 h-1.5 rounded-full bg-[var(--bg-card-subtle)] overflow-hidden">
                     <div className="h-full rounded-full bg-[var(--accent-app)] transition-[width] duration-150" style={{ width: `${pct}%` }} />
                 </div>
