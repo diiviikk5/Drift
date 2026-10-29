@@ -9,11 +9,11 @@ import { useTheme } from '../ThemeProvider';
 import ProductHuntBadge from '../ProductHuntBadge';
 
 // Drift Recorder is the current app; the 2.0 installer stays up as Legacy Drift.
-const DOWNLOAD_URL = '/downloads/Drift-Recorder_3.1.0_x64-setup.exe';
+const DOWNLOAD_URL = '/downloads/Drift-Recorder_3.1.1_x64-setup.exe';
 // macOS and Linux builds come from CI and live on the GitHub release.
 const RELEASE_URL = 'https://github.com/diiviikk5/Drift/releases/download/v3.1.0';
 const DOWNLOADS = {
-    windows: { url: DOWNLOAD_URL, label: 'Windows', note: 'Windows 10 & 11 · 4.4 MB' },
+    windows: { url: DOWNLOAD_URL, label: 'Windows', note: 'Windows 10 & 11 · 5 MB' },
     mac: { url: `${RELEASE_URL}/Drift-Recorder_3.1.0_mac-universal.dmg`, label: 'macOS', note: 'macOS 11+ · Apple Silicon & Intel · beta' },
     linux: { url: `${RELEASE_URL}/Drift-Recorder_3.1.0_linux-x86_64.AppImage`, label: 'Linux', note: 'Linux x86-64 · X11 session · beta' },
 };
