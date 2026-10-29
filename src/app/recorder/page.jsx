@@ -1579,7 +1579,7 @@ export default function RecorderPage() {
                 focusSegments: studioRef.current?.getFocusSegments() ?? focusSegments,
                 annotations, captions, captionsEnabled, background,
                 customBackground: customImage?.src ?? null,
-                zoomLevel, zoomFrequency, showCursor, cursorBakedIn, cursorTheme, cursorScale, splineSmoothing, aspectRatio, frameFit,
+                zoomLevel, zoomFrequency, autoZoomOnClicks, showCursor, cursorBakedIn, cursorTheme, cursorScale, splineSmoothing, aspectRatio, frameFit,
                 systemAudioVolume, micAudioVolume, isSystemAudioMuted, isMicAudioMuted, autoDuck,
                 insetPadding, borderRadius, windowChrome, springProfile, playbackSpeed, showKeystrokes,
                 tiltAngle, connectedZooms, reactiveWebcam, webcamSettings, trimStart, trimEnd,
@@ -1656,6 +1656,8 @@ export default function RecorderPage() {
             setCustomImage(image);
             setZoomLevel(project.zoomLevel ?? 1.35);
             setZoomFrequency(project.zoomFrequency === 'every' ? 'every' : 'minimal');
+            // A project saved with auto zoom off must not get zooms back on reopening
+            setAutoZoomOnClicks(project.autoZoomOnClicks ?? true);
             setShowCursor(project.showCursor ?? false);
             setCursorBakedIn(Boolean(project.cursorBakedIn));
             setFrameFit(project.frameFit === 'fill' ? 'fill' : 'contain');

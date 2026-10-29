@@ -549,7 +549,8 @@ export class StudioEngine {
         if (this.autoZoomOnClicks) {
             await this._generateSegments();
         } else {
-            this.resetToOverview();
+            // Off removes the automatic zooms only; zooms placed by hand stay.
+            this.setFocusSegments((this.focusSegments || []).filter(s => !s.auto));
         }
         this.drawFrame();
         return this.focusSegments;

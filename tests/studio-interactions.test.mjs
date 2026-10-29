@@ -178,3 +178,43 @@ test('interaction clustering centers camera on common centroid of multiple click
 
 
 
+
+test('zoom settings: Off, Minimal and Every action each re-plan, and hand-placed zooms survive', async () => {
+    const canvas = createMockCanvas(1920, 1080);
+    const mockVideo = { videoWidth: 1920, videoHeight: 1080, currentTime: 0 };
+    // A lone click (Minimal skips it) and a pair of clicks in one area (both modes zoom).
+    const clicks = [
+        { time: 2000, x: 960, y: 540 },
+        { time: 8000, x: 400, y: 300 },
+        { time: 9100, x: 420, y: 310 },
+    ];
+    const engine = new StudioEngine(canvas, mockVideo, null, clicks, 14, [], { zoomFrequency: 'minimal' });
+    const auto = () => engine.getFocusSegments().filter(s => s.auto).length;
+
+    assert.equal(auto(), 1, 'Minimal: only the focused pair zooms');
+    engine.setZoomFrequency('every');
+    assert.equal(auto(), 2, 'Every action: the lone click zooms too');
+    engine.setZoomFrequency('minimal');
+    assert.equal(auto(), 1, 'back to Minimal');
+
+    // A zoom placed by hand, away from the auto zooms.
+    const manual = { id: 'hand', startTime: 11, endTime: 13, targetX: 0.7, targetY: 0.7, zoomScale: 1.6, auto: false };
+    engine.setFocusSegments([...engine.getFocusSegments(), manual]);
+
+    await engine.setAutoZoomOnClicks(false);
+    assert.equal(auto(), 0, 'Off: no automatic zooms');
+    assert.ok(engine.getFocusSegments().some(s => s.id === 'hand'), 'Off keeps the zoom placed by hand');
+
+    engine.setZoomFrequency('every');
+    assert.equal(auto(), 0, 'changing the mode while Off adds nothing');
+
+    await engine.setAutoZoomOnClicks(true);
+    assert.equal(auto(), 2, 'On again: re-planned with the chosen mode (Every action)');
+    assert.ok(engine.getFocusSegments().some(s => s.id === 'hand'), 'and the hand-placed zoom is still there');
+
+    const before = engine.getFocusSegments().filter(s => s.auto).map(s => s.zoomScale);
+    engine.setZoomLevel(1.8);
+    const after = engine.getFocusSegments().filter(s => s.auto).map(s => s.zoomScale);
+    assert.ok(after.every((z, i) => z > before[i]), `zoom depth applies: ${before} -> ${after}`);
+    assert.equal(engine.getFocusSegments().find(s => s.id === 'hand').zoomScale, 1.8, 'hand zooms take the new depth');
+});
