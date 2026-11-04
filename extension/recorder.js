@@ -96,6 +96,7 @@ class Drift {
             document.getElementById('startBtn').disabled = false;
 
             this.screenStream.getVideoTracks()[0].onended = () => {
+                if (this.mediaRecorder?.state === 'recording') this.stopRecording();
                 btn.textContent = '🖥️ Select screen';
                 btn.classList.remove('selected');
                 document.getElementById('startBtn').disabled = true;
@@ -176,6 +177,10 @@ class Drift {
         this.mediaRecorder.onstop = () => {
             // Cleanup Audio Context
             if (this.audioContext) this.audioContext.close();
+            this.screenStream?.getTracks().forEach(track => track.stop());
+            this.micStream?.getTracks().forEach(track => track.stop());
+            this.screenStream = null;
+            this.micStream = null;
             this.onStop();
         };
         this.mediaRecorder.start(100);
