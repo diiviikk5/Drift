@@ -1618,10 +1618,8 @@ export default function RecorderPage() {
             }
             // Built-in backgrounds load by id, uploads from the saved image;
             // anything else (removed backgrounds) falls back to the default.
-            const builtIn = BACKGROUNDS[project.background];
-            const upload = !builtIn && project.customBackground && !String(project.customBackground).startsWith('/')
-                ? project.customBackground : null;
-            const bgKey = builtIn || upload ? project.background : DEFAULT_BACKGROUND;
+            const upload = project.customBackground;
+            const bgKey = Object.hasOwn(BACKGROUNDS, project.background) ? project.background : DEFAULT_BACKGROUND;
             let image = null;
             const imageSrc = upload || BACKGROUNDS[bgKey]?.src;
             if (imageSrc) {
