@@ -31,3 +31,15 @@ test('foreign files and invalid timelines are rejected', async () => {
         focusSegments: [{ startTime: 3, endTime: 1, zoomScale: 2 }] });
     await assert.rejects(decodeProject(file), /Invalid zoom track/);
 });
+
+test('import preserves embedded backgrounds and drops URLs', async () => {
+    const recording = new Blob(['screen']);
+    for (const [customBackground, expected] of [
+        ['https://example.invalid/pixel', null],
+        ['//example.invalid/pixel', null],
+        ['data:image/png;base64,AA==', 'data:image/png;base64,AA=='],
+    ]) {
+        const project = await decodeProject(await encodeProject({ recording, duration: 5, customBackground }));
+        assert.equal(project.customBackground, expected);
+    }
+});

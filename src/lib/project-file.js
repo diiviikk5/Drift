@@ -39,6 +39,8 @@ export async function decodeProject(file) {
     const offset = 12 + length;
     return {
         ...state,
+        customBackground: typeof state.customBackground === 'string' &&
+            /^data:image\/[\w.+-]+;base64,/i.test(state.customBackground) ? state.customBackground : null,
         recording: file.slice(offset, offset + sizes[0], manifest.recording.type),
         webcam: sizes[1] ? file.slice(offset + sizes[0], file.size, manifest.webcam.type) : null,
     };
