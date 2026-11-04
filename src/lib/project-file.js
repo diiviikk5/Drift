@@ -1,5 +1,7 @@
 const MAGIC = 'DRIFT001';
 const MAX_MANIFEST_BYTES = 16 * 1024 * 1024;
+const MAX_DURATION_SECONDS = 24 * 60 * 60;
+const TRACKS = ['focusSegments', 'clicks', 'moves', 'annotations', 'captions', 'keystrokes', 'caret', 'cursorShapes', 'blurRegions'];
 
 export async function encodeProject({ recording, webcam = null, ...state }) {
     if (!(recording instanceof Blob) || !recording.size) throw new Error('A recording is required.');
@@ -27,9 +29,24 @@ export async function decodeProject(file) {
     if (!sizes.every(size => Number.isSafeInteger(size) && size >= 0) || sizes[0] === 0 ||
         12 + length + sizes[0] + sizes[1] !== file.size) throw new Error('Project media is incomplete.');
     const state = manifest.state;
-    if (!state || !Number.isFinite(state.duration) || state.duration <= 0) throw new Error('Invalid recording duration.');
-    for (const field of ['focusSegments', 'clicks', 'moves', 'annotations', 'captions', 'keystrokes']) {
-        if (state[field] !== undefined && !Array.isArray(state[field])) throw new Error(`Invalid ${field}.`);
+    if (!state || !Number.isFinite(state.duration) || state.duration <= 0 || state.duration > MAX_DURATION_SECONDS) {
+        throw new Error('Invalid recording duration.');
+    }
+    for (const field of TRACKS) {
+        const track = state[field];
+        if (track !== undefined && (!Array.isArray(track) || track.some(entry => !entry || typeof entry !== 'object' || Array.isArray(entry)))) {
+            throw new Error(`Invalid ${field}.`);
+        }
+    }
+    // Cursor tracks are resampled on a fixed-rate grid. Bound the timestamp span
+    // before any track reaches the renderer. Allow a little capture-end drift.
+    for (const field of ['clicks', 'moves']) {
+        for (const sample of state[field] ?? []) {
+            const time = sample.timeMs ?? sample.time ?? sample.t ?? 0;
+            if (!Number.isFinite(time) || time < -1000 || time > (state.duration + 5) * 1000) {
+                throw new Error(`Invalid ${field} timestamp.`);
+            }
+        }
     }
     if ((state.focusSegments || []).some(segment => !Number.isFinite(segment.startTime) ||
         !Number.isFinite(segment.endTime) || segment.startTime < 0 || segment.endTime <= segment.startTime ||
