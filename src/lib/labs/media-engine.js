@@ -5,18 +5,13 @@
  * 
  * Priority order for maximum speed:
  * 1. Canvas API for images (instant, native)
- * 2. WebCodecs API for video (hardware GPU encoding)
- * 3. FFmpeg stream copy for containers (instant, no re-encoding)
- * 4. FFmpeg WASM ultrafast (fallback)
+ * 2. FFmpeg stream copy for containers (instant, no re-encoding)
+ * 3. FFmpeg WASM ultrafast (re-encoding)
  */
 
 // ============================================
 // FEATURE DETECTION
 // ============================================
-
-export function supportsWebCodecs() {
-    return typeof VideoEncoder !== 'undefined' && typeof VideoDecoder !== 'undefined';
-}
 
 export function supportsOffscreenCanvas() {
     return typeof OffscreenCanvas !== 'undefined';
@@ -74,7 +69,7 @@ export async function convertImageWithCanvas(file, outputFormat, quality = 0.92)
 }
 
 // ============================================
-// VIDEO CONVERSIONS (WebCodecs + FFmpeg hybrid)
+// VIDEO CONVERSIONS
 // ============================================
 
 /**
@@ -97,19 +92,7 @@ export async function convertVideoSmart(file, outputExt, ffmpegArgs, onProgress)
         return convertFileWithFFmpeg(file, outputExt, ['-c', 'copy', '-movflags', '+faststart'], onProgress);
     }
 
-    // 2. Try WebCodecs for hardware-accelerated encoding
-    if (supportsWebCodecs() && outputExt === 'mp4') {
-        try {
-            console.log('[Engine] Attempting WebCodecs hardware encoding');
-            const { convertVideoWithWebCodecs } = await import('./webcodecs-engine.js');
-            return await convertVideoWithWebCodecs(file, onProgress);
-        } catch (e) {
-            console.warn('[Engine] WebCodecs failed:', e.message, '- falling back to FFmpeg');
-        }
-    }
-
-    // 3. Fall back to FFmpeg WASM with ultrafast settings
-    console.log('[Engine] Using FFmpeg WASM (ultrafast preset)');
+    // Re-encode through FFmpeg to preserve the audio stream.
     const { convertFileWithFFmpeg } = await import('./ffmpeg.js');
     return convertFileWithFFmpeg(file, outputExt, ffmpegArgs, onProgress);
 }
@@ -130,16 +113,6 @@ export async function extractAudioFast(file, onProgress) {
  * Compress video with quality setting
  */
 export async function compressVideoSmart(file, quality, onProgress) {
-    // Try WebCodecs first for much faster compression
-    if (supportsWebCodecs()) {
-        try {
-            const { convertVideoWithWebCodecs } = await import('./webcodecs-engine.js');
-            return await convertVideoWithWebCodecs(file, onProgress);
-        } catch (e) {
-            console.warn('[Engine] WebCodecs compression failed:', e.message);
-        }
-    }
-
     const { compressVideo } = await import('./ffmpeg.js');
     return compressVideo(file, quality, onProgress);
 }
@@ -216,8 +189,6 @@ export function getConversionSpeedTier(inputExt, outputExt, category) {
 
     if (category === 'audio') return 'fast';
 
-    // Check if WebCodecs will be used (hardware accelerated)
-    if (supportsWebCodecs() && outputExt === 'mp4') return 'fast';
 
     return 'medium'; // FFmpeg WASM
 }
@@ -230,7 +201,7 @@ export function estimateConversionTime(fileSize, inputExt, outputExt, category) 
         case 'instant':
             return Math.max(0.5, mbSize * 0.05);
         case 'fast':
-            return Math.max(2, mbSize * 0.5); // WebCodecs ~2x realtime
+            return Math.max(2, mbSize * 0.5); // Audio conversion
         case 'medium':
             return Math.max(10, mbSize * 3); // FFmpeg WASM
         default:
