@@ -18,7 +18,7 @@
 
     // Track clicks
     document.addEventListener('mousedown', (e) => {
-        if (!isTracking) return;
+        if (!isTracking || !e.isTrusted) return;
         chrome.runtime.sendMessage({
             type: 'CLICK_EVENT',
             screenX: e.screenX,
@@ -30,7 +30,7 @@
     // Track mouse movement (throttled 15fps)
     let lastMove = 0;
     document.addEventListener('mousemove', (e) => {
-        if (!isTracking) return;
+        if (!isTracking || !e.isTrusted) return;
         const now = Date.now();
         if (now - lastMove > 60) { // ~15fps
             lastMove = now;
@@ -45,7 +45,7 @@
 
     // KEYBOARD SHORTCUT: Ctrl+Shift+X to stop recording
     document.addEventListener('keydown', (e) => {
-        if (e.ctrlKey && e.shiftKey && e.key === 'X') {
+        if (isTracking && e.isTrusted && !e.repeat && e.ctrlKey && e.shiftKey && e.key === 'X') {
             e.preventDefault();
             chrome.runtime.sendMessage({ type: 'TOGGLE_RECORDING_HOTKEY' }).catch(() => { });
         }
