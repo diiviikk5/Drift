@@ -36,6 +36,7 @@ chrono = "0.4"
 dirs-next = "2.0"
 cpal = "0.15"
 hound = "3.5"
+tempfile = "3"
 tauri-plugin-updater = "2"
 
 [target.'cfg(windows)'.dependencies]
