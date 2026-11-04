@@ -190,7 +190,7 @@ export async function minimizeWindow() {
     }
 }
 
-/** Freeze a monitor for area selection: returns { image_path, width, height }. */
+/** Freeze a monitor for area selection: returns { png, width, height }. */
 export async function enterAreaPicker(monitorIndex = 0) {
     if (!isTauri()) throw new Error('Area recording needs the desktop app');
     const api = await getTauriApi();
