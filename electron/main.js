@@ -14,6 +14,23 @@ try {
 }
 
 let mainWindow;
+let rendererOrigin;
+
+function isTrustedRendererUrl(url) {
+    try {
+        return new URL(url).origin === rendererOrigin;
+    } catch {
+        return false;
+    }
+}
+
+function requireTrustedRenderer(event) {
+    if (event.sender !== mainWindow?.webContents ||
+        event.senderFrame !== event.sender.mainFrame ||
+        !isTrustedRendererUrl(event.senderFrame.url)) {
+        throw new Error('Untrusted IPC sender');
+    }
+}
 
 // Hotkey configuration with defaults
 let hotkeyConfig = {
@@ -68,6 +85,13 @@ function getKeycode(key) {
 }
 
 function createWindow(productionUrl) {
+    const startUrl = process.env.ELECTRON_START_URL || productionUrl || 'http://localhost:3000/recorder';
+    const rendererUrl = new URL(startUrl);
+    if (rendererUrl.protocol !== 'http:' || !['localhost', '127.0.0.1', '[::1]'].includes(rendererUrl.hostname)) {
+        throw new Error('Drift requires a loopback renderer URL');
+    }
+    rendererOrigin = rendererUrl.origin;
+
     let dims = { width: 800, height: 600 };
     try {
         const { width, height } = screen.getPrimaryDisplay().workAreaSize;
@@ -87,7 +111,12 @@ function createWindow(productionUrl) {
         }
     });
 
-    const startUrl = process.env.ELECTRON_START_URL || productionUrl || 'http://localhost:3000/recorder';
+    const guardNavigation = (event, url) => {
+        if (!isTrustedRendererUrl(url)) event.preventDefault();
+    };
+    mainWindow.webContents.on('will-navigate', guardNavigation);
+    mainWindow.webContents.on('will-redirect', guardNavigation);
+    mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     console.log('[Drift Main] Loading URL:', startUrl);
     mainWindow.loadURL(startUrl);
 
@@ -165,7 +194,8 @@ function setupInputHooks() {
 }
 
 // IPC Handlers
-ipcMain.handle('GET_SOURCES', async () => {
+ipcMain.handle('GET_SOURCES', async (event) => {
+    requireTrustedRenderer(event);
     try {
         const sources = await desktopCapturer.getSources({
             types: ['window', 'screen'],
@@ -182,11 +212,13 @@ ipcMain.handle('GET_SOURCES', async () => {
     }
 });
 
-ipcMain.handle('GET_HOTKEYS', () => {
+ipcMain.handle('GET_HOTKEYS', (event) => {
+    requireTrustedRenderer(event);
     return hotkeyConfig;
 });
 
 ipcMain.handle('SET_HOTKEYS', (event, hotkeys) => {
+    requireTrustedRenderer(event);
     hotkeyConfig = hotkeys;
     saveHotkeys();
     return hotkeyConfig;
