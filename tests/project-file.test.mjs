@@ -31,3 +31,11 @@ test('foreign files and invalid timelines are rejected', async () => {
         focusSegments: [{ startTime: 3, endTime: 1, zoomScale: 2 }] });
     await assert.rejects(decodeProject(file), /Invalid zoom track/);
 });
+
+test('import rejects timestamps that would make the renderer allocate unbounded tracks', async () => {
+    const recording = new Blob(['screen']);
+    const duration = await encodeProject({ recording, duration: 1e20 });
+    await assert.rejects(decodeProject(duration), /Invalid recording duration/);
+    const moves = await encodeProject({ recording, duration: 5, moves: [{ time: 1e20 }] });
+    await assert.rejects(decodeProject(moves), /Invalid moves timestamp/);
+});
