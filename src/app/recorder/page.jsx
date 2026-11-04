@@ -683,12 +683,16 @@ export default function RecorderPage() {
     }, [sourceArea]);
 
     const monitorIndexOf = (src) => (typeof src === 'number' ? src : (parseInt(String(src || '0').replace(/\D+/g, ''), 10) || 0));
+    const areaBackdropUrl = areaPicker?.imageUrl;
+    useEffect(() => {
+        if (areaBackdropUrl) return () => URL.revokeObjectURL(areaBackdropUrl);
+    }, [areaBackdropUrl]);
 
     const handlePickArea = async () => {
         try {
             const backdrop = await drift.enterAreaPicker(monitorIndexOf(selectedSource));
-            const url = await drift.resolveAssetUrl(backdrop.image_path);
-            setAreaPicker({ imageUrl: `${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`, width: backdrop.width, height: backdrop.height });
+            const png = new Blob([Uint8Array.from(backdrop.png)], { type: 'image/png' });
+            setAreaPicker({ imageUrl: URL.createObjectURL(png), width: backdrop.width, height: backdrop.height });
         } catch (e) {
             setNotice(`Couldn't open the area picker: ${e?.message || e}`);
             try { await drift.exitAreaPicker(); } catch {}

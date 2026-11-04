@@ -24,7 +24,7 @@ pub struct AreaPickerState(Mutex<Option<SavedWindow>>);
 #[derive(Debug, Serialize)]
 pub struct AreaBackdrop {
     /// PNG of the monitor at native resolution.
-    pub image_path: String,
+    pub png: Vec<u8>,
     pub width: u32,
     pub height: u32,
 }
@@ -66,13 +66,14 @@ pub async fn enter_area_picker(
             return Err(e);
         }
     };
-    let dir = dirs_next::data_local_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join("Drift");
-    let _ = std::fs::create_dir_all(&dir);
-    let path = dir.join("area-backdrop.png");
-    image::save_buffer(&path, &rgba, w, h, image::ExtendedColorType::Rgba8)
-        .map_err(|e| format!("Failed to save the screenshot: {}", e))?;
+    let mut png = Vec::new();
+    let encoder = image::codecs::png::PngEncoder::new(&mut png);
+    if let Err(e) =
+        image::ImageEncoder::write_image(encoder, &rgba, w, h, image::ExtendedColorType::Rgba8)
+    {
+        let _ = window.show();
+        return Err(format!("Failed to encode the screenshot: {}", e));
+    }
 
     // Fullscreen overlay on that monitor.
     if window.is_maximized().unwrap_or(false) {
@@ -86,7 +87,7 @@ pub async fn enter_area_picker(
     let _ = window.set_focus();
 
     Ok(AreaBackdrop {
-        image_path: path.to_string_lossy().to_string(),
+        png,
         width: d.width,
         height: d.height,
     })
