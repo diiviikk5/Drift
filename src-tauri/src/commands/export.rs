@@ -196,11 +196,10 @@ pub async fn convert_webm_to_mp4(
     }));
 
     // Write WebM to temp file
-    let temp_dir = std::env::temp_dir().join("drift-export");
-    std::fs::create_dir_all(&temp_dir)
+    let temp_dir = tempfile::Builder::new().prefix("drift-export-").tempdir()
         .map_err(|e| format!("Failed to create temp dir: {}", e))?;
 
-    let input_path = temp_dir.join("input.webm");
+    let input_path = temp_dir.path().join("input.webm");
     std::fs::write(&input_path, &webm_data)
         .map_err(|e| format!("Failed to write temp WebM: {}", e))?;
 
@@ -259,9 +258,8 @@ pub async fn convert_webm_to_mp4(
 
     let app_clone = app.clone();
     let output_path_clone = output_path.clone();
-    let input_path_clone = input_path.clone();
-
     let result = tokio::task::spawn_blocking(move || -> Result<String, String> {
+        let _temp_dir = temp_dir;
         let output = quiet_command(&ffmpeg)
             .args(&args)
             .stdin(Stdio::null())
@@ -269,9 +267,6 @@ pub async fn convert_webm_to_mp4(
             .stderr(Stdio::piped())
             .output()
             .map_err(|e| format!("Failed to run ffmpeg: {}", e))?;
-
-        // Clean up temp input
-        let _ = std::fs::remove_file(&input_path_clone);
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
