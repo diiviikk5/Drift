@@ -14,35 +14,7 @@
     "global-shortcut:allow-is-registered",
     "dialog:default",
     "dialog:allow-save",
-    "fs:default",
-    "fs:allow-read-file",
     "fs:allow-write-file",
-    {
-      "identifier": "fs:scope",
-      "allow": [
-        {
-          "path": "$VIDEO/**"
-        },
-        {
-          "path": "$TEMP/**"
-        },
-        {
-          "path": "$DOWNLOAD/**"
-        },
-        {
-          "path": "$HOME/**"
-        },
-        {
-          "path": "$DESKTOP/**"
-        },
-        {
-          "path": "$DOCUMENT/**"
-        },
-        {
-          "path": "**"
-        }
-      ]
-    },
     "shell:default",
     "process:default",
     "updater:default",
