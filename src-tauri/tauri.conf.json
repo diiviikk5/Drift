@@ -33,7 +33,10 @@
       "assetProtocol": {
         "enable": true,
         "scope": [
-          "**"
+          "$LOCALDATA/Drift/sessions/**",
+          "$LOCALDATA/Drift/area-backdrop.png",
+          "$VIDEO/drift-recording-*.mp4",
+          "$TEMP/drift-recording-*.mp4"
         ]
       }
     }
