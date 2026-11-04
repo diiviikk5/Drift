@@ -162,4 +162,4 @@ jobs:
             gh release create "$TAG" --target "$GITHUB_SHA" --title "Drift Recorder $VERSION" \
               --notes "Drift Recorder $VERSION for Windows, macOS and Linux. Downloads: https://drift.dvkk.dev"
           fi
-          gh release upload "$TAG" dist-desktop/* --clobber
+          gh release upload "$TAG" dist-desktop/*
