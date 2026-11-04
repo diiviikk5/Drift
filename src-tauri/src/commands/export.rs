@@ -132,17 +132,6 @@ fn detect_encoder(ffmpeg: &PathBuf, use_hw: bool) -> EncoderConfig {
     }
 }
 
-fn resolve_output_path(path: &str) -> String {
-    if path.is_empty() {
-        let videos_dir = dirs_next::video_dir()
-            .unwrap_or_else(|| std::env::temp_dir());
-        let filename = format!("drift-recording-{}.mp4", chrono::Local::now().format("%Y%m%d-%H%M%S"));
-        videos_dir.join(filename).to_string_lossy().to_string()
-    } else {
-        path.to_string()
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConvertConfig {
     #[serde(default = "default_crf")]
@@ -153,9 +142,6 @@ pub struct ConvertConfig {
     pub fps: u32,
     #[serde(default)]
     pub use_hw_accel: bool,
-    /// If empty, auto-generates path in Videos folder
-    #[serde(default)]
-    pub output_path: String,
 }
 
 fn default_crf() -> u32 { 18 }
@@ -169,7 +155,6 @@ impl Default for ConvertConfig {
             preset: "medium".to_string(),
             fps: 60,
             use_hw_accel: true,
-            output_path: String::new(),
         }
     }
 }
@@ -204,17 +189,11 @@ pub async fn convert_webm_to_mp4(
     std::fs::write(&input_path, &webm_data)
         .map_err(|e| format!("Failed to write temp WebM: {}", e))?;
 
-    // Determine output path
-    let output_path = if cfg.output_path.is_empty() {
-        resolve_output_path("")
-    } else {
-        cfg.output_path.clone()
-    };
-
-    if let Some(parent) = std::path::Path::new(&output_path).parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create output dir: {}", e))?;
-    }
+    let output_path = dirs_next::video_dir()
+        .unwrap_or_else(std::env::temp_dir)
+        .join(format!("drift-recording-{}.mp4", uuid::Uuid::new_v4()))
+        .to_string_lossy()
+        .into_owned();
 
     let encoder = detect_encoder(&ffmpeg, cfg.use_hw_accel);
 
@@ -226,7 +205,7 @@ pub async fn convert_webm_to_mp4(
 
     // Build ffmpeg command
     let mut args: Vec<String> = vec![
-        "-y".into(),
+        "-n".into(),
         "-i".into(), input_path.to_string_lossy().to_string(),
         "-c:v".into(), encoder.codec.clone(),
         "-pix_fmt".into(), "yuv420p".into(),
